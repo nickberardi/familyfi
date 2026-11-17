@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { apiCompatibility } from "@/lib/api-compat";
-import { CLIENT_SCOPES, CLIENT_TYPES, clientTypeFrom, legacyClient, mayHoldScope, scopeFor, scopeWord } from "@/lib/client-type";
+import { CLIENT_SCOPES, mayHoldScope } from "@/lib/client-type";
 import { parsePairingCode } from "@/lib/pairing-code";
 
 describe("client types and scopes", () => {
@@ -16,22 +16,6 @@ describe("client types and scopes", () => {
     expect(mayHoldScope("app-watch", "rulesOnly")).toBe(false);
     expect(mayHoldScope("watch", "app:rulesOnly")).toBe(false);
     expect(mayHoldScope("agent", null)).toBe(false);
-  });
-
-  it("answers installed apps with the older client and scope words", () => {
-    expect(CLIENT_TYPES.map(legacyClient)).toEqual(["app", "watch", "app", "me", "agent"]);
-    expect(["app:full", "app:rulesOnly", "agent:readOnly", "me:askOnly"].map(scopeWord)).toEqual(["full", "rulesOnly", "readOnly", "askOnly"]);
-    expect(scopeFor("agent", "readOnly")).toBe("agent:readOnly");
-    expect(scopeFor("agent", "rulesOnly")).toBeNull();
-  });
-
-  it("reads an older request's client and scope as a client type", () => {
-    expect(clientTypeFrom("app")).toBe("app");
-    expect(clientTypeFrom("phone")).toBe("app");
-    expect(clientTypeFrom("app", "rulesOnly")).toBe("app-controls");
-    expect(clientTypeFrom("watch", "rulesOnly")).toBe("app-watch");
-    expect(clientTypeFrom("agent", "full")).toBe("agent");
-    expect(clientTypeFrom("browser")).toBeNull();
   });
 
   it("reads a pairing code's client type, and a code without one from an older server", () => {

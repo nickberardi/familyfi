@@ -61,7 +61,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A write-only `serviceToken` puts an `own` `cloudflare` route behind Cloudflare Access (a different token replaces it); `edgeAuth: none` turns Access off; any other route is 409 `access_unsupported`. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off. Any update clears the route's reachability evidence |
 | POST | `/api/v1/connection/endpoints/{id}/check` | Checks from home whether a route the household runs answers as this FamilyFi: it requests the route's `/api/v1/connection/identity` with the route's own trust and Access token and compares `instanceId`. Stores and returns `reachability`; a `quick` or `domain` route is 409 `managed_route` |
 | GET/PUT | `/api/v1/connection/tunnel` | Remote access: publish one route — `off`, `quick`, or `named` with a `hostname` (FamilyFi's Cloudflare tunnel on your domain) or an `endpointId` (a route you run). Every other route is turned off. A published route you run always reports `status: running`; `reachability` says whether it works: `reachedAt`, the last request the remote-access port answered through it (written at most once a minute), and FamilyFi's own last check (`checkedAt`, `result`, `message`), run once on publish and on request. Publishing again clears it. Clients never show such a route as on without that evidence |
-| POST | `/api/v1/paired/invites` | Invite a device to join. An administrator invites a phone, tablet or Mac (`client: app`; `phone` is its deprecated alias; its route, the administrator it signs in as; five minutes) or an agent (`client: agent`, `scope`; fifteen minutes, home network only) and gets a single-use `code`. With `?claim=true`, a signed-in paired app invites and claims its Watch, or its own sign-in for Siri and shortcuts (`client: app`, `scope: rulesOnly`), in one call |
+| POST | `/api/v1/paired/invites` | Invite a device to join. An administrator invites a phone, tablet or Mac (`clientType: app`; its route, the administrator it signs in as; five minutes) or an agent (`clientType: agent`, `scope`; fifteen minutes, home network only) and gets a single-use `code`. With `?claim=true`, a signed-in paired app invites and claims its Watch, or its own sign-in for Siri and shortcuts (`clientType: app-controls`), in one call |
 | GET/PUT | `/api/v1/connection/home` | Administrator reads or sets the home network address: where FamilyFi is inside the home (an http or https origin, 400 `invalid_home_url` otherwise; `null` clears it), apart from the route remote access publishes. Both answer `current`, the address this request reached and whether it is `private`, which stands in while none is saved. Agents pair there |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/paired/invites/{id}` | Administrator reads an invite's status (`pending`, `claimed`, `expired`) or cancels it early |
@@ -241,21 +241,19 @@ The iPhone invites and claims its reachable Watch in one call (`POST /paired/inv
 without an administrator: the Watch makes no network call to join, the phone hands it its bearer,
 refresh token and manifest, and the phone is recorded as its parent. The Watch acts as the phone's
 account, appears as a separate device in System → Pair Device, and can be revoked there, by itself
-or by its phone. Its scope is `rulesOnly`: its sessions may only read session,
+or by its phone. Its scope is `app:rulesOnly`: its sessions may only read session,
 connection, group, rule and change state, pause, resume, extend and allow any group, and pause,
 resume, extend, allow, disallow, turn on and turn off any rule, or lift one for a single group; role never limits a control. They cannot
 create, edit or delete rules. A phone may set up several Watches. Revoking or removing the phone
 revokes its Watches too; signing the phone out does not. It renews its own bearer with its own
 refresh token.
 
-The app pairs as `app`, whether it runs on a phone, a tablet or a Mac. `phone` is the name it had
-before 1.1.0: the server still accepts it in an invite and in `?client=`, reads it as `app`, and
-never answers with it. It is deprecated.
+The app pairs as `app`, whether it runs on a phone, a tablet or a Mac.
 
 An app's Siri, Shortcuts and system controls (Control Center, Quick Settings) run outside the app.
 They never use the app's own tokens: two holders of one rotating refresh token end the sign-in
 (403 `refresh_reused`). The app instead sets up a second sign-in for them with the same call
-(`client: app`, `scope: rulesOnly`, and a `clientId` the app makes once and keeps), and stores the
+(`clientType: app-controls` and a `clientId` the app makes once and keeps), and stores the
 answer where its native code reads it. That is its own paired device, `app:rulesOnly`, with the
 Watch's list and the app as its parent, listed in System → Pair Device in its platform's words ("Siri and Shortcuts on" an
 iPhone, "Quick Settings and shortcuts on" an Android phone). Setting it up again with the same `clientId` replaces the earlier record, so an app has
@@ -285,7 +283,7 @@ household-settings changes or connection management (403 `agent_scope`). It
 is refused through FamilyFi's remote access tunnel (403 `agent_remote`), at its claim, its refresh
 and every call; like browser sign-in, an
 address the household publishes itself is the household's choice. Agents are paired devices: they appear in `GET /paired/devices` with
-`client: agent`, an administrator may change their scope, and they are revoked like a phone, by an
+`clientType: agent`, an administrator may change their scope, and they are revoked like a phone, by an
 administrator or by themselves. The
 [authorization matrix](../tests/integration/authorization-matrix.test.ts) names, for each route,
 which device scopes may call it.
@@ -321,11 +319,10 @@ A client type holds only the scopes in its row, and a device holding any other a
 phone, tablet or Mac always pairs as `app`, and a Watch and an app's Siri and shortcuts enroll with
 `app:rulesOnly`; an administrator chooses an agent's scope when connecting it.
 
-The API answers both in the fields installed apps already read, unchanged: `client` (`app`,
-`watch`, `agent`; `app-controls` is `app`) and `scope` without its group (`full`, `rulesOnly`,
-`readOnly`). Since API 1.6.0 it adds `clientType`. Requests take `clientType`, or the older `client`
-words (`watch` is `app-watch`, `app` with `scope: rulesOnly` is `app-controls`, `phone` is `app`),
-which stay accepted.
+The API names them the same way everywhere: `clientType`, and `scope` as its whole value
+(`agent:full`). API 1.6.0 removed the older words (`client` with `phone`, `app` or `watch`, and
+scopes without their group) from requests and responses, so `x-min-app` and `x-min-server` rose to
+1.6.0 with it: an app built before it is told to update.
 
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may
 accept a pin change only in a manifest signed by the already trusted key; any other identity
@@ -359,7 +356,7 @@ An app and a server on different contract versions can each send something the o
 - **`x-min-app-watch`**: the oldest watch app API version this server still serves. The watches read only a few routes, so most breaking changes never reach them; until CI can tell which do, it is set by hand (0.30.0).
 - **`x-min-me`**: the oldest FamilyFi Me API version this server still serves, set by hand like `x-min-app-watch` (it started at 1.6.0).
 
-Any of them may rise on purpose and none ever falls or passes `info.version`. `scripts/ci/check-openapi-floors.mjs` (`make test-api-floors`) enforces the rule against the base branch, in CI's first job, `contract`, before the long jobs start. Their first values came from replaying the rule over the document's history: 0.34 and 0.36 broke old apps, and 0.36 added required response fields, so both start at 0.36.0. `x-min-app-watch` started at 0.30.0, set by hand.
+Any of them may rise on purpose and none ever falls or passes `info.version`. `scripts/ci/check-openapi-floors.mjs` (`make test-api-floors`) enforces the rule against the base branch, in CI's first job, `contract`, before the long jobs start. Their first values came from replaying the rule over the document's history: 0.34 and 0.36 broke old apps, and 0.36 added required response fields, so both started at 0.36.0; 1.6.0 removed the older client words and raised both to 1.6.0. `x-min-app-watch` started at 0.30.0, set by hand.
 
 `GET /api/v1/health` reports `apiVersion` (this document's `info.version`), `minAppApiVersion` (`x-min-app`) and `minWatchApiVersion` (`x-min-app-watch`) to anyone, in every answer. A client that names its client type, `GET /api/v1/health?client=me`, also gets `minApiVersion`, its own floor from the server's table (`MIN_API_VERSION_BY_CLIENT` in `src/lib/api-compat.ts`): `x-min-app` for `app` and `agent`, `x-min-app-watch` for `app-watch` and `app-controls`, `x-min-me` for `me`. A client type the server does not know, or a server before 1.6.0, sends none, and the client falls back to the two fields above. A client that can meet a server of another version, the companion app, compares them before it reads the household (`src/lib/api-compat.ts`, and the household store's `checkCompatibility`):
 
@@ -373,4 +370,4 @@ Pairing makes the same check after the household's identity verifies and before 
 
 ### Values that grow
 
-A list the server is expected to extend, such as `CheckupCheck` or a paired device's `client` (`PairedClient`), is declared with `x-extensible-enum` instead of `enum`, so adding a value is a minor version and not a breaking change. A client must accept a value it does not know. Where such a value is shown to the user, the object also carries a `Message`: a `key` (for example `checkup.leftover_policies`) that the client looks up in its own localized copy, and `text`, a short English line. A client with no copy for the key shows `text` and adds its own note that a newer app shows more. Clients keep their copy and localization; the server's `text` is only the fallback.
+A list the server is expected to extend, such as `CheckupCheck` or a paired device's `clientType` (`ClientType`), is declared with `x-extensible-enum` instead of `enum`, so adding a value is a minor version and not a breaking change. A client must accept a value it does not know. Where such a value is shown to the user, the object also carries a `Message`: a `key` (for example `checkup.leftover_policies`) that the client looks up in its own localized copy, and `text`, a short English line. A client with no copy for the key shows `text` and adds its own note that a newer app shows more. Clients keep their copy and localization; the server's `text` is only the fallback.

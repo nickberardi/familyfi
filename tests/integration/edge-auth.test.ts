@@ -48,7 +48,7 @@ async function protectedRoute(auth: SessionAuth) {
 }
 
 async function pairPhone(auth: SessionAuth, endpointId: string, name: string) {
-  const issued = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "app", endpointId, displayName: name })));
+  const issued = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { clientType: "app", endpointId, displayName: name })));
   const pairing = await issuedPairing(issued);
   const claim = await claimPairing(
     request(`/api/v1/paired/invites/${pairing.id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: pairing.token, deviceName: name }) }),
@@ -235,7 +235,7 @@ describe("Cloudflare Access service tokens", () => {
   it("never hands the token to an agent, in its pairing code or its claim", async () => {
     const auth = await adminAuth();
     await protectedRoute(auth);
-    const pairing = await issuedPairing(await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { client: "agent", displayName: "Agent", scope: "full" }))));
+    const pairing = await issuedPairing(await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { clientType: "agent", displayName: "Agent", scope: "agent:full" }))));
     expect(pairing.payload).not.toHaveProperty("access");
     const claim = await claimPairing(
       request(`/api/v1/paired/invites/${pairing.id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: pairing.token, deviceName: "Agent" }) }),

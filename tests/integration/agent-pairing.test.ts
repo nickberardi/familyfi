@@ -41,7 +41,7 @@ async function adult(): Promise<SessionAuth> {
 }
 
 async function agentPairing(auth: SessionAuth, scope: "readOnly" | "full", headers: Record<string, string> = {}) {
-  return createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: { ...json, ...headers }, body: JSON.stringify({ client: "agent", displayName: "Claude Code", scope }) }));
+  return createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: { ...json, ...headers }, body: JSON.stringify({ clientType: "agent", displayName: "Claude Code", scope: `agent:${scope}` }) }));
 }
 
 function claim(issued: { inviteId: string; token: string }, headers: Record<string, string> = {}) {
@@ -84,7 +84,7 @@ describe("paired agents", () => {
     expect(claimed).not.toHaveProperty("connection");
     expect(new Date(claimed.session.expiresAt).getTime() - Date.now()).toBeLessThanOrEqual(60 * 60 * 1000);
     expect(new Date(claimed.refreshExpiresAt).getTime() - Date.now()).toBeGreaterThan(89 * 24 * 60 * 60 * 1000);
-    expect(claimed.device).toMatchObject({ displayName: "Claude Code on a MacBook", scope: "full" });
+    expect(claimed.device).toMatchObject({ displayName: "Claude Code on a MacBook", scope: "agent:full" });
     const device = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: claimed.device.id } });
     expect(device.clientType).toBe("agent");
     expect(device.accountId).toBe((await prisma().account.findUniqueOrThrow({ where: { username: "parent" } })).id);
@@ -137,7 +137,7 @@ describe("paired agents", () => {
     expect(await errorCode(again)).toBe("invalid_pairing");
     // Only phones and Watches, which may work away from home, get a route and manifest.
     expect(claimed).not.toHaveProperty("connection");
-    expect(claimed.device).toMatchObject({ client: "agent", scope: "readOnly" });
+    expect(claimed.device).toMatchObject({ clientType: "agent", scope: "agent:readOnly" });
 
     const parent = await prisma().account.findUniqueOrThrow({ where: { username: "parent" } });
     await expect(inviteAgent({ url: TEST_ORIGIN, displayName: "Agent", scope: "app:rulesOnly", createdByAccountId: parent.id })).rejects.toThrow(/cannot hold/);
@@ -255,7 +255,7 @@ describe("paired agents", () => {
     const auth = await adult();
     const { claimed } = await connectedAgent(auth, "readOnly");
     const { devices } = (await (await listDevices(request("/api/v1/paired/devices", { auth }))).json()) as { devices: { id: string; client: string; scope: string }[] };
-    expect(devices.find((device) => device.id === claimed.device.id)).toMatchObject({ client: "agent", scope: "readOnly" });
+    expect(devices.find((device) => device.id === claimed.device.id)).toMatchObject({ clientType: "agent", scope: "agent:readOnly" });
   });
 
   it("serves the guide without a session, with this address, and the spec to an agent's bearer", async () => {

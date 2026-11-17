@@ -90,7 +90,7 @@ export function enrollWatch(request: ApiRequest, watchId: string, displayName?: 
   const name = displayName?.trim();
   return request<WatchEnrollment>("/api/v1/paired/invites?claim=true", {
     method: "POST",
-    body: { client: "watch", clientId: watchId.toLowerCase(), ...(name ? { displayName: name } : {}) },
+    body: { clientType: "app-watch", clientId: watchId.toLowerCase(), ...(name ? { displayName: name } : {}) },
   });
 }
 
@@ -131,7 +131,7 @@ export function watchProvisioning(
 
 /** The Watches this phone set up that still work, from the devices the phone may see. */
 export async function listWatches(request: ApiRequest, phoneDeviceId: string): Promise<PairedPhone[]> {
-  const { devices } = await request<{ devices: PairedPhone[] }>("/api/v1/paired/devices?client=watch&status=active");
+  const { devices } = await request<{ devices: PairedPhone[] }>("/api/v1/paired/devices?clientType=app-watch&status=active");
   return devices.filter((device) => device.parentDeviceId === phoneDeviceId);
 }
 

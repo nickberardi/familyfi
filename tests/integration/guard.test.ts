@@ -34,7 +34,7 @@ async function guarded(guard: keyof typeof GUARDS, incoming: Request) {
 
 async function agent(): Promise<SessionAuth> {
   const created = await invite(
-    request("/api/v1/paired/invites", { method: "POST", auth: await pairingAdminAuth(), headers: { "content-type": "application/json" }, body: JSON.stringify({ client: "agent", displayName: "Claude Code", scope: "full" }) }),
+    request("/api/v1/paired/invites", { method: "POST", auth: await pairingAdminAuth(), headers: { "content-type": "application/json" }, body: JSON.stringify({ clientType: "agent", displayName: "Claude Code", scope: "agent:full" }) }),
   );
   expect(created.status).toBe(201);
   const claimed = await claimInvite(await issuedInvite(created), "Claude Code on a MacBook");

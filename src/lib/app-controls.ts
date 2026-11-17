@@ -8,8 +8,8 @@ import { watchProvisioning, type WatchEnrollment, type WatchProvisioning } from 
 /**
  * An app's controls: Siri, Shortcuts and the system's own switches run outside the app, where the
  * app's session cannot be shared safely, because two holders of one rotating refresh token end the
- * sign-in. So the app sets up one paired device for them, as it sets up a Watch: the same client
- * (`app`) with the `rulesOnly` scope, its own bearer and refresh token, and the app as its parent,
+ * sign-in. So the app sets up one paired device for them, as it sets up a Watch: client type
+ * `app-controls` with the `app:rulesOnly` scope, its own bearer and refresh token, and the app as its parent,
  * so unpairing or revoking the app ends it too. Each app has at most one.
  */
 
@@ -40,7 +40,7 @@ export function appControlsName(platform: AppControlsPlatform, deviceName: strin
 export function enrollAppControls(request: ApiRequest, controlsId: string, platform: AppControlsPlatform, deviceName?: string | null): Promise<WatchEnrollment> {
   return request<WatchEnrollment>("/api/v1/paired/invites?claim=true", {
     method: "POST",
-    body: { client: "app", scope: "rulesOnly", clientId: controlsId.toLowerCase(), displayName: appControlsName(platform, deviceName) },
+    body: { clientType: "app-controls", clientId: controlsId.toLowerCase(), displayName: appControlsName(platform, deviceName) },
   });
 }
 
@@ -58,7 +58,7 @@ export function appControlsProvisioning(
 
 /** This app's controls that still work, from the devices the app may see, or null. */
 export async function findAppControls(request: ApiRequest, appDeviceId: string): Promise<PairedPhone | null> {
-  const { devices } = await request<{ devices: PairedPhone[] }>("/api/v1/paired/devices?client=app&status=active");
+  const { devices } = await request<{ devices: PairedPhone[] }>("/api/v1/paired/devices?clientType=app-controls&status=active");
   return devices.find((device) => isAppControls(device) && device.parentDeviceId === appDeviceId) ?? null;
 }
 

@@ -37,7 +37,7 @@ async function household() {
   const auth = await admin();
   const phone = await pairPhone(auth);
   const watch = (await (await claimWatchRequest(bearer(phone.token))).json()) as Claim;
-  const agentInvite = await issuedInvite(await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ client: "agent", displayName: "Agent", scope: "readOnly" }) })));
+  const agentInvite = await issuedInvite(await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ clientType: "agent", displayName: "Agent", scope: "agent:readOnly" }) })));
   const agent = (await (await claimInvite(agentInvite, "Agent")).json()) as Claim;
   return { auth, phone, watch, agent };
 }
@@ -51,15 +51,15 @@ describe("/paired/devices", () => {
     const { auth, phone, watch, agent } = await household();
     const all = await list(auth);
     expect(all.map((device) => device.id).sort()).toEqual([phone.device.id, watch.device.id, agent.device.id].sort());
-    expect(all.find((device) => device.id === watch.device.id)).toMatchObject({ client: "watch", scope: "rulesOnly", parentDeviceId: phone.device.id, actsAs: { username: PAIRING_ADMIN.username } });
+    expect(all.find((device) => device.id === watch.device.id)).toMatchObject({ clientType: "app-watch", scope: "app:rulesOnly", parentDeviceId: phone.device.id, actsAs: { username: PAIRING_ADMIN.username } });
 
-    expect((await list(auth, "?client=agent")).map((device) => device.id)).toEqual([agent.device.id]);
-    expect((await list(auth, "?client=app&client=watch")).map((device) => device.id).sort()).toEqual([phone.device.id, watch.device.id].sort());
+    expect((await list(auth, "?clientType=agent")).map((device) => device.id)).toEqual([agent.device.id]);
+    expect((await list(auth, "?clientType=app&clientType=app-watch")).map((device) => device.id).sort()).toEqual([phone.device.id, watch.device.id].sort());
 
     expect((await revoke(agent.device.id, auth)).status).toBe(200);
     expect((await list(auth, "?status=active")).map((device) => device.id)).not.toContain(agent.device.id);
     expect((await list(auth, "?status=revoked")).map((device) => device.id)).toEqual([agent.device.id]);
-    expect((await listDevices(request("/api/v1/paired/devices?client=tablet", { auth }))).status).toBe(400);
+    expect((await listDevices(request("/api/v1/paired/devices?clientType=watch", { auth }))).status).toBe(400);
   });
 
   it("lets a phone set up several Watches, each listed under it", async () => {
@@ -68,7 +68,7 @@ describe("/paired/devices", () => {
     const first = (await (await claimWatchRequest(bearer(phone.token))).json()) as Claim;
     const second = (await (await claimWatchRequest(bearer(phone.token), { clientId: "0f7b2c4e-2d7a-4b0e-9c1d-5a6e7f8091a2" })).json()) as Claim;
     expect(first.device.id).not.toBe(second.device.id);
-    const watches = await list(bearer(phone.token), "?client=watch&status=active");
+    const watches = await list(bearer(phone.token), "?clientType=app-watch&status=active");
     expect(watches.map((device) => device.id).sort()).toEqual([first.device.id, second.device.id].sort());
     expect(watches.every((device) => device.parentDeviceId === phone.device.id)).toBe(true);
   });
@@ -97,23 +97,18 @@ describe("/paired/devices", () => {
     expect(renamed.status).toBe(200);
     expect(((await renamed.json()) as { device: { displayName: string } }).device.displayName).toBe("Kitchen iPhone");
 
-    const widened = await patch(agent.device.id, { scope: "full" });
-    expect(((await widened.json()) as { device: { scope: string } }).device.scope).toBe("full");
-    const whole = await patch(agent.device.id, { scope: "agent:readOnly" });
-    expect(((await whole.json()) as { device: { scope: string } }).device.scope).toBe("readOnly");
-    expect((await patch(agent.device.id, { scope: "app:full" })).status).toBe(400);
-    expect((await patch(phone.device.id, { scope: "agent:full" })).status).toBe(400);
-    await patch(agent.device.id, { scope: "full" });
-    const invalid = await patch(agent.device.id, { scope: "rulesOnly" });
+    const widened = await patch(agent.device.id, { scope: "agent:full" });
+    expect(((await widened.json()) as { device: { scope: string } }).device.scope).toBe("agent:full");
+    // Only an agent's own two scopes, named whole, are offered.
+    for (const scope of ["full", "readOnly", "app:full", "app:rulesOnly"]) expect((await patch(agent.device.id, { scope })).status, scope).toBe(400);
+    const invalid = await patch(phone.device.id, { scope: "agent:readOnly" });
     expect(invalid.status).toBe(400);
     expect(((await invalid.json()) as { error: { code: string } }).error.code).toBe("invalid_scope");
-    expect((await patch(phone.device.id, { scope: "readOnly" })).status).toBe(400);
     // An app is `full` or its own `rulesOnly` sign-in from the start: neither ever becomes the other.
-    const controls = (await (await claimWatchRequest(bearer(phone.token), { client: "app", scope: "rulesOnly", clientId: "7b0c2f4e-5a1d-4c3b-9e8f-2d6a1b0c9e7f" })).json()) as Claim;
-    const promoted = await patch(controls.device.id, { scope: "full" });
+    const controls = (await (await claimWatchRequest(bearer(phone.token), { clientType: "app-controls", clientId: "7b0c2f4e-5a1d-4c3b-9e8f-2d6a1b0c9e7f" })).json()) as Claim;
+    const promoted = await patch(controls.device.id, { scope: "agent:full" });
     expect(promoted.status).toBe(400);
     expect(((await promoted.json()) as { error: { code: string } }).error.code).toBe("invalid_scope");
-    expect((await patch(phone.device.id, { scope: "rulesOnly" })).status).toBe(400);
     expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: controls.device.id } })).scope).toBe("app:rulesOnly");
     expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: phone.device.id } })).scope).toBe("app:full");
     // Renaming it is still allowed.
@@ -170,7 +165,7 @@ describe("/paired/devices", () => {
     // The phone pairs a second phone, which pairs an agent and its own Watch, and leaves an invite waiting.
     const second = (await (await claimInvite(await issuedInvite(await invitePhoneRequest(bearer(phone.token), { endpointId, displayName: "iPad" })), "iPad")).json()) as Claim;
     const watch = (await (await claimWatchRequest(bearer(second.token))).json()) as Claim;
-    const agentCode = await issuedInvite(await createInvite(request("/api/v1/paired/invites", { method: "POST", auth: bearer(second.token), headers: json, body: JSON.stringify({ client: "agent", displayName: "Agent", scope: "readOnly" }) })));
+    const agentCode = await issuedInvite(await createInvite(request("/api/v1/paired/invites", { method: "POST", auth: bearer(second.token), headers: json, body: JSON.stringify({ clientType: "agent", displayName: "Agent", scope: "agent:readOnly" }) })));
     const agent = (await (await claimInvite(agentCode, "Agent")).json()) as Claim;
     const pending = await issuedInvite(await invitePhoneRequest(bearer(second.token), { endpointId, displayName: "Spare" }));
     // A phone paired from the browser is nobody's companion, and stays.

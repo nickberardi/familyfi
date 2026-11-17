@@ -21,7 +21,7 @@ describe("app controls", () => {
     expect(supportsAppControls("soon")).toBe(false);
   });
 
-  it("enroll with the claim call, as the app client with the rulesOnly scope and a lowercased id", async () => {
+  it("enroll with the claim call, as the app-controls client type with a lowercased id", async () => {
     const calls: { path: string; init: unknown }[] = [];
     const request = (async (path: string, init?: unknown) => {
       calls.push({ path, init });
@@ -31,16 +31,16 @@ describe("app controls", () => {
     expect(calls).toEqual([
       {
         path: "/api/v1/paired/invites?claim=true",
-        init: { method: "POST", body: { client: "app", scope: "rulesOnly", clientId: "abcdef12-0000-4000-8000-000000000000", displayName: "Siri and Shortcuts on Kitchen iPad" } },
+        init: { method: "POST", body: { clientType: "app-controls", clientId: "abcdef12-0000-4000-8000-000000000000", displayName: "Siri and Shortcuts on Kitchen iPad" } },
       },
     ]);
   });
 
   it("find only this app's own rulesOnly sign-in, never another app it paired", async () => {
     const devices = [
-      { id: "other", client: "app", scope: "rulesOnly", parentDeviceId: "app-2" },
-      { id: "paired-phone", client: "app", scope: "full", parentDeviceId: "app-1" },
-      { id: "mine", client: "app", scope: "rulesOnly", parentDeviceId: "app-1" },
+      { id: "other", clientType: "app-controls", scope: "app:rulesOnly", parentDeviceId: "app-2" },
+      { id: "paired-phone", clientType: "app", scope: "app:full", parentDeviceId: "app-1" },
+      { id: "mine", clientType: "app-controls", scope: "app:rulesOnly", parentDeviceId: "app-1" },
     ] as PairedPhone[];
     const paths: string[] = [];
     const request = (async (path: string) => {
@@ -49,7 +49,7 @@ describe("app controls", () => {
     }) as never;
     expect((await findAppControls(request, "app-1"))?.id).toBe("mine");
     expect(await findAppControls(request, "app-3")).toBeNull();
-    expect(paths[0]).toBe("/api/v1/paired/devices?client=app&status=active");
+    expect(paths[0]).toBe("/api/v1/paired/devices?clientType=app-controls&status=active");
   });
 
   describe("set up", () => {

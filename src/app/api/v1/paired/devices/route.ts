@@ -3,11 +3,11 @@ import { withAdmin, withSession } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { listPairedDevices } from "@/server/paired-devices";
 
-/** Paired devices the caller may see: `?client=` (repeatable) and `?status=active|revoked` narrow it. */
+/** Paired devices the caller may see: `?clientType=` (repeatable) and `?status=active|revoked` narrow it. */
 export async function GET(request: Request) {
   return withSession(request, async (session) => {
     const params = new URL(request.url).searchParams;
-    const devices = await listPairedDevices(session, { client: params.getAll("client"), status: params.get("status") ?? undefined });
+    const devices = await listPairedDevices(session, { clientType: params.getAll("clientType"), status: params.get("status") ?? undefined });
     return Response.json({ devices });
   });
 }

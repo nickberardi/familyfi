@@ -113,7 +113,7 @@ app runs on, as a link in the app's own scheme (`src/lib/pairing-link.ts`); all 
 same string, and the app confirms the household before it claims any of them. A code that carries a Cloudflare Access token is never offered as a link: a custom scheme belongs to whichever app registered it. The single-use claim in any other code accepts that risk: an app that registered the scheme first could claim it, which the Pair Device sheet would show as an unexpected device. A phone invites and claims its Watch itself (`?claim=true`). Pairing establishes both
 device trust and the account the device acts as; the device's scope bounds what that session may
 do, and the server checks it on each request. A Watch gets its own device identity and its
-narrower `rulesOnly` scope. Only administrators sign in or have paired devices: an adult without
+narrower `app:rulesOnly` scope. Only administrators sign in or have paired devices: an adult without
 administrator access has no sign-in, session or device, and demoting one ends all three (see the
 [invariant](../AGENTS.md#invariants)).
 

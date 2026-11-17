@@ -89,7 +89,7 @@ describe("watch", () => {
       return {};
     }) as never;
     await enrollWatch(request, "ABC-123");
-    expect(sent).toEqual([["/api/v1/paired/invites?claim=true", { method: "POST", body: { client: "watch", clientId: "abc-123" } }]]);
+    expect(sent).toEqual([["/api/v1/paired/invites?claim=true", { method: "POST", body: { clientType: "app-watch", clientId: "abc-123" } }]]);
   });
 
   it("names the Watch when its platform tells the phone its name, and leaves a blank one to the household", async () => {
@@ -101,8 +101,8 @@ describe("watch", () => {
     await enrollWatch(request, "wear-1", "  Pixel Watch 3 ");
     await enrollWatch(request, "wear-2", "   ");
     expect(sent).toEqual([
-      { method: "POST", body: { client: "watch", clientId: "wear-1", displayName: "Pixel Watch 3" } },
-      { method: "POST", body: { client: "watch", clientId: "wear-2" } },
+      { method: "POST", body: { clientType: "app-watch", clientId: "wear-1", displayName: "Pixel Watch 3" } },
+      { method: "POST", body: { clientType: "app-watch", clientId: "wear-2" } },
     ]);
   });
 
@@ -153,7 +153,7 @@ describe("watch", () => {
     await removeWatch(request, { id: "w1" });
     await renameWatch(request, { id: "w1" }, "  Kitchen Watch ");
     expect(sent).toEqual([
-      ["/api/v1/paired/devices?client=watch&status=active", undefined],
+      ["/api/v1/paired/devices?clientType=app-watch&status=active", undefined],
       ["/api/v1/paired/devices/w1", { method: "DELETE" }],
       ["/api/v1/paired/devices/w1", { method: "PATCH", body: { displayName: "Kitchen Watch" } }],
     ]);

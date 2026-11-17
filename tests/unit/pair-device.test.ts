@@ -23,14 +23,13 @@ import {
   showAllLabel,
   splitPhones,
 } from "@/lib/pair-device";
-import { ApiError } from "@/lib/api-client";
 import type { Account, ConnectionRoute, PairedPhone } from "@/lib/types";
 
 const phone = (over: Partial<PairedPhone> = {}): PairedPhone => ({
   id: "p1",
   displayName: "A phone",
-  client: "app",
-  scope: "full",
+  clientType: "app",
+  scope: "app:full",
   actsAs: { username: "admin", displayName: "An adult" },
   parentDeviceId: null,
   enrolledAt: "2026-09-01T12:00:00Z",
@@ -70,7 +69,7 @@ describe("pair device", () => {
 
   it("asks before revoking or removing, in the web's words", () => {
     expect(revokeConfirm(phone())).toMatchObject({ title: "Revoke A phone?", message: "It is signed out now and must be paired again. Its shortcuts and system controls, and any Watch, phone or agent it paired, stop working too." });
-    expect(revokeConfirm(phone({ client: "watch", displayName: "A Watch" }))).toMatchObject({ title: "Revoke A Watch?", message: "It is signed out now and must be paired again." });
+    expect(revokeConfirm(phone({ clientType: "app-watch", displayName: "A Watch" }))).toMatchObject({ title: "Revoke A Watch?", message: "It is signed out now and must be paired again." });
     expect(removeConfirm(phone())).toMatchObject({ title: "Remove A phone from the list?", message: "This can't be undone; setup would be needed again." });
     expect(removeAllConfirm(3)).toMatchObject({ title: "Remove all 3 revoked devices from the list?", message: "This can't be undone." });
     expect(showAllLabel(12)).toBe("Show all 12 devices");
@@ -80,7 +79,7 @@ describe("pair device", () => {
 
   it("describes every device the same way: access, how it reaches home, and its dates", () => {
     const now = new Date("2026-09-14T20:00:00Z");
-    const session = (id: string, expiresAt: string) => ({ id, username: "admin", client: "app" as const, expiresAt, createdAt: "2026-09-14T12:00:00Z" });
+    const session = (id: string, expiresAt: string) => ({ id, username: "admin", expiresAt, createdAt: "2026-09-14T12:00:00Z" });
     const lines = phoneLines(phone({ actsAs: { username: "admin", displayName: "An adult" }, sessions: [session("s2", "2026-12-14T12:00:00Z"), session("s1", "2026-10-14T12:00:00Z")] }), now);
     expect(lines.tags.map((tag) => tag.label)).toEqual(["Full access", "An adult"]);
     expect(lines.tags[1].name).toBe("Acts as An adult");
@@ -112,8 +111,8 @@ describe("pair device", () => {
     const tones = (over: Partial<PairedPhone>) => phoneLines(phone(over), now).tags.map((tag) => tag.tone);
     expect(tones({ alerts: true })).toEqual(["green", "neutral", "green"]);
     expect(tones({ alerts: false })).toEqual(["green", "neutral", "yellow"]);
-    expect(tones({ scope: "rulesOnly" })[0]).toBe("blue");
-    expect(tones({ scope: "readOnly" })[0]).toBe("red");
+    expect(tones({ scope: "app:rulesOnly" })[0]).toBe("blue");
+    expect(tones({ scope: "agent:readOnly" })[0]).toBe("red");
   });
 
   it("offers Re-pair on any phone, active or revoked, but not the one showing the list", () => {
@@ -122,49 +121,34 @@ describe("pair device", () => {
     expect(canRepair(phone(), { canPair: true, selfId: phone().id })).toBe(false);
     expect(canRepair(phone(), { canPair: true, selfId: "another-phone" })).toBe(true);
     expect(canRepair(phone(), { canPair: false })).toBe(false);
-    expect(canRepair(phone({ client: "watch" }), { canPair: true })).toBe(false);
-    expect(canRepair(phone({ client: "agent" }), { canPair: true })).toBe(false);
+    expect(canRepair(phone({ clientType: "app-watch" }), { canPair: true })).toBe(false);
+    expect(canRepair(phone({ clientType: "agent" }), { canPair: true })).toBe(false);
     // An app's own Siri and shortcuts sign-in is the app client too, and is never re-paired.
-    expect(canRepair(phone({ scope: "rulesOnly" }), { canPair: true })).toBe(false);
+    expect(canRepair(phone({ clientType: "app-controls", scope: "app:rulesOnly" }), { canPair: true })).toBe(false);
   });
 
-  it("reads an older server's phone as the app, and tells an app from its Siri and shortcuts by scope", () => {
+  it("tells an app from its Siri and shortcuts by client type", () => {
     expect(isApp(phone())).toBe(true);
-    expect(isApp(phone({ client: "phone" }))).toBe(true);
-    expect(isApp(phone({ scope: "rulesOnly" }))).toBe(false);
-    expect(isApp(phone({ client: "watch", scope: "rulesOnly" }))).toBe(false);
-    expect(isAppControls(phone({ scope: "rulesOnly" }))).toBe(true);
+    expect(isApp(phone({ clientType: "app-controls", scope: "app:rulesOnly" }))).toBe(false);
+    expect(isApp(phone({ clientType: "app-watch", scope: "app:rulesOnly" }))).toBe(false);
+    expect(isAppControls(phone({ clientType: "app-controls", scope: "app:rulesOnly" }))).toBe(true);
     expect(isAppControls(phone())).toBe(false);
-    expect(isAppControls(phone({ client: "watch", scope: "rulesOnly" }))).toBe(false);
-    expect(revokeConfirm(phone({ client: "phone" })).message).toContain("stop working too");
-    expect(revokeConfirm(phone({ scope: "rulesOnly", displayName: "Siri and Shortcuts on A phone" }))).toMatchObject({
+    expect(isAppControls(phone({ clientType: "app-watch", scope: "app:rulesOnly" }))).toBe(false);
+    expect(revokeConfirm(phone({ clientType: "app-controls", scope: "app:rulesOnly", displayName: "Siri and Shortcuts on A phone" }))).toMatchObject({
       title: "Revoke Siri and Shortcuts on A phone?",
       message: "They stop working now, until you next open FamilyFi on that device. The app itself stays paired.",
     });
-    expect(removeConfirm(phone({ scope: "rulesOnly" })).message).toBe("This can't be undone.");
+    expect(removeConfirm(phone({ clientType: "app-controls", scope: "app:rulesOnly" })).message).toBe("This can't be undone.");
   });
 
-  it("invites a phone as the app, and as the deprecated phone only when an older server refuses app", async () => {
-    const sent: string[] = [];
-    const server = (accepts: string[]) =>
-      (async (_path: string, init: { body: { client: string } }) => {
-        sent.push(init.body.client);
-        if (!accepts.includes(init.body.client)) throw new ApiError("A phone needs its name and route.", 400, "invalid_request");
-        return { invite: { id: "i" } };
-      }) as never;
-    await invitePhone(server(["app", "phone"]), { endpointId: "r1", displayName: "iPhone" });
-    expect(sent).toEqual(["app"]);
-    sent.length = 0;
-    await invitePhone(server(["phone"]), { endpointId: "r1", displayName: "iPhone" });
-    expect(sent).toEqual(["app", "phone"]);
-    // Any other refusal is the answer: it is not sent twice.
-    sent.length = 0;
-    const refuses = (async (_path: string, init: { body: { client: string } }) => {
-      sent.push(init.body.client);
-      throw new ApiError("Connection endpoint not found.", 404, "not_found");
+  it("invites a phone as the app", async () => {
+    const sent: unknown[] = [];
+    const server = (async (path: string, init: { body: unknown }) => {
+      sent.push([path, init.body]);
+      return { invite: { id: "i" } };
     }) as never;
-    await expect(invitePhone(refuses, { endpointId: "gone", displayName: "iPhone" })).rejects.toThrow("Connection endpoint not found.");
-    expect(sent).toEqual(["app"]);
+    await invitePhone(server, { endpointId: "r1", displayName: "iPhone" });
+    expect(sent).toEqual([["/api/v1/paired/invites", { clientType: "app", endpointId: "r1", displayName: "iPhone" }]]);
   });
 
   it("titles each step of the pairing sheet", () => {
@@ -211,21 +195,21 @@ describe("pair device", () => {
 
   it("names a device's scope, the adult it acts as, and where it came from", () => {
     expect(phoneLines(phone({ actsAs: null })).tags.map((tag) => tag.label)).toEqual(["Full access"]);
-    const agent = phone({ client: "agent", scope: "readOnly", pairedVia: null, actsAs: { username: "admin", displayName: "An adult" } });
+    const agent = phone({ clientType: "agent", scope: "agent:readOnly", pairedVia: null, actsAs: { username: "admin", displayName: "An adult" } });
     expect(phoneLines(agent).tags.map((tag) => tag.label)).toEqual(["Read only", "An adult"]);
     expect(phoneLines(agent).origin).toBe("On the home network");
-    const watch = phone({ client: "watch", scope: "rulesOnly", pairedVia: null });
+    const watch = phone({ clientType: "app-watch", scope: "app:rulesOnly", pairedVia: null });
     expect(phoneLines(watch).origin).toBe("Paired automatically from an iPhone");
     expect(phoneLines(watch, new Date(), "Kitchen iPhone").origin).toBe("Paired automatically from Kitchen iPhone");
   });
 
   it("names the phone a phone or agent was paired from, which revoking takes it with", () => {
-    const paired = phone({ client: "agent", scope: "readOnly", pairedVia: null });
+    const paired = phone({ clientType: "agent", scope: "agent:readOnly", pairedVia: null });
     expect(phoneLines(paired, new Date(), "Kitchen iPhone").dates).toMatch(/^Paired .+ from Kitchen iPhone/);
     expect(phoneLines(paired).dates).not.toContain(" from ");
-    const watch = phone({ client: "watch", scope: "rulesOnly", pairedVia: null });
+    const watch = phone({ clientType: "app-watch", scope: "app:rulesOnly", pairedVia: null });
     expect(phoneLines(watch, new Date(), "Kitchen iPhone").dates).not.toContain(" from ");
-    const controls = phone({ client: "app", scope: "rulesOnly", pairedVia: null });
+    const controls = phone({ clientType: "app-controls", scope: "app:rulesOnly", pairedVia: null });
     expect(phoneLines(controls, new Date(), "Kitchen iPhone").origin).toBe("Set up automatically by Kitchen iPhone");
     expect(phoneLines(controls).origin).toBe("Set up automatically by the FamilyFi app");
     expect(phoneLines(controls, new Date(), "Kitchen iPhone").dates).not.toContain(" from ");
