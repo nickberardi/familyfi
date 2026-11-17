@@ -207,7 +207,8 @@ and never sent by the server.
 ### Pairing
 
 Every paired device joins through `/paired/invites` and is managed through `/paired/devices`.
-Pairing is the authentication: an invite names the account the device acts as, and claiming it
+Pairing is the authentication: an invite names the account the device acts as (for a child's
+phone, the family group it signs in for: see [FamilyFi Me](#familyfi-me-on-a-childs-phone)), and claiming it
 signs the device in, with no password and no device credential. An administrator invites a phone
 with a five-minute, single-use QR for an enabled route and chooses which administrator it signs in
 as (only administrators have paired phones: an invite for any other account is refused, 400
@@ -249,6 +250,26 @@ revokes its Watches too; signing the phone out does not. It renews its own beare
 refresh token.
 
 The app pairs as `app`, whether it runs on a phone, a tablet or a Mac.
+
+### FamilyFi Me on a child's phone
+
+FamilyFi Me pairs as `me` with `me:askOnly`. An administrator, in a browser or the app, invites it
+like a phone, over a route for five minutes, but names the family group it is for
+(`{ clientType: "me", displayName, endpointId, groupId }`; 400 `family_group_required` for a group
+of things) instead of an account. Its code carries what a phone's does: the route, its pin, and a
+Cloudflare Access token where the route has one, so it reaches the household away from home. It
+signs in for that group and never as an account: its session's `kind` is `me`, its `displayName`
+the group's name and its `username` names the device, and a paired-device listing shows its
+`group` with `actsAs` null. It has no parent device, since it belongs to its group: re-pairing or
+revoking the phone that invited it leaves it alone.
+
+It reads `GET /me/day`, which tells the group's own pause and allowance, the windows of its
+internet rules (each with the days it starts on and its household-time start and end), and the
+rules that block something all the time; nothing else in the household. `src/lib/child-day.ts`
+(`meDaySubject`, `tellDay`) turns that answer into the day FamilyFi Me shows. It renews like any
+paired device, and may revoke itself. Deleting its group revokes it and cancels invites still
+waiting for the group, keeping the record; an import keeps it where its group comes back with the
+same id and revokes it otherwise.
 
 An app's Siri, Shortcuts and system controls (Control Center, Quick Settings) run outside the app.
 They never use the app's own tokens: two holders of one rotating refresh token end the sign-in
@@ -301,7 +322,7 @@ can tell a code meant for another before spending it.
 | `app` | The FamilyFi app on a phone, tablet or Mac | `app:full` |
 | `app-watch` | That app's Watch | `app:rulesOnly` |
 | `app-controls` | That app's Siri, Shortcuts and system controls, which run outside the app | `app:rulesOnly` |
-| `me` | FamilyFi Me on a child's phone (reserved: nothing pairs it yet) | `me:askOnly` |
+| `me` | FamilyFi Me on a child's phone | `me:askOnly` |
 | `agent` | An AI agent | `agent:full` or `agent:readOnly` |
 
 `me-watch` is reserved. The scope is stored as one value, `group:scope`, and each is one explicit
@@ -313,7 +334,7 @@ allowlist in [`src/server/device-scope.ts`](../src/server/device-scope.ts), not 
 | `app:rulesOnly` | Its session, connection manifest, groups, rules and changes; the rule and group-rule verbs; revoking itself (403 `watch_scope` for a Watch, `app_scope` for the app's controls, beyond that) |
 | `agent:full` | Household reads and controls; never accounts, UniFi settings, resolvers, household-settings changes or connection management |
 | `agent:readOnly` | Household reads |
-| `me:askOnly` | Nothing yet: FamilyFi Me's routes come with it |
+| `me:askOnly` | Its session, connection manifest and its own group's day (`GET /me/day`); revoking itself (403 `me_scope` beyond that) |
 
 A client type holds only the scopes in its row, and a device holding any other allows nothing. A
 phone, tablet or Mac always pairs as `app`, and a Watch and an app's Siri and shortcuts enroll with

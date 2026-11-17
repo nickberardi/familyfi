@@ -50,7 +50,7 @@ foreign key.
 | `Household` | Gateway configuration, managed network scope, timezone, desired revision, resolver defaults and connection identity |
 | `Group` → `Device` | Family/Things controls: pause and allowance, as the verbs on the built-in `internet` rule; each discovered network device has an optional group. Unassigned devices are quarantined. |
 | `Account` → `Session` | Login identity and permissions. An account can link to a family group; group membership and authentication are separate concepts. |
-| `PairedDevice` → `Session` | Paired apps (on phones, tablets and Macs), Watches and agents (with their scope, the account they act as, and the parent app of a Watch or of an app's Siri and shortcuts sign-in) and their device-bound sessions. This is distinct from a network `Device`, even if the same physical phone appears in both. |
+| `PairedDevice` → `Session` | Paired apps (on phones, tablets and Macs), Watches, agents and FamilyFi Me on children's phones (with their scope, the account they act as or, for a child's phone, its family group, and the parent app of a Watch or of an app's Siri and shortcuts sign-in) and their device-bound sessions. This is distinct from a network `Device`, even if the same physical phone appears in both. |
 | `ConnectionEndpoint`, `Pairing`, `DeviceEdgeToken` | Routes, one-time enrollment and delivery records for encrypted edge credentials; see [connection guidance](api.md#companion-connection-and-https) |
 | `Rule` → `RuleGroup`, `RuleWindow`, `RulePolicy`; `Group` → `AppPolicy` | A household rule blocks all internet, a DPI category, apps or websites for one or more groups (or managed networks), always or in named windows; `RulePolicy` records one UniFi policy per window and zone. A group's `AppPolicy` is its pause policy, and app policies also represent quarantine. `PolicyOperation` records external write attempts and creation evidence. |
 | `ChangeResult` → `SyncRun` | A requested revision and its outcome versus a reconciliation pass that may settle multiple requests. Actor account/device links attribute the request. |
@@ -115,7 +115,10 @@ device trust and the account the device acts as; the device's scope bounds what 
 do, and the server checks it on each request. A Watch gets its own device identity and its
 narrower `app:rulesOnly` scope. Only administrators sign in or have paired devices: an adult without
 administrator access has no sign-in, session or device, and demoting one ends all three (see the
-[invariant](../AGENTS.md#invariants)).
+[invariant](../AGENTS.md#invariants)). The one exception is FamilyFi Me on a child's phone (`me`,
+`me:askOnly`): its invite names a family group, it signs in for that group as no account, and it
+reads only that group's day ([`src/server/child-day.ts`](../src/server/child-day.ts)); deleting
+the group revokes it ([API](api.md#familyfi-me-on-a-childs-phone)).
 
 Remote routes reach the [phone-only gateway](../src/server/tunnel/phone-gateway.ts), which forwards
 only API traffic, strips cookies and stamps tunnel provenance. The ordinary web UI is not exposed

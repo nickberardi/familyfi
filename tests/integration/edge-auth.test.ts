@@ -47,8 +47,8 @@ async function protectedRoute(auth: SessionAuth) {
   return id;
 }
 
-async function pairPhone(auth: SessionAuth, endpointId: string, name: string) {
-  const issued = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { clientType: "app", endpointId, displayName: name })));
+async function pairPhone(auth: SessionAuth, endpointId: string, name: string, kind: Record<string, unknown> = { clientType: "app" }) {
+  const issued = await createPairing(request("/api/v1/paired/invites", json(auth, "POST", { ...kind, endpointId, displayName: name })));
   const pairing = await issuedPairing(issued);
   const claim = await claimPairing(
     request(`/api/v1/paired/invites/${pairing.id}/claim`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: pairing.token, deviceName: name }) }),
@@ -150,6 +150,16 @@ describe("Cloudflare Access service tokens", () => {
     expect((await addRoute(auth, { url: "https://spaced.example.com", transport: "cloudflare", serviceToken: { clientId: "a b", clientSecret: "c" } })).response.status).toBe(400);
     expect((await addRoute(auth, { url: "https://split.example.com", transport: "cloudflare", serviceToken: { clientId: "a", clientSecret: "c\r\nx-evil: 1" } })).response.status).toBe(400);
     expect((await addRoute(auth, { url: "https://both.example.com", transport: "cloudflare", edgeAuth: "none", serviceToken: TOKEN })).response.status).toBe(400);
+  });
+
+  it("hands the token to a child's phone (FamilyFi Me) as to any phone", async () => {
+    const auth = await adminAuth();
+    const id = await protectedRoute(auth);
+    const group = await prisma().group.create({ data: { kind: "family", name: "Emma" } });
+    const { payload, claimed, bearer } = await pairPhone(auth, id, "Emma's iPhone", { clientType: "me", groupId: group.id });
+    expect(payload).toMatchObject({ clientType: "me", access: TOKEN });
+    expect((await verifiedPayload(claimed.manifest)).edgeCredentials).toEqual([{ endpointId: id, version: 1, ...TOKEN }]);
+    expect((await manifestFor(bearer)).payload.edgeCredentials).toEqual([{ endpointId: id, version: 1, ...TOKEN }]);
   });
 
   it("hands the token to a pairing phone in the pairing code and the claim, and to a paired device's manifest only", async () => {

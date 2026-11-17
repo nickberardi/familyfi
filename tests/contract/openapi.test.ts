@@ -48,6 +48,7 @@ describe("openapi contract", () => {
       "Health.gateway", // only with ?gateway=true, for a session, while ready
       "Household.alertsRelay", // always sent, but servers before 1.4.0 leave it out: required would raise x-min-server
       "PairedDevice.alerts", // only for app:full devices, the only ones that register for alerts
+      "PairedDevice.group", // only for a child's phone (me), which signs in for its group
       "Change.actor", // never to an agent, nor once the adult's account is removed; servers before 1.5.0 leave it out
       "Change.actor.device", // only through a paired device that is still on record, never for a web sign-in
       "Error.error.link", // only where there is somewhere to go next, such as demo_locked

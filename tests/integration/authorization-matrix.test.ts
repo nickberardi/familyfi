@@ -11,7 +11,7 @@
 
 import { readdirSync } from "node:fs";
 import path from "node:path";
-import { AccountKind, SessionKind } from "@prisma/client";
+import { AccountKind, GroupKind, SessionKind } from "@prisma/client";
 import { beforeAll, describe, expect, it } from "vitest";
 import { CSRF_COOKIE, RECOVERY_USERNAME, SESSION_COOKIE } from "@/lib/constants";
 import { createSession, hashPassword } from "@/server/auth";
@@ -41,12 +41,14 @@ const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password"
  * - `agent:full`, `agent:readOnly`, `app-watch` and `app-controls`: a paired device on the home network,
  *   signed in as the administrator: an agent with that scope, the app's Watch, or its Siri, Shortcuts
  *   and system controls, both `app:rulesOnly`. Its scope bounds it, not the account.
+ * - `me`: FamilyFi Me on a child's phone (`me:askOnly`), signed in for a family group and as no account.
  */
 const DEVICE_KINDS = {
   "agent:full": { clientType: "agent", scope: "agent:full" },
   "agent:readOnly": { clientType: "agent", scope: "agent:readOnly" },
   "app-watch": { clientType: "app-watch", scope: "app:rulesOnly" },
   "app-controls": { clientType: "app-controls", scope: "app:rulesOnly" },
+  me: { clientType: "me", scope: "me:askOnly" },
 } as const;
 const DEVICES = Object.keys(DEVICE_KINDS) as (keyof typeof DEVICE_KINDS)[];
 type Device = (typeof DEVICES)[number];
@@ -66,8 +68,9 @@ type Outcome = "allowed" | "401" | "403";
  *   without it.
  * - `refresh-token`: a paired device's refresh token is the credential; no session helps
  *   without it.
+ * - `me`: only a child's phone (FamilyFi Me) has one; every signed-in person gets 403.
  */
-type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "refresh-token";
+type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "refresh-token" | "me";
 
 type Person = Exclude<Caller, Device>;
 
@@ -84,6 +87,7 @@ const EXPECTED: Record<Access, Record<Person, Outcome>> = {
   csrf: { anonymous: "403", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403", "tunnel-bearer": "allowed" },
   "pairing-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403", "tunnel-bearer": "403" },
   "refresh-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403", "tunnel-bearer": "403" },
+  me: { anonymous: "401", member: "401", administrator: "403", recovery: "403", tunnel: "401", "tunnel-bearer": "401" },
 };
 
 /**
@@ -93,7 +97,7 @@ const EXPECTED: Record<Access, Record<Person, Outcome>> = {
 function deviceOutcome(entry: Entry, device: Device): Outcome {
   if (entry.access === "public" || entry.access === "home-network" || entry.access === "csrf") return "allowed";
   if (entry.access === "pairing-token" || entry.access === "refresh-token") return "403";
-  if (entry.devices?.includes(device)) return entry.access === "session" ? "allowed" : "403";
+  if (entry.devices?.includes(device)) return entry.access === "session" || entry.access === "me" ? "allowed" : "403";
   return "403";
 }
 
@@ -112,6 +116,8 @@ type Entry = { access: Access; devices?: readonly Device[]; question?: string };
 
 const READERS: readonly Device[] = ["agent:full", "agent:readOnly"];
 const READERS_AND_WATCH: readonly Device[] = ["agent:full", "agent:readOnly", "app-watch", "app-controls"];
+/** Every paired device, a child's phone included: its own session. */
+const EVERY_DEVICE: readonly Device[] = [...READERS_AND_WATCH, "me"];
 const CONTROLLERS: readonly Device[] = ["agent:full"];
 const CONTROLLERS_AND_WATCH: readonly Device[] = ["agent:full", "app-watch", "app-controls"];
 
@@ -139,9 +145,9 @@ const ACCESS: Record<string, Entry> = {
   "POST /api/v1/auth/login": { access: "home-network" },
   "POST /api/v1/auth/logout": { access: "csrf" },
   "POST /api/v1/auth/refresh": { access: "refresh-token" },
-  "GET /api/v1/auth/session": { access: "session", devices: READERS_AND_WATCH },
+  "GET /api/v1/auth/session": { access: "session", devices: EVERY_DEVICE },
   "GET /api/v1/changes/{id}": { access: "session", devices: READERS_AND_WATCH },
-  "GET /api/v1/connection": { access: "session", devices: ["app-watch", "app-controls"] },
+  "GET /api/v1/connection": { access: "session", devices: ["app-watch", "app-controls", "me"] },
   "GET /api/v1/connection/endpoints": { access: "administrator" },
   "POST /api/v1/connection/endpoints": { access: "administrator" },
   "PUT /api/v1/connection/endpoints/{id}": { access: "administrator" },
@@ -187,6 +193,7 @@ const ACCESS: Record<string, Entry> = {
   "PUT /api/v1/groups/{id}/resolver": { access: "session" },
   "DELETE /api/v1/groups/{id}/resolver": { access: "session" },
   "GET /api/v1/health": { access: "public" },
+  "GET /api/v1/me/day": { access: "me", devices: ["me"] },
   "GET /api/v1/rules": { access: "session", devices: READERS_AND_WATCH },
   "POST /api/v1/rules": { access: "session", devices: CONTROLLERS },
   "GET /api/v1/rules/{id}": { access: "session", devices: READERS },
@@ -291,7 +298,11 @@ async function requestAs(caller: Caller, route: Route): Promise<Request> {
   };
   if (caller === "anonymous") return request(url, init);
   if (isDevice(caller)) {
-    const issued = await createSession({ accountId: accounts.administrator!, username: "matrix-admin", kind: SessionKind.bearer, deviceId: devices[caller] });
+    // A child's phone signs in for its group, as no account.
+    const issued =
+      caller === "me"
+        ? await createSession({ accountId: null, username: `device:${devices.me}`, kind: SessionKind.bearer, deviceId: devices.me })
+        : await createSession({ accountId: accounts.administrator!, username: "matrix-admin", kind: SessionKind.bearer, deviceId: devices[caller] });
     return request(url, { ...init, auth: { cookie: "", csrf: "", token: issued.raw } });
   }
   const viaTunnel = caller === "tunnel" || caller === "tunnel-bearer";
@@ -319,9 +330,12 @@ describe("authorization matrix", () => {
     const member = await prisma().account.create({ data: { username: "matrix-member", displayName: "Member", kind: AccountKind.personal, isAdmin: false, passwordHash } });
     const administrator = await prisma().account.create({ data: { username: "matrix-admin", displayName: "Administrator", kind: AccountKind.personal, isAdmin: true, passwordHash } });
     Object.assign(accounts, { member: member.id, administrator: administrator.id, recovery: recovery.id });
+    const child = await prisma().group.create({ data: { kind: GroupKind.family, name: "Matrix child" } });
     for (const device of DEVICES) {
       const { clientType, scope } = DEVICE_KINDS[device];
-      const created = await prisma().pairedDevice.create({ data: { displayName: device, clientType, scope, accountId: clientType === "agent" ? administrator.id : null } });
+      const created = await prisma().pairedDevice.create({
+        data: { displayName: device, clientType, scope, accountId: clientType === "agent" ? administrator.id : null, groupId: clientType === "me" ? child.id : null },
+      });
       devices[device] = created.id;
     }
   });

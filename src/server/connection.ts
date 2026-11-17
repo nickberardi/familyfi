@@ -196,6 +196,17 @@ export async function removeAccountDevices(accountId: string, db: Db = prisma() 
   return devices.length;
 }
 
+/**
+ * Signs out every child's phone (FamilyFi Me) that signs in for this group: each is revoked, its
+ * record kept, and invites still waiting for the group are cancelled.
+ */
+export async function revokeGroupDevices(groupId: string, db: Db = prisma() as unknown as Db, now = new Date()): Promise<number> {
+  const devices = await db.pairedDevice.findMany({ where: { groupId, revokedAt: null }, select: { id: true } });
+  for (const device of devices) await revokeDevice(device.id, db, now);
+  await db.pairing.updateMany({ where: { groupId, claimedAt: null, expiresAt: { gt: now } }, data: { expiresAt: now } });
+  return devices.length;
+}
+
 /** Deletes every revoked phone's record; the live-test harness alone can leave hundreds. */
 export async function removeRevokedDevices(): Promise<number> {
   return prisma().$transaction(async (db) => {

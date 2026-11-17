@@ -223,6 +223,11 @@ model PairedDevice {
   /// The account this device acts as, fixed by the invite it was paired with.
   accountId       String?
   account         Account?       @relation("pairedDeviceAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  /// A child's phone (FamilyFi Me, `me`) signs in for its family group, never as an account: it has a
+  /// group and no account. Deleting the group revokes the device in code first (src/server/groups.ts),
+  /// so the record and its history stay; the link then clears.
+  groupId         String?
+  group           Group?         @relation("pairedDeviceGroup", fields: [groupId], references: [id], onDelete: SetNull)
   /// The paired device that vouched for this one: a Watch's phone. Revoking the parent revokes the child.
   parentDeviceId  String?
   parentDevice    PairedDevice?  @relation("pairedDeviceParent", fields: [parentDeviceId], references: [id], onDelete: SetNull)
@@ -322,6 +327,9 @@ model Pairing {
   /// made since pairing became the sign-in has one; an older one without it can never be claimed.
   accountId          String?
   account            Account?            @relation("pairingAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  /// The family group a child's phone (`me`) will sign in for, instead of an account.
+  groupId            String?
+  group              Group?              @relation("pairingGroup", fields: [groupId], references: [id], onDelete: SetNull)
   /// The paired device that made this invite for its companion (`claim=true`).
   parentDeviceId     String?
   parentDevice       PairedDevice?       @relation("pairingParentDevice", fields: [parentDeviceId], references: [id], onDelete: SetNull)
@@ -357,6 +365,9 @@ model Group {
   /// longer covers the group reads as all internet.
   blockButtonRuleId String?
   upstreamChecks   UpstreamCheck[]
+  /// FamilyFi Me on the child's phones (`me` paired devices), and their invites.
+  pairedDevices    PairedDevice[]  @relation("pairedDeviceGroup")
+  pairings         Pairing[]       @relation("pairingGroup")
 }
 
 model Account {

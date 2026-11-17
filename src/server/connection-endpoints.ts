@@ -49,7 +49,8 @@ export async function connectionOverview(session: SignedInSession) {
   const [household, lastRun, lastChange] = await Promise.all([
     loadHousehold(),
     prisma().syncRun.findFirst({ orderBy: { startedAt: "desc" } }),
-    prisma().changeResult.findFirst({ where: { actorAccountId: session.accountId ?? undefined }, orderBy: { updatedAt: "desc" } }),
+    // The caller's own last change; a child's phone acts as no account and makes none.
+    session.accountId ? prisma().changeResult.findFirst({ where: { actorAccountId: session.accountId }, orderBy: { updatedAt: "desc" } }) : null,
   ]);
   const manifest = await signedEndpointManifest({ deviceId: session.deviceId });
   return {
