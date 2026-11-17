@@ -15,7 +15,7 @@ import { useWide } from "./use-wide";
 
 /**
  * A group card's identity, shared by every client: a things group's monogram tile, the name with
- * its Online or Blocked badge, the line saying why (`groupStatusParts`, grey unless someone blocked
+ * its Online, Unblocked or Blocked badge, the line saying why (`groupStatusParts`, grey unless someone blocked
  * or unblocked it), and the note line. The card
  * around it (open or closed, marks, actions) belongs to the caller. A stacked card shows a person's
  * monogram too (`mark`), and its note in the card's body instead (`note={false}`).
