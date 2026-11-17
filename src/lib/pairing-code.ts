@@ -16,7 +16,7 @@ export type PairingPayload = {
   /**
    * The client type the invite admits (src/lib/client-type.ts), such as `app` or `agent`, so a
    * client can tell a code meant for another before it spends it. Codes from servers before API
-   * 1.6.0 leave it out; readers ignore fields they do not know, so adding it kept `version` 1.
+   * 2.0.0 leave it out; readers ignore fields they do not know, so adding it kept `version` 1.
    */
   clientType?: string;
   /** The HTTPS origin the phone pairs over. */
@@ -48,7 +48,7 @@ export type PairingCode = {
   keyFingerprint: string;
   /** The code's Access token, which only bootstraps pairing; the manifest delivers the one kept. */
   edgeCredential: EdgeCredential | null;
-  /** The client type the code admits, or null from a server before API 1.6.0. */
+  /** The client type the code admits, or null from a server before API 2.0.0. */
   clientType?: string | null;
 };
 

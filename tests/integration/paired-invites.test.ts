@@ -205,7 +205,7 @@ describe("POST /paired/invites", () => {
     const controls = (await (await claimWatchRequest(bearer(phone.token), { clientType: "app-controls", clientId: "3d6f1a2b-4c5d-4e6f-8a9b-0c1d2e3f4a5b" })).json()) as Claim;
     expect(controls.device).toMatchObject({ clientType: "app-controls", scope: "app:rulesOnly", displayName: "Shortcuts and controls" });
 
-    // The words before API 1.6.0, and a client type this route does not set up, are refused.
+    // The words before API 2.0.0, and a client type this route does not set up, are refused.
     const invite = (body: object) => createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify(body) }));
     expect((await invite({ client: "app", displayName: "iPhone", endpointId: route.id })).status).toBe(400);
     expect((await invite({ client: "phone", displayName: "iPhone", endpointId: route.id })).status).toBe(400);

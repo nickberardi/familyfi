@@ -1,20 +1,20 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 1.6.0
+  version: 2.0.0
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
-  x-min-app: 1.6.0
+  x-min-app: 2.0.0
   # The oldest server API version an app built from this document can read: raised to `version`
   # when a response gains a required field. Apps compile it in; it never leaves the app.
-  x-min-server: 1.6.0
+  x-min-server: 2.0.0
   # The oldest watch app API version this server still serves. The watches read only a few routes,
   # so this is set by hand until CI can tell which changes reach them. GET /api/v1/health reports it
   # as `minWatchApiVersion`.
   x-min-app-watch: 0.30.0
   # The oldest FamilyFi Me API version this server still serves. Set by hand, like x-min-app-watch.
   # GET /api/v1/health?clientType=me reports it as `minApiVersion`.
-  x-min-me: 1.6.0
+  x-min-me: 2.0.0
   # scripts/ci/check-openapi-floors.mjs enforces all three (docs/api.md, "Versioning the contract"):
   # none falls or passes `version`, and CI raises x-min-app and x-min-server where a change needs it.
   description: |
@@ -96,7 +96,7 @@ paths:
             The caller's client type. The response then adds `minApiVersion`, the oldest API version this
             server serves that client type: `x-min-app` for `app` and `agent`, `x-min-app-watch` for
             `app-watch` and `app-controls`, `x-min-me` for `me`. A client type the server does not know
-            gets no `minApiVersion`, and neither does a server before 1.6.0.
+            gets no `minApiVersion`, and neither does a server before 2.0.0.
           schema: { $ref: "#/components/schemas/ClientType" }
       responses:
         "200":
@@ -3204,7 +3204,7 @@ components:
           description: |
             Only with `?clientType=`: the oldest API version this server serves that client type. A client
             whose API version is older must ask to be updated. Absent for a client type the server does
-            not know, and from servers before 1.6.0; read `minAppApiVersion` or `minWatchApiVersion` then.
+            not know, and from servers before 2.0.0; read `minAppApiVersion` or `minWatchApiVersion` then.
         revision:
           type: integer
           minimum: 0
