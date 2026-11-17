@@ -419,7 +419,7 @@ describe("a child's day on the household's clock", () => {
   it("draws a pause set before today from midnight, one with no end to the end of today, and tells no time it doesn't have", () => {
     const pause = { by: "Dad", since: "2026-11-16T22:00:00Z", until: null };
     const { subject, now, clock: day } = meDaySubject(me({ pause }), TUESDAY_MORNING);
-    expect(subject.pause).toEqual({ by: "Dad", from: 0, to: 1440, open: true, earlier: true });
+    expect(subject.pause).toEqual({ by: "Dad", from: 0, to: 1440, open: true });
     const story = tellDay(subject, now, PHONE_VOICE, day);
     expect(story.day.kind).toBe("paused");
     // No end time is told: not "until 12 AM", and nothing later today.
@@ -427,21 +427,21 @@ describe("a child's day on the household's clock", () => {
     expect(story.items).toHaveLength(1);
     expect(story.items[0].detail).toBe("No end time");
     const band = story.bands.find((entry) => entry.kind === "pause")!;
-    expect(bandTimes(band)).toBe("No end time");
-    expect(timelineLegend(story.bands)[0]?.times).toBe("No end time");
+    expect(bandTimes(band)).toBe("no end time");
+    expect(timelineLegend(story.bands)[0]?.times).toBe("no end time");
     const thing = tellDay(subject, now, THING_VOICE, day);
     expect(thingTile(thing)).toMatchObject({ word: "Blocked", line: "No end time" });
     expect(thingNote(thing)).toBe("Blocked with no end time. Ask here and your parents decide.");
-    // Set today with no end: from when it was set, never "until 12 AM".
+    // Set today with no end: no start either (FamilyFi knows when it was last set, not begun), never "until 12 AM".
     const today = meDaySubject(me({ pause: { by: "Dad", since: "2026-11-17T10:00:00Z", until: null } }), TUESDAY_MORNING);
     const told = tellDay(today.subject, today.now, PHONE_VOICE, today.clock);
-    expect(told.items[0].detail).toBe("Since 5 AM, with no end time");
-    expect(bandTimes(told.bands.find((entry) => entry.kind === "pause")!)).toBe("From 5 AM");
-    // Set yesterday with an end today: only its end.
+    expect(told.items[0].detail).toBe("No end time");
+    expect(bandTimes(told.bands.find((entry) => entry.kind === "pause")!)).toBe("no end time");
+    // With an end: only its end.
     const ending = meDaySubject(me({ pause: { by: "Dad", since: "2026-11-16T22:00:00Z", until: "2026-11-17T13:00:00Z" } }), TUESDAY_MORNING);
     const ends = tellDay(ending.subject, ending.now, PHONE_VOICE, ending.clock);
     expect(ends.items[0].detail).toBe("Until 8 AM");
-    expect(bandTimes(ends.bands.find((entry) => entry.kind === "pause")!)).toBe("Until 8 AM");
+    expect(bandTimes(ends.bands.find((entry) => entry.kind === "pause")!)).toBe("until 8 AM");
   });
 
   it("tells a window a parent lifted as allowed until then, and when it comes back", () => {
@@ -462,6 +462,20 @@ describe("a child's day on the household's clock", () => {
     const early = tellDay(evening.subject, evening.now, PHONE_VOICE, evening.clock);
     expect(topAnswer(early).title).toBe("Nothing is blocked");
     expect(early.items.find((item) => item.sign === "window")?.time).toBe("11 PM");
+    expect(topAnswer(early).sentence).toBe("Bedtime starts at 11 PM.");
+    // Its band starts when the lift ends.
+    expect(early.bands.filter((band) => band.kind === "window").map((band) => [band.from, band.to])).toEqual([[23 * 60, 1440]]);
+  });
+
+  it("tells nothing of a window a parent lifted for the whole of it", () => {
+    // Bedtime lifted until 9 AM tomorrow; it is 7 PM.
+    const lifted = { ...bedtime([1]), allowed: { by: "Dad", until: "2026-11-17T14:00:00Z" } };
+    const { subject, now, clock: day } = meDaySubject(me({ windows: [lifted] }), new Date("2026-11-17T00:00:00Z"));
+    const story = tellDay(subject, now, PHONE_VOICE, day);
+    expect(topAnswer(story)).toMatchObject({ title: "Nothing is blocked", sentence: "Nothing is planned for today." });
+    expect(thingTile(tellDay(subject, now, THING_VOICE, day))).toMatchObject({ line: "All day" });
+    expect(story.items.some((item) => item.sign === "window")).toBe(false);
+    expect(story.bands.filter((band) => band.kind === "window")).toEqual([]);
   });
 
   it("names a window by its own name, or else its rule's, and says a pause without a name when FamilyFi did not record who", () => {

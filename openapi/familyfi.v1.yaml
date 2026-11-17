@@ -3429,7 +3429,7 @@ components:
           required: [by, since, until]
           properties:
             by: { type: [string, "null"], description: "Who paused it, as they were named then; null when FamilyFi recorded no person or the recovery account did." }
-            since: { type: string, format: date-time, description: "When the pause was last set: started, or extended." }
+            since: { type: string, format: date-time, description: "When the pause was last set: started, or extended. Not when it began; FamilyFi Me draws from it but tells no start." }
             until: { type: [string, "null"], format: date-time, description: Null until a parent ends it. }
         allowance:
           type: [object, "null"]
