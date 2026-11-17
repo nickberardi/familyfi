@@ -586,7 +586,10 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     // Lifted for now: allowed until then, or until a window starts first, and no internet from then on.
     const { label, allowed } = liftedAlways;
     const by = allowed!.by;
-    const sooner = nextWindow(now);
+    // The window on now, lifted for less than its length, blocks again when its own lift ends.
+    const resumes = window?.allowed && now < window.allowed.until && window.allowed.until < windowEnd ? { ...window, from: window.allowed.until } : undefined;
+    const upcoming = nextWindow(now);
+    const sooner = resumes && (!upcoming || resumes.from <= upcoming.from) ? resumes : upcoming;
     const then = sooner && sooner.from < back! ? sooner : undefined;
     const until = then ? then.from : back!;
     bands.push({ kind: "window", from: back!, to: 1440, label, source: "No internet", times: `from ${clock(back!)}` });
