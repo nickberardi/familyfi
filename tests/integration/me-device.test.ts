@@ -140,7 +140,7 @@ describe("FamilyFi Me on a child's phone", () => {
     expect(tellDay(subject, now, PHONE_VOICE, clock).day.kind).toBe("paused");
   });
 
-  it("leaves out a rule allowed for everyone, or for this group, while it is lifted", async () => {
+  it("marks a window whose rule is lifted until a time, and leaves out a rule lifted with no end or always on", async () => {
     const group = await childGroup();
     const later = new Date(Date.now() + 60 * 60_000);
     const window = { create: [{ position: 0, name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "21:00", end: "07:00" }] };
@@ -151,9 +151,18 @@ describe("FamilyFi Me on a child's phone", () => {
       data: { name: "Games", kind: RuleKind.category, mode: RuleMode.always, targetIds: [8], groups: { create: { groupId: group.id, pauseActive: true, pauseUntil: later, pauseKind: "allow" } } },
     });
     await prisma().rule.create({ data: { name: "Homework", kind: RuleKind.internet, mode: RuleMode.scheduled, groups: { create: { groupId: group.id } }, windows: window } });
+    await prisma().rule.create({
+      data: { name: "Reading", kind: RuleKind.internet, mode: RuleMode.scheduled, groups: { create: { groupId: group.id, pauseActive: true, pauseUntil: null, pauseKind: "allow" } }, windows: window },
+    });
+    // This group's own allowance, by Mom: the later of the two lifts counts.
+    const latest = new Date(Date.now() + 2 * 60 * 60_000);
+    await prisma().ruleGroup.updateMany({ where: { groupId: group.id, rule: { name: "Bedtime" } }, data: { pauseActive: true, pauseUntil: latest, pauseKind: "allow", pausedByName: "Mom" } });
     const claim = await pairMe(admin, group.id);
     const day = (await (await meDay(request("/api/v1/me/day", { auth: bearer(claim.token) }))).json()) as MeDay;
-    expect(day.windows.map((entry) => entry.ruleName)).toEqual(["Homework"]);
+    expect(day.windows.map((entry) => [entry.ruleName, entry.allowed])).toEqual([
+      ["Bedtime", { by: "Mom", until: latest.toISOString() }],
+      ["Homework", null],
+    ]);
     expect(day.alwaysOn).toEqual([]);
   });
 

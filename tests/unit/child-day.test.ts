@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { bandTimes, timelineLegend } from "@/lib/day-timeline";
 
 import {
   INTERNET_VOICE,
@@ -386,7 +387,7 @@ describe("a child's day on the household's clock", () => {
     alwaysOn: [],
     ...patch,
   });
-  const bedtime = (days: number[]) => ({ ruleId: "r1", ruleName: "Bedtime", name: "", days, start: "21:00", end: "07:00" });
+  const bedtime = (days: number[]) => ({ ruleId: "r1", ruleName: "Bedtime", name: "", days, start: "21:00", end: "07:00", allowed: null });
 
   it("counts minutes from the household's midnight, whatever the machine's zone", () => {
     const { clock: day, now } = householdDay(MONDAY_NIGHT, ZONE);
@@ -415,19 +416,52 @@ describe("a child's day on the household's clock", () => {
     expect(bands.map((band) => band.source)).toEqual(["Tue"]);
   });
 
-  it("draws a pause from yesterday from where it began, and one with no end to the end of today", () => {
+  it("draws a pause set before today from midnight, one with no end to the end of today, and tells no time it doesn't have", () => {
     const pause = { by: "Dad", since: "2026-11-16T22:00:00Z", until: null };
     const { subject, now, clock: day } = meDaySubject(me({ pause }), TUESDAY_MORNING);
-    expect(subject.pause).toEqual({ by: "Dad", from: -7 * 60, to: 1440, open: true });
+    expect(subject.pause).toEqual({ by: "Dad", from: 0, to: 1440, open: true, earlier: true });
     const story = tellDay(subject, now, PHONE_VOICE, day);
     expect(story.day.kind).toBe("paused");
     // No end time is told: not "until 12 AM", and nothing later today.
     expect(topAnswer(story)).toMatchObject({ title: "Paused", sentence: "Dad paused your apps." });
     expect(story.items).toHaveLength(1);
-    expect(story.items[0].detail).toBe("Since 5 PM. No end time");
+    expect(story.items[0].detail).toBe("No end time");
+    const band = story.bands.find((entry) => entry.kind === "pause")!;
+    expect(bandTimes(band)).toBe("No end time");
+    expect(timelineLegend(story.bands)[0]?.times).toBe("No end time");
     const thing = tellDay(subject, now, THING_VOICE, day);
     expect(thingTile(thing)).toMatchObject({ word: "Blocked", line: "No end time" });
-    expect(thingNote(thing)).toBe("Blocked. No end time. Ask here and your parents decide.");
+    expect(thingNote(thing)).toBe("Blocked with no end time. Ask here and your parents decide.");
+    // Set today with no end: from when it was set, never "until 12 AM".
+    const today = meDaySubject(me({ pause: { by: "Dad", since: "2026-11-17T10:00:00Z", until: null } }), TUESDAY_MORNING);
+    const told = tellDay(today.subject, today.now, PHONE_VOICE, today.clock);
+    expect(told.items[0].detail).toBe("Since 5 AM, with no end time");
+    expect(bandTimes(told.bands.find((entry) => entry.kind === "pause")!)).toBe("From 5 AM");
+    // Set yesterday with an end today: only its end.
+    const ending = meDaySubject(me({ pause: { by: "Dad", since: "2026-11-16T22:00:00Z", until: "2026-11-17T13:00:00Z" } }), TUESDAY_MORNING);
+    const ends = tellDay(ending.subject, ending.now, PHONE_VOICE, ending.clock);
+    expect(ends.items[0].detail).toBe("Until 8 AM");
+    expect(bandTimes(ends.bands.find((entry) => entry.kind === "pause")!)).toBe("Until 8 AM");
+  });
+
+  it("tells a window a parent lifted as allowed until then, and when it comes back", () => {
+    // Bedtime 9 PM to 7 AM, Dad allowed it until 11 PM; it is 10:30 PM.
+    const allowed = { ...bedtime([1]), allowed: { by: "Dad", until: "2026-11-17T04:00:00Z" } };
+    const { subject, now, clock: day } = meDaySubject(me({ windows: [allowed] }), MONDAY_NIGHT);
+    expect(subject.windows[0].allowed).toEqual({ by: "Dad", until: 23 * 60 });
+    const story = tellDay(subject, now, PHONE_VOICE, day);
+    expect(story.day).toMatchObject({ kind: "extended", until: 23 * 60, by: "Dad" });
+    expect(topAnswer(story)).toMatchObject({ title: "Allowed until 11 PM", sentence: "Dad said yes. Bedtime starts again at 11 PM." });
+    expect(story.items.map((item) => item.title)).toEqual(["Allowed until 11 PM", "Bedtime again", "Not blocked"]);
+    expect(story.bands.find((band) => band.kind === "allowance")).toMatchObject({ from: 21 * 60, to: 23 * 60, source: "Dad said yes" });
+    // With no name: the window is off for now.
+    const nameless = meDaySubject(me({ windows: [{ ...allowed, allowed: { by: null, until: "2026-11-17T04:00:00Z" } }] }), MONDAY_NIGHT);
+    expect(topAnswer(tellDay(nameless.subject, nameless.now, PHONE_VOICE, nameless.clock)).sentence).toBe("Bedtime is off for now. Bedtime starts again at 11 PM.");
+    // Before the window, a lift past its start moves when it starts.
+    const evening = meDaySubject(me({ windows: [allowed] }), new Date("2026-11-17T00:00:00Z"));
+    const early = tellDay(evening.subject, evening.now, PHONE_VOICE, evening.clock);
+    expect(topAnswer(early).title).toBe("Nothing is blocked");
+    expect(early.items.find((item) => item.sign === "window")?.time).toBe("11 PM");
   });
 
   it("names a window by its own name, or else its rule's, and says a pause without a name when FamilyFi did not record who", () => {

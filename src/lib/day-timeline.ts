@@ -19,6 +19,8 @@ export type TimelineBand = {
   tone?: number;
   /** Drawn faintly: the rule is paused or lifted now. */
   dim?: boolean;
+  /** Its times in words, when its from and to don't tell them: a pause with no end, or one set before today. */
+  times?: string;
 };
 
 /** How a band is filled: a token name for its fill, its opacity, and an optional inset outline. */
@@ -74,8 +76,8 @@ function clock(minutes: number): string {
 }
 
 /** "9:30 PM–6:45 AM" for a band. */
-export function bandTimes(band: Pick<TimelineBand, "from" | "to">): string {
-  return `${clock(band.from)}–${clock(band.to)}`;
+export function bandTimes(band: Pick<TimelineBand, "from" | "to" | "times">): string {
+  return band.times ?? `${clock(band.from)}–${clock(band.to)}`;
 }
 
 /** Drawing order: allowances and pauses last, over the windows they change. */
