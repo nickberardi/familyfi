@@ -47,7 +47,7 @@ export async function childDay(groupId: string | null, now = new Date()): Promis
       // group-unblock.ts), so its last update is when the pause was last set.
       ? { by: await childFacingName(shown.suspension.by), since: block.updatedAt.toISOString(), until: shown.suspension.until }
       : null,
-    allowance: shown.allowance.active ? { by: shown.allowance.by?.name ?? null, until: shown.allowance.until } : null,
+    allowance: shown.allowance.active ? { by: await childFacingName(shown.allowance.by), until: shown.allowance.until } : null,
     windows: covering
       .filter((rule) => rule.kind === "internet" && rule.mode === RuleMode.scheduled)
       .flatMap((rule) =>

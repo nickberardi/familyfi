@@ -29,8 +29,20 @@ export type DayWindow = { label: string; from: Clock; to: Clock; days?: number[]
  * window the line names (its `window`), which an app may draw by its name.
  */
 export type DaySign = "pause" | "window" | "allowed" | "morning" | "waiting" | "declined";
-/** `by` is who paused, as they were named then; absent when FamilyFi did not record a person. */
-export type DayPause = { by?: string; from: Clock; to: Clock };
+/**
+ * `by` is who paused, as they were named then; absent when FamilyFi did not record a person.
+ * `open`: the pause has no end time (it lasts until a parent ends it); `to` is then only where its
+ * band stops drawing, and no time is told.
+ */
+export type DayPause = { by?: string; from: Clock; to: Clock; open?: boolean };
+
+/** What a pause with no end time says where a time would go. */
+export const NO_END_TIME = "No end time";
+
+/** "Until 5 PM", or for a pause with no end "No end time". */
+function pauseUntil(pause: DayPause): string {
+  return pause.open ? NO_END_TIME : `Until ${clock(pause.to)}`;
+}
 export type AskLength = 15 | 30 | 60;
 /**
  * A request and its answer: `at` is when it was sent, `answeredAt` when a parent answered, `by`
@@ -253,7 +265,11 @@ export function meDaySubject(me: MeDay, now: Date): { subject: DaySubject; now: 
     return { label: window.name || window.ruleName, from, to: end <= from ? end + 1440 : end, days: window.days };
   });
   const pause = me.pause
-    ? { ...(me.pause.by ? { by: me.pause.by } : {}), from: Math.min(minutesOf(me.pause.since), minutes), to: me.pause.until ? minutesOf(me.pause.until) : 1440 }
+    ? {
+        ...(me.pause.by ? { by: me.pause.by } : {}),
+        from: Math.min(minutesOf(me.pause.since), minutes),
+        ...(me.pause.until ? { to: minutesOf(me.pause.until) } : { to: 1440, open: true }),
+      }
     : undefined;
   return { subject: { windows, ...(pause ? { pause } : {}) }, now: minutes, clock };
 }
@@ -402,7 +418,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       label: voice.pauseWord,
       source: pause.by ? `By ${pause.by}` : voice.pauseWord,
     });
-    const next = nextWindow(pause.to);
+    const next = pause.open ? undefined : nextWindow(pause.to);
     // Only a request to unpause (no length) belongs to a pause; a window's request does not.
     const current = ask?.minutes ? undefined : ask;
     story = current;
@@ -415,12 +431,13 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
           tone: "paused",
           sign: "pause",
           title: pause.by ? `${voice.pauseWord} by ${pause.by}` : voice.pauseWord,
-          detail: `${clock(pause.from)} until ${clock(pause.to)}`,
+          detail: pause.open ? `Since ${clock(pause.from)}. ${NO_END_TIME}` : `${clock(pause.from)} until ${clock(pause.to)}`,
         },
         false,
       ),
       // A window already on when the pause ends carries on; otherwise nothing blocks until the next.
-      ...onwards(pause.to),
+      // A pause with no end has no later today to tell.
+      ...(pause.open ? [] : onwards(pause.to)),
     ];
     day = { kind: "paused", pause, next };
   } else if (window && ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil) {
@@ -556,7 +573,7 @@ export function topAnswer({ day, voice }: DayStory): TopAnswer {
       return {
         sign: "pause",
         tone: "paused",
-        title: `Paused until ${clock(day.pause.to)}`,
+        title: day.pause.open ? voice.pauseWord : `${voice.pauseWord} until ${clock(day.pause.to)}`,
         sentence: day.pause.by ? `${day.pause.by} paused ${voice.whose}.` : voice.pausedByNoOne,
       };
     case "window":
@@ -605,7 +622,7 @@ export function thingTile({ day, ask }: DayStory): {
         tone: "muted",
       };
     const line =
-      ask?.state === "no" ? "Not this time" : `Until ${clock(day.kind === "paused" ? day.pause.to : day.end)}`;
+      ask?.state === "no" ? "Not this time" : day.kind === "paused" ? pauseUntil(day.pause) : `Until ${clock(day.end)}`;
     return day.kind === "paused"
       ? { word: "Blocked", line, tone: "paused" }
       : { word: day.window.label, line, tone: "window" };
@@ -623,7 +640,9 @@ export function thingTile({ day, ask }: DayStory): {
 export function thingNote({ day, ask, items }: DayStory): string {
   const blocked =
     day.kind === "paused"
-      ? `Blocked until ${clock(day.pause.to)}`
+      ? day.pause.open
+        ? `Blocked. ${NO_END_TIME}`
+        : `Blocked until ${clock(day.pause.to)}`
       : day.kind === "window"
         ? `${day.window.label} until ${clock(day.end)}`
         : "";

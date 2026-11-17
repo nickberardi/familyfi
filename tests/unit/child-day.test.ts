@@ -63,6 +63,11 @@ describe("a child's day", () => {
     expect(topAnswer(story).title).toBe("Not blocked until 9 PM");
   });
 
+  it("names the parent who answered, not the one who paused", () => {
+    const story = tellDay({ ...paused, ask: { state: "yes", at: NOW - 5, answeredAt: NOW - 2, by: "Mom" } }, NOW, PHONE_VOICE);
+    expect(topAnswer(story).sentence).toMatch(/^Mom unpaused your apps\./);
+  });
+
   it("asks for a length during a window, and allows that long before the window carries on", () => {
     const window = tellDay({ windows: [BEDTIME] }, 21 * 60, PHONE_VOICE);
     expect(window.items[0]?.ask).toEqual({
@@ -413,8 +418,16 @@ describe("a child's day on the household's clock", () => {
   it("draws a pause from yesterday from where it began, and one with no end to the end of today", () => {
     const pause = { by: "Dad", since: "2026-11-16T22:00:00Z", until: null };
     const { subject, now, clock: day } = meDaySubject(me({ pause }), TUESDAY_MORNING);
-    expect(subject.pause).toEqual({ by: "Dad", from: -7 * 60, to: 1440 });
-    expect(tellDay(subject, now, PHONE_VOICE, day).day.kind).toBe("paused");
+    expect(subject.pause).toEqual({ by: "Dad", from: -7 * 60, to: 1440, open: true });
+    const story = tellDay(subject, now, PHONE_VOICE, day);
+    expect(story.day.kind).toBe("paused");
+    // No end time is told: not "until 12 AM", and nothing later today.
+    expect(topAnswer(story)).toMatchObject({ title: "Paused", sentence: "Dad paused your apps." });
+    expect(story.items).toHaveLength(1);
+    expect(story.items[0].detail).toBe("Since 5 PM. No end time");
+    const thing = tellDay(subject, now, THING_VOICE, day);
+    expect(thingTile(thing)).toMatchObject({ word: "Blocked", line: "No end time" });
+    expect(thingNote(thing)).toBe("Blocked. No end time. Ask here and your parents decide.");
   });
 
   it("names a window by its own name, or else its rule's, and says a pause without a name when FamilyFi did not record who", () => {

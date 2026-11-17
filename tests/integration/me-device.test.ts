@@ -168,6 +168,22 @@ describe("FamilyFi Me on a child's phone", () => {
     expect(day.pause).toMatchObject({ by: null, until: null });
   });
 
+  it("names no one for an allowance the recovery account gave", async () => {
+    const group = await childGroup();
+    const recovery = await prisma().account.findUniqueOrThrow({ where: { username: "admin" } });
+    await prisma().rule.create({
+      data: {
+        name: "Bedtime",
+        kind: RuleKind.internet,
+        mode: RuleMode.always,
+        groups: { create: { groupId: group.id, pauseActive: true, pauseUntil: new Date(Date.now() + 60 * 60_000), pauseKind: "allow", pausedByAccountId: recovery.id, pausedByName: "Recovery admin" } },
+      },
+    });
+    const claim = await pairMe(admin, group.id);
+    const day = (await (await meDay(request("/api/v1/me/day", { auth: bearer(claim.token) }))).json()) as MeDay;
+    expect(day.allowance).toMatchObject({ by: null });
+  });
+
   it("un-pairs itself, and only itself", async () => {
     const group = await childGroup();
     const first = await pairMe(admin, group.id);
