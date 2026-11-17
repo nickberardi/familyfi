@@ -517,6 +517,12 @@ describe("a child's day on the household's clock", () => {
       ["Now", "Paused by Dad"],
       ["4 PM", "Grounded"],
     ]);
+    // The same with Bedtime on when the pause ends: the rule, never "7 AM Not blocked".
+    const overnight = meDaySubject(me({ windows: [bedtime([1])], pause: { by: "Dad", since: "2026-11-17T00:00:00Z", until: "2026-11-17T03:00:00Z" }, alwaysOn: [{ ruleId: "r2", name: "Grounded", kind: "internet", allowed: null }] }), new Date("2026-11-17T02:00:00Z"));
+    expect(tellDay(overnight.subject, overnight.now, PHONE_VOICE, overnight.clock).items.map((item) => [item.time, item.title])).toEqual([
+      ["Now", "Paused by Dad"],
+      ["10 PM", "Grounded"],
+    ]);
     // A category rule alone leaves the internet on.
     const games = meDaySubject(me({ alwaysOn: [{ ruleId: "r3", name: "Games", kind: "category", allowed: null }] }), MONDAY_NIGHT);
     expect(games.subject.always).toBeUndefined();
