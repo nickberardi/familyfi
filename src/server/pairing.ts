@@ -107,6 +107,9 @@ export async function inviteAgent(input: { url: string; displayName: string; sco
   return { invite, code };
 }
 
+/** The invite stopped being claimable inside the claim's transaction, which rolls back its claim. */
+class VoidInvite extends Error {}
+
 /** The `clientId` belongs to another kind of device. */
 class ClientIdInUseError extends Error {
   constructor() {
@@ -216,9 +219,18 @@ export async function claimInvite(input: { id: string; token: string; displayNam
   const joined = await prisma().$transaction(async (db) => {
     const claimed = await db.pairing.updateMany({ where: { id: invite.id, claimedAt: null, expiresAt: { gt: now } }, data: { claimedAt: now } });
     if (claimed.count !== 1) return null;
+    // A child's phone's group may have gone since the invite was read. Holding its row until the device is
+    // made keeps a deletion from slipping in between; one that already happened voids the invite.
+    if (signer.group) {
+      const held = await db.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Group" WHERE "id" = ${signer.group.id} FOR SHARE`;
+      if (!held.length) throw new VoidInvite();
+    }
     // A phone is called what the administrator named it when inviting it; what it calls itself is often just "iPhone".
     const displayName = invite.clientType === "app" || invite.clientType === "me" ? invite.displayName : input.displayName;
     return join(db, { invite, signer, displayName, userAgent: input.userAgent, now });
+  }).catch((caught: unknown) => {
+    if (caught instanceof VoidInvite) return null;
+    throw caught;
   });
   if (!joined) return null;
   return claimResponse({ invite, ...signer, ...joined }, invite.endpoint);

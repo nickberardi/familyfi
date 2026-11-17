@@ -36,7 +36,7 @@ A **Group** holds network controls for a person (`family`) or collection of equi
 A **Rule** blocks all internet, a category, apps or websites for one or more groups, always or in
 named **windows**; each window is one UniFi policy. An internet rule is optional.
 An **Account** is a login and may be linked to a group; a family member card does not imply a login.
-A **Device** is a discovered network client; a **PairedDevice** is the app (on a phone, tablet or Mac), a Watch or an agent authorized to
+A **Device** is a discovered network client; a **PairedDevice** is the app (on a phone, tablet or Mac), a Watch, an agent, or FamilyFi Me on a child's phone, authorized to
 call the API. A **ChangeResult** tracks an enforcement request; a **SyncRun** tracks a reconciliation
 pass. Keep these distinctions when naming features and choosing data owners.
 
