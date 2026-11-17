@@ -511,6 +511,17 @@ describe("a child's day on the household's clock", () => {
       ["Now", "Homework"],
       ["6 PM", "Grounded again"],
     ]);
+    // Grounded lifted until 5 PM, inside Homework (2 to 4 PM) lifted only until 3 PM: allowed until 3 PM, then Homework.
+    const shortLift = { ...study, start: "14:00", end: "16:00", allowed: { by: "Mom", until: "2026-11-16T20:00:00Z" } };
+    const both = meDaySubject(me({ windows: [shortLift], alwaysOn: [{ ruleId: "r2", name: "Grounded", kind: "internet", allowed: { by: "Dad", until: "2026-11-16T22:00:00Z" } }] }), new Date("2026-11-16T19:30:00Z"));
+    const bothTold = tellDay(both.subject, both.now, PHONE_VOICE, both.clock);
+    expect(topAnswer(bothTold).title).toBe("Allowed until 3 PM");
+    expect(bothTold.items.map((item) => [item.time, item.title])).toEqual([
+      ["Now", "Allowed until 3 PM"],
+      ["3 PM", "Homework"],
+      ["4 PM", "Not blocked"],
+      ["5 PM", "Grounded again"],
+    ]);
     // A pause over a rule still on: after the pause, the rule, never "Not blocked".
     const paused = meDaySubject(me({ pause: { by: "Dad", since: "2026-11-16T20:00:00Z", until: "2026-11-16T21:00:00Z" }, alwaysOn: [{ ruleId: "r2", name: "Grounded", kind: "internet", allowed: null }] }), new Date("2026-11-16T20:30:00Z"));
     expect(tellDay(paused.subject, paused.now, PHONE_VOICE, paused.clock).items.map((item) => [item.time, item.title])).toEqual([
