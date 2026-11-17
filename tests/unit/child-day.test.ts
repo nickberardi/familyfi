@@ -656,6 +656,27 @@ describe("a child's day on the household's clock", () => {
     expect(groupDayOf(group, [], ZONE, MONDAY_NIGHT).ask).toBeNull();
   });
 
+  it("tells a yes as the group's pause and lifts stand now, not as it was asked", () => {
+    const at = "2026-11-17T03:00:00Z"; // 10 PM
+    const answeredAt = "2026-11-17T03:05:00Z";
+    const yes = { id: "a1", about: "rule" as const, ruleId: "r1", minutes: 60, state: "yes" as const, at, answeredAt, by: "Mom" };
+    // Asked for an hour, given until 10:15 PM: at 10:20 PM Bedtime blocks again.
+    const over = meDaySubject(me({ windows: [bedtime([1])], ask: yes }), new Date("2026-11-17T03:20:00Z"));
+    expect(over.subject.ask).toBeUndefined();
+    expect(tellDay(over.subject, over.now, PHONE_VOICE, over.clock).day.kind).toBe("window");
+    // While it runs, it is told for the time given.
+    const lifted = { ...bedtime([1]), allowed: { by: "Mom", until: "2026-11-17T03:15:00Z" } };
+    const during = meDaySubject(me({ windows: [lifted], ask: yes }), new Date("2026-11-17T03:10:00Z"));
+    const story = tellDay(during.subject, during.now, PHONE_VOICE, during.clock);
+    expect(story.items[0]).toMatchObject({ title: "Allowed until 10:15 PM", detail: "Mom said yes to 10 more minutes" });
+    // Unpaused on a yes, then paused again: the new pause is what is told.
+    const pauseYes = { id: "a2", about: "pause" as const, state: "yes" as const, at, answeredAt, by: "Mom" };
+    const again = meDaySubject(me({ pause: { by: "Dad", since: "2026-11-17T03:10:00Z", until: null }, ask: pauseYes }), new Date("2026-11-17T03:20:00Z"));
+    expect(again.subject.ask).toBeUndefined();
+    expect(tellDay(again.subject, again.now, PHONE_VOICE, again.clock).day.kind).toBe("paused");
+    expect(meDaySubject(me({ ask: pauseYes }), new Date("2026-11-17T03:20:00Z")).subject.ask).toMatchObject({ state: "yes", by: "Mom" });
+  });
+
   it("names no one for a parent FamilyFi has no name for, and drops a timed-out ask once its block is over", () => {
     const at = "2026-11-17T03:10:00Z";
     const no = { id: "a1", about: "rule" as const, ruleId: "r1", minutes: 30, state: "no" as const, at, answeredAt: at, by: null, askAgainAt: "2026-11-17T04:00:00Z" };
