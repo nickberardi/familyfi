@@ -368,6 +368,8 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   // What comes from `start` on: a window on then carries on to its end (and any window overlapping
   // it after that), then nothing blocks until the next window or tomorrow morning.
   const onwards = (start: Clock, again?: DayWindow): DayItem[] => {
+    // An always-on internet rule still on (after a pause) blocks from then, whatever the windows.
+    if (blockingAlways) return [later({ time: clock(start), tone: "window", sign: "window", title: blockingAlways.label, detail: "For the rest of today" })];
     const items: DayItem[] = [];
     let at = start;
     // Past midnight: tomorrow morning is free, unless a lifted always-on rule has come back by then.
@@ -415,8 +417,6 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       at = end;
     }
     if (at >= 1440) return morning();
-    // An always-on internet rule still on (after a pause) blocks the rest of today.
-    if (blockingAlways) return [...items, later({ time: clock(at), tone: "window", sign: "window", title: blockingAlways.label, detail: "For the rest of today" })];
     if (back !== undefined && back <= at) return [...items, alwaysAgain(at)];
     const next = nextWindow(at);
     if (back !== undefined && (!next || back < next.from)) return [...items, notBlocked(at, undefined, clock(back)), alwaysAgain(back)];
