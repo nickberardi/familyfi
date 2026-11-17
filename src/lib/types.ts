@@ -41,10 +41,10 @@ export type Group = {
  */
 export type GroupAsk = {
   id: string;
-  about: "pause" | "rule";
+  about: "pause" | "rule" | (string & {});
   ruleId?: string;
   minutes?: number;
-  state: "waiting" | "yes" | "no" | "timedOut" | "ended";
+  state: "waiting" | "yes" | "no" | "timedOut" | "ended" | (string & {});
   at: string;
   /** While waiting: when it closes unanswered. */
   expiresAt?: string;

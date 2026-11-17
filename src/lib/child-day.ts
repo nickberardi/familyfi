@@ -387,14 +387,15 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
     (ask.about === "pause"
       ? Boolean(me.pause)
       : me.windows.some((window) => window.ruleId === ask.ruleId && !window.allowed && isWindowActive(window, now, me.timezone)));
-  const ask = me.ask && stillOn(me.ask) ? answerNow(me.ask) : undefined;
+  // An ask about something, or in a state, this build does not know is not told.
+  const ask = me.ask && knownAsk(me.ask) && stillOn(me.ask) ? answerNow(me.ask) : undefined;
   return { subject: { windows, ...(pause ? { pause } : {}), ...(always.length ? { always } : {}), ...(ask ? { ask } : {}) }, now: minutes, clock };
 
   // A yes is told only while what it gave is still so, and as long as it is now: the group's pause
   // and its rules' lifts are what hold, not what was asked for. A pause set again after a yes is a
   // new pause; a rule's lift for less, or more, than was asked is told as given, and once it is
   // over, or a parent took it back, the yes is not told.
-  function answerNow(ask: NonNullable<GroupDay["ask"]>): DayAsk | undefined {
+  function answerNow(ask: KnownAsk): DayAsk | undefined {
     if (ask.state !== "yes") return dayAsk(ask, minutesOf);
     if (ask.about === "pause") return me.pause ? undefined : dayAsk(ask, minutesOf);
     const allowed = me.windows.find((window) => window.ruleId === ask.ruleId && window.allowed)?.allowed;
@@ -404,8 +405,16 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
   }
 }
 
+/** An ask whose `about` and `state` are ones this build knows; the API may add others. */
+type KnownAsk = NonNullable<GroupDay["ask"]> & { about: "pause" | "rule"; state: DayAsk["state"] };
+const ASK_STATES: readonly string[] = ["waiting", "yes", "no", "timedOut", "ended"] satisfies DayAsk["state"][];
+
+function knownAsk(ask: NonNullable<GroupDay["ask"]>): ask is KnownAsk {
+  return (ask.about === "pause" || ask.about === "rule") && ASK_STATES.includes(ask.state);
+}
+
 /** FamilyFi's ask as the day tells it; a parent FamilyFi has no name for goes unnamed. */
-function dayAsk(ask: NonNullable<GroupDay["ask"]>, minutesOf: (iso: string) => Clock): DayAsk {
+function dayAsk(ask: KnownAsk, minutesOf: (iso: string) => Clock): DayAsk {
   const at = minutesOf(ask.at);
   const minutes = ask.minutes !== undefined ? { minutes: ask.minutes } : {};
   if (ask.state === "waiting" || ask.state === "timedOut" || ask.state === "ended") return { state: ask.state, at, ...minutes };

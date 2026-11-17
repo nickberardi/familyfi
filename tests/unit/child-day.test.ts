@@ -691,6 +691,14 @@ describe("a child's day on the household's clock", () => {
     expect(meDaySubject(me({ ask: { ...lapsed, about: "pause" as const, ruleId: undefined } }), MONDAY_NIGHT).subject.ask).toBeUndefined();
   });
 
+  it("tells nothing for an ask whose state or subject a newer server added", () => {
+    const at = "2026-11-17T03:10:00Z";
+    const waiting = { id: "a1", about: "rule", ruleId: "r1", minutes: 30, state: "waiting", at, by: null };
+    expect(meDaySubject(me({ windows: [bedtime([1])], ask: waiting }), MONDAY_NIGHT).subject.ask).toMatchObject({ state: "waiting" });
+    expect(meDaySubject(me({ windows: [bedtime([1])], ask: { ...waiting, state: "withdrawn" } }), MONDAY_NIGHT).subject.ask).toBeUndefined();
+    expect(meDaySubject(me({ windows: [bedtime([1])], ask: { ...waiting, about: "app" } }), MONDAY_NIGHT).subject.ask).toBeUndefined();
+  });
+
   it("names a window by its own name, or else its rule's, and says a pause without a name when FamilyFi did not record who", () => {
     const named = { ...bedtime([1]), name: "School night" };
     const { subject } = meDaySubject(me({ windows: [named], pause: { by: null, since: "2026-11-17T03:00:00Z", until: "2026-11-17T04:00:00Z" } }), MONDAY_NIGHT);
