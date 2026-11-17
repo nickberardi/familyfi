@@ -57,15 +57,15 @@ export async function fileAsk(session: SignedInSession, groupId: string, input: 
   let ruleName: string | undefined;
   if (input.about === "pause") {
     const block = blockRuleOf(group);
-    if (!block?.enabled || (block.expiresAt !== null && block.expiresAt <= now)) throw new ApiError(409, "not_blocked", "This group isn't paused.");
+    if (!block?.enabled || (block.expiresAt !== null && block.expiresAt <= now)) throw new ApiError(409, "not_blocked", "You aren't paused right now.");
     blockEnd = block.expiresAt;
   } else {
     const link = group.rules.find((item) => item.ruleId === input.ruleId && item.rule.systemGroupId === null && !builtInRule(item.rule));
-    if (!link) throw new ApiError(404, "not_found", "That rule doesn't cover this group.");
+    if (!link) throw new ApiError(404, "not_found", "That rule isn't one of yours.");
     const { rule } = link;
-    if (rule.mode === RuleMode.always) throw new ApiError(409, "always_on", "An always-on rule isn't lifted by asking.");
+    if (rule.mode === RuleMode.always) throw new ApiError(409, "always_on", "You can't ask for more time on this one.");
     const ends = activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone);
-    if (!rule.enabled || lifted(rule, now) || lifted(link, now) || !ends) throw new ApiError(409, "not_blocked", "This rule isn't blocking this group now.");
+    if (!rule.enabled || lifted(rule, now) || lifted(link, now) || !ends) throw new ApiError(409, "not_blocked", "That rule isn't blocking you right now.");
     blockEnd = ends;
     ruleName = rule.name;
   }
@@ -75,11 +75,11 @@ export async function fileAsk(session: SignedInSession, groupId: string, input: 
   const ask = await prisma().$transaction(async (tx) => {
     // One ask at a time for a group: two phones asking at once wait on its row.
     await tx.$queryRaw`SELECT "id" FROM "Group" WHERE "id" = ${groupId} FOR UPDATE`;
-    if (await tx.ask.findFirst({ where: { groupId, ...open(now) } })) throw new ApiError(409, "ask_waiting", "An ask is already waiting for an answer.");
+    if (await tx.ask.findFirst({ where: { groupId, ...open(now) } })) throw new ApiError(409, "ask_waiting", "You already asked. Waiting for an answer.");
     const no = await tx.ask.findFirst({ where: { groupId, state: AskState.no, askAgainAt: { gt: now } } });
-    if (no) throw new ApiError(409, "ask_too_soon", "A parent said not this time. Ask again later.");
+    if (no) throw new ApiError(409, "ask_too_soon", "Not this time. You can ask again later.");
     const recent = await tx.ask.count({ where: { groupId, createdAt: { gt: new Date(now.getTime() - HOUR_MS) } } });
-    if (recent >= ASKS_PER_HOUR) throw new ApiError(429, "too_many_asks", "That's a lot of asks. Try again later.");
+    if (recent >= ASKS_PER_HOUR) throw new ApiError(429, "too_many_asks", "You've asked a lot this hour. Try again later.");
     return tx.ask.create({
       data: {
         groupId,
@@ -173,6 +173,22 @@ export async function answerAsks(
     where: { ...(groupId ? { groupId } : {}), ...open(now), OR: about },
     data: { state: AskState.yes, answeredAt: now, answeredByAccountId: by.accountId, answeredByName: by.name },
   });
+}
+
+/**
+ * A group's pause was set again or extended: a waiting ask to be unpaused now closes at the
+ * earlier of the household's timeout and the pause's new end (`end` null: none).
+ */
+export async function followPause(groupId: string, end: Date | null): Promise<void> {
+  const now = new Date();
+  const waiting = await prisma().ask.findMany({ where: { groupId, about: "pause", ...open(now) } });
+  if (!waiting.length) return;
+  const { askTimeoutMinutes } = await loadHousehold();
+  for (const ask of waiting) {
+    const timeout = new Date(ask.createdAt.getTime() + askTimeoutMinutes * 60_000);
+    const endsWithBlock = end !== null && end <= timeout;
+    await prisma().ask.updateMany({ where: { id: ask.id, ...open(now) }, data: { expiresAt: endsWithBlock ? end : timeout, endsWithBlock } });
+  }
 }
 
 /** The sync pass's sweep: an ask left waiting past its end closes, `ended` with its block, else `timedOut`. */

@@ -185,7 +185,8 @@ describe("a child's day", () => {
   });
 
   it("says any length a child asked for", () => {
-    expect([15, 30, 60, 90, 120].map(lengthText)).toEqual(["15 more minutes", "30 more minutes", "1 more hour", "1 hour 30 more minutes", "2 more hours"]);
+    expect([15, 30, 60, 90, 120].map(lengthText)).toEqual(["15 more minutes", "30 more minutes", "1 more hour", "1 hour 30 minutes more", "2 more hours"]);
+    expect([1, 61].map(lengthText)).toEqual(["1 more minute", "1 hour 1 minute more"]);
   });
 
   it("tells a Thing's day in its own words", () => {
@@ -647,12 +648,26 @@ describe("a child's day on the household's clock", () => {
     const again = "2026-11-17T03:50:00Z";
     const ask = { id: "a1", about: "rule" as const, ruleId: "r1", minutes: 30, state: "no" as const, at, answeredAt: answered, by: null, askAgainAt: again };
     const { subject } = meDaySubject(me({ windows: [bedtime([1])], ask }), MONDAY_NIGHT);
-    expect(subject.ask).toEqual({ state: "no", at: 22 * 60 + 10, answeredAt: 22 * 60 + 20, by: "A parent", minutes: 30, againAt: 22 * 60 + 50 });
+    expect(subject.ask).toEqual({ state: "no", at: 22 * 60 + 10, answeredAt: 22 * 60 + 20, minutes: 30, againAt: 22 * 60 + 50 });
     const waiting = meDaySubject(me({ ask: { id: "a2", about: "pause", state: "waiting", at, expiresAt: again, by: null } }), MONDAY_NIGHT);
     expect(waiting.subject.ask).toEqual({ state: "waiting", at: 22 * 60 + 10 });
     const group = { id: "g1", name: "Emma", suspension: { active: false, until: null, by: null }, allowance: { active: false, until: null, by: null } };
     expect(groupDayOf({ ...group, ask: { ...ask, by: { accountId: "mom", name: "Mom" } } }, [], ZONE, MONDAY_NIGHT).ask?.by).toBe("Mom");
     expect(groupDayOf(group, [], ZONE, MONDAY_NIGHT).ask).toBeNull();
+  });
+
+  it("names no one for a parent FamilyFi has no name for, and drops a timed-out ask once its block is over", () => {
+    const at = "2026-11-17T03:10:00Z";
+    const no = { id: "a1", about: "rule" as const, ruleId: "r1", minutes: 30, state: "no" as const, at, answeredAt: at, by: null, askAgainAt: "2026-11-17T04:00:00Z" };
+    const declined = meDaySubject(me({ windows: [bedtime([1])], ask: no }), MONDAY_NIGHT);
+    const story = tellDay(declined.subject, declined.now, PHONE_VOICE, declined.clock);
+    expect(story.items[0]?.status?.text).toBe("Not this time. You can ask again at 11 PM.");
+    const lapsed = { id: "a2", about: "rule" as const, ruleId: "r1", minutes: 30, state: "timedOut" as const, at, by: null };
+    // Bedtime is still on: the child is told no one answered.
+    expect(meDaySubject(me({ windows: [bedtime([1])], ask: lapsed }), MONDAY_NIGHT).subject.ask).toEqual({ state: "timedOut", at: 22 * 60 + 10, minutes: 30 });
+    // Asked about another rule, or about a pause that has ended: nothing to tell.
+    expect(meDaySubject(me({ windows: [bedtime([1])], ask: { ...lapsed, ruleId: "r2" } }), MONDAY_NIGHT).subject.ask).toBeUndefined();
+    expect(meDaySubject(me({ ask: { ...lapsed, about: "pause" as const, ruleId: undefined } }), MONDAY_NIGHT).subject.ask).toBeUndefined();
   });
 
   it("names a window by its own name, or else its rule's, and says a pause without a name when FamilyFi did not record who", () => {

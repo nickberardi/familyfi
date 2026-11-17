@@ -22,7 +22,12 @@ function unnamed(recovery: Set<string>) {
 /** The group as a child's phone reads it. */
 export async function groupForChild(group: Group): Promise<Group> {
   const actor = unnamed(await recoveryAccountIds());
-  return { ...group, suspension: { ...group.suspension, by: actor(group.suspension.by) }, allowance: { ...group.allowance, by: actor(group.allowance.by) } };
+  return {
+    ...group,
+    suspension: { ...group.suspension, by: actor(group.suspension.by) },
+    allowance: { ...group.allowance, by: actor(group.allowance.by) },
+    ...(group.ask ? { ask: { ...group.ask, ...(group.ask.by !== undefined ? { by: actor(group.ask.by) } : {}) } } : {}),
+  };
 }
 
 /**

@@ -48,8 +48,9 @@ export function alertText(kind: string, data: Record<string, unknown>): AlertTex
       if (a === "pause") return { title: `${who} asked to be unpaused`, body: "Open FamilyFi to answer." };
       const rule = text(r);
       const length = typeof m === "number" && Number.isInteger(m) && m > 0 ? minutesText(m) : null;
-      const what = length && rule ? `${length} of ${rule}` : length ? length : rule ? `More time in ${rule}` : null;
-      return { title: `${who} asked for more time`, body: what ? `${what}. Open FamilyFi to answer.` : "Open FamilyFi to answer." };
+      // Time off the rule's block, never "of" it: the child wants out of Bedtime, not more of it.
+      const body = length && rule ? `${length} off ${rule}.` : rule ? `Time off ${rule}.` : length ? `${length} more.` : "Open FamilyFi to answer.";
+      return { title: `${who} asked for more time`, body };
     }
     case "sync.down":
       return { title: "Can't reach your gateway", body: "Your rules may not apply until FamilyFi reaches it again." };
@@ -73,7 +74,7 @@ export const ALERT_KIND_LABELS: Record<string, string> = {
   "device.new": "New devices",
   "sync.down": "Can't reach your gateway",
   "sync.up": "Gateway back",
-  "ask.new": "Asks for more time",
+  "ask.new": "Asks from children",
 };
 
 /** The Alerts card in Settings. */
@@ -81,7 +82,7 @@ export const ALERTS_CARD_COPY = {
   title: "Alerts",
   switchLabel: "Send alerts to the FamilyFi app",
   description:
-    "Tells the FamilyFi app on your phones and tablets when a new device is waiting in Unassigned, when FamilyFi can't reach your gateway, or when a child asks for more time.",
+    "Tells the FamilyFi app on your phones and tablets when a new device is waiting in Unassigned, when FamilyFi can't reach your gateway or when a child asks for more time.",
   disclosureTitle: "What leaves your home",
   disclosure: [
     "Alerts go through FamilyFi's push relay, which hands them to Apple or Google.",

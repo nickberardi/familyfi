@@ -1,6 +1,7 @@
 import { RuleKind, RuleLiftKind, RuleMode, RuleScope } from "@prisma/client";
 import { extendSuspensionUntil } from "@/lib/schedule";
-import { answerAsks, claimAsk, releaseAsk } from "./asks";
+import { answerAsks, claimAsk, followPause, releaseAsk } from "./asks";
+import { isFullApp } from "./device-scope";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
 import { blockRuleOf, groupInclude, internetLinks, lifted, publicGroup, sessionActor } from "./groups";
@@ -65,16 +66,16 @@ export async function liftGroupInternet(
       });
       await tx.ruleGroup.updateMany({ where: { ...lifts, pauseActive: true, pauseKind: RuleLiftKind.allow }, data: CLEARED });
     });
+    await followPause(groupId, end);
   } else if (action === "resume") {
     await prisma().rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
     await answerAsks(session, groupId, { pause: true });
   } else if (action === "extend") {
     if (!block || !blocking) throw new ApiError(409, "not_paused", "Extend requires an active pause.");
     if (!block.expiresAt) throw new ApiError(409, "indefinite", "An indefinite pause has no expiry to extend.");
-    await prisma().rule.update({
-      where: { id: block.id },
-      data: { expiresAt: extendSuspensionUntil(block.expiresAt, now, body.minutes! * 60_000) },
-    });
+    const extended = extendSuspensionUntil(block.expiresAt, now, body.minutes! * 60_000);
+    await prisma().rule.update({ where: { id: block.id }, data: { expiresAt: extended } });
+    await followPause(groupId, extended);
   } else if (action === "allow") {
     const requested = until(body.until);
     // A rule already paused, or paused for this group, is not blocking it. One this group is
@@ -120,7 +121,7 @@ export async function liftGroupInternet(
  * unpaused, `allow` on the rule for an ask for minutes in its window.
  */
 export async function liftGroupRule(
-  session: Parameters<typeof liftRule>[0],
+  session: AnsweringSession,
   action: LiftAction,
   target: { groupId: string; ruleId: string },
   body: LiftBody,
@@ -130,15 +131,24 @@ export async function liftGroupRule(
   return liftRule(session, action, target, body);
 }
 
+/** Who is lifting, with what decides whether they may answer an ask by its id. */
+type AnsweringSession = Parameters<typeof liftRule>[0] & {
+  account?: { displayName: string; kind?: string; isAdmin?: boolean } | null;
+  device?: { clientType: string; scope: string } | null;
+};
+
 /**
  * A parent's yes to a child's ask, given with its id. The ask is taken first, so a second parent
  * answering it gets 409 `ask_closed`, and put back if the lift fails. A window's yes lasts the
  * minutes asked for from now, or the parent's own `until`, and never past the window's end.
  */
-async function liftForAsk(session: Parameters<typeof liftRule>[0], action: LiftAction, target: { groupId: string; ruleId: string }, body: LiftBody) {
+async function liftForAsk(session: AnsweringSession, action: LiftAction, target: { groupId: string; ruleId: string }, body: LiftBody) {
   const internet = target.ruleId === INTERNET_RULE_ID;
   const about = action === "resume" && internet ? "pause" : action === "allow" && !internet ? "rule" : null;
   if (!about) throw new ApiError(400, "invalid_request", "askId answers an ask with the group's resume on internet, or allow on the rule it asks about.");
+  // A parent answers by the ask's id, as only a parent says no: never a Watch, the app's controls or an agent.
+  const administrator = (!session.device || isFullApp(session.device)) && (session.account?.kind === "recovery" || session.account?.isAdmin === true);
+  if (!administrator) throw new ApiError(403, "administrator_required", "A FamilyFi administrator answers a child's ask.");
   const ask = await claimAsk(session, body.askId!, { groupId: target.groupId, about, ruleId: target.ruleId });
   try {
     const rest: LiftBody = { ...body, askId: undefined };
@@ -147,7 +157,9 @@ async function liftForAsk(session: Parameters<typeof liftRule>[0], action: LiftA
     if (!rule) throw new ApiError(404, "not_found", "Rule not found.");
     const now = new Date();
     const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
-    const windowEnd = activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone) ?? null;
+    const windowEnd = activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone);
+    // A yes lifts the window that is on, and never past its end.
+    if (!windowEnd) throw new ApiError(409, "not_in_window", "This rule is not blocking now.");
     const wanted = body.until === undefined ? new Date(now.getTime() + (ask.minutes ?? 0) * 60_000) : body.until ? new Date(body.until) : null;
     const until = windowEnd && (!wanted || windowEnd < wanted) ? windowEnd : wanted;
     return await liftRule(session, action, target, { ...rest, until: until?.toISOString() ?? null });
