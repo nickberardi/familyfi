@@ -45,10 +45,10 @@ async function pairedPhone() {
 }
 
 /** A phone invites its Watch and claims it in one call. */
-function enrollRequest(auth: Auth, clientId = watchId, client = "watch") {
+function enrollRequest(auth: Auth, clientId = watchId, clientType = "app-watch") {
   return invite(request("/api/v1/paired/invites?claim=true", {
     method: "POST", auth, headers: { "content-type": "application/json" },
-    body: JSON.stringify({ client, clientId, displayName: "Kitchen Watch" }),
+    body: JSON.stringify({ clientType, clientId, displayName: "Kitchen Watch" }),
   }));
 }
 
@@ -108,8 +108,8 @@ describe("independent Watch device", () => {
     const listed = await listDevices(request("/api/v1/paired/devices", { auth: await administrator() }));
     const devices = (await listed.json() as { devices: { id: string; client: string }[] }).devices;
     expect(devices).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: phone.device.id, client: "app", clientType: "app", scope: "full" }),
-      expect.objectContaining({ id: watch.deviceId, client: "watch", clientType: "app-watch", scope: "rulesOnly" }),
+      expect.objectContaining({ id: phone.device.id, clientType: "app", scope: "app:full" }),
+      expect.objectContaining({ id: watch.deviceId, clientType: "app-watch", scope: "app:rulesOnly" }),
     ]));
   });
 
@@ -173,7 +173,7 @@ describe("independent Watch device", () => {
     const fromBrowser = await enrollRequest(await administrator());
     expect(fromBrowser.status).toBe(403);
     expect(((await fromBrowser.json()) as { error: { code: string } }).error.code).toBe("paired_phone_required");
-    expect((await enrollRequest(phone.auth, watchId, "phone")).status).toBe(400);
+    expect((await enrollRequest(phone.auth, watchId, "app")).status).toBe(400);
     const watch = await enrolledWatch(phone.auth);
     const byWatch = await enrollRequest(bearer(watch.token));
     expect(byWatch.status).toBe(403);

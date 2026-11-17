@@ -8,10 +8,8 @@
  *   `agent:readOnly` or `me:askOnly`. It names one allowlist in `src/server/device-scope.ts`.
  *
  * The invite sets both, the claim copies them onto the device, and every signed-in call reads them
- * from the session's device. Each client type holds only the scopes `CLIENT_SCOPES` lists.
- *
- * The API's older `client` and `scope` fields stay as they were, for installed apps: `legacyClient`
- * and `scopeWord` give them, and `clientTypeFrom` reads an older request's words.
+ * from the session's device. Each client type holds only the scopes `CLIENT_SCOPES` lists. The API
+ * names them the same way: `clientType`, and `scope` as its whole value.
  */
 
 export const CLIENT_TYPES = ["app", "app-watch", "app-controls", "me", "agent"] as const;
@@ -40,32 +38,4 @@ export function isClientScope(value: unknown): value is ClientScope {
 /** Whether a client type may hold a scope. */
 export function mayHoldScope(clientType: string, scope: string | null | undefined): boolean {
   return isClientType(clientType) && Boolean(scope) && CLIENT_SCOPES[clientType].includes(scope as ClientScope);
-}
-
-/** The API's older `client` word: `watch` for a Watch, `app` for the app and its controls. */
-export function legacyClient(clientType: string): string {
-  if (clientType === "app-watch") return "watch";
-  if (clientType === "app-controls") return "app";
-  return clientType;
-}
-
-/** The API's older `scope` word: the part after the group, such as `full` for `app:full`. */
-export function scopeWord(scope: string): string {
-  const colon = scope.indexOf(":");
-  return colon < 0 ? scope : scope.slice(colon + 1);
-}
-
-/** The full scope a client type holds for an older request's scope word, or null when it may not hold it. */
-export function scopeFor(clientType: ClientType, word: string): ClientScope | null {
-  return CLIENT_SCOPES[clientType].find((scope) => scopeWord(scope) === word) ?? null;
-}
-
-/**
- * The client type an older request names with `client` and `scope`: `watch` is `app-watch`, `app`
- * with `rulesOnly` is `app-controls`, and `phone` (apps before API 1.1.0) is `app`.
- */
-export function clientTypeFrom(client: string, scope?: string | null): ClientType | null {
-  if (client === "watch") return "app-watch";
-  if (client === "app" || client === "phone") return scope === "rulesOnly" ? "app-controls" : "app";
-  return isClientType(client) ? client : null;
 }

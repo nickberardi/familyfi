@@ -65,7 +65,7 @@ export async function pairingAdminAuth(): Promise<SessionAuth> {
 
 export async function invitePhoneRequest(auth: SessionAuth, body: Record<string, unknown>, headers: Record<string, string> = {}) {
   if (!("accountId" in body)) body = { ...body, accountId: (await pairingAdmin()).id };
-  return invite(request("/api/v1/paired/invites", { method: "POST", auth, headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ client: "app", displayName: "iPhone", ...body }) }));
+  return invite(request("/api/v1/paired/invites", { method: "POST", auth, headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ clientType: "app", displayName: "iPhone", ...body }) }));
 }
 
 export function claimInvite(issued: { inviteId: string; token: string }, deviceName = "iPhone", headers: Record<string, string> = {}) {
@@ -87,5 +87,5 @@ export async function pairPhone(admin: SessionAuth, options: { endpointId?: stri
 
 /** A phone invites its Watch and claims it in one call. */
 export function claimWatchRequest(phone: SessionAuth, body: Record<string, unknown> = {}) {
-  return invite(request("/api/v1/paired/invites?claim=true", { method: "POST", auth: phone, headers: { "content-type": "application/json" }, body: JSON.stringify({ client: "watch", clientId: "f626e8d1-57bc-4c88-9068-7c9ce6d4d0d1", ...body }) }));
+  return invite(request("/api/v1/paired/invites?claim=true", { method: "POST", auth: phone, headers: { "content-type": "application/json" }, body: JSON.stringify({ clientType: "app-watch", clientId: "f626e8d1-57bc-4c88-9068-7c9ce6d4d0d1", ...body }) }));
 }

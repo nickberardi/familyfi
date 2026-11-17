@@ -59,7 +59,7 @@ export function usePairDevice(request: ApiRequest) {
 
   const { active } = splitPhones(phones);
   // Agents are home-network only and never hold an Access token, so remote access counts phones and Watches.
-  const remote = phones.filter((device) => device.client !== "agent");
+  const remote = phones.filter((device) => device.clientType !== "agent");
   // Phones pair through the one published route, once it is live.
   const published = publishedRoute(tunnel, routes);
   return {

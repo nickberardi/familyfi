@@ -1,5 +1,5 @@
 import { ConnectionTrustMode, SessionKind, type Account, type Pairing } from "@prisma/client";
-import { legacyClient, scopeWord, type ClientType, type ClientScope } from "@/lib/client-type";
+import type { ClientScope, ClientType } from "@/lib/client-type";
 import { bearerSessionData, isAdministratorAccount, mayPairAs, toPublicSession, type SignedInSession } from "./auth";
 import { ensureConnectionIdentity, instanceFingerprint, publicEndpoint, removeDevice, signedEndpointManifest } from "./connection";
 import { randomToken, safeEqual, sha256 } from "./crypto";
@@ -157,12 +157,9 @@ async function join(db: Db, input: {
   return { device, bearer };
 }
 
-/**
- * A device's kind as the API names it: its client type, and the older `client` and `scope` words
- * installed apps read (src/lib/client-type.ts).
- */
+/** A device as a claim names it: its client type and its whole scope (src/lib/client-type.ts). */
 export function publicDeviceKind(device: { id: string; displayName: string; clientType: string; scope: string }) {
-  return { id: device.id, displayName: device.displayName, client: legacyClient(device.clientType), clientType: device.clientType, scope: scopeWord(device.scope) };
+  return { id: device.id, displayName: device.displayName, clientType: device.clientType, scope: device.scope };
 }
 
 /** What a claim answers, the same for every client. Apps and Watches, which may work away from home, also get their manifest. */
@@ -256,7 +253,7 @@ function inviteBody(invite: { id: string; expiresAt: Date }, code: string) {
   return { invite: { id: invite.id, expiresAt: invite.expiresAt.toISOString(), code } };
 }
 
-export type InviteInput =
+type InviteInput =
   | { clientType: "app"; displayName: string; endpointId: string; accountId?: string; replacesDeviceId?: string }
   | { clientType: "agent"; displayName: string; scope: ClientScope };
 

@@ -19,9 +19,9 @@ export function ConnectAgentSheet({ onClose, onConnected }: { onClose: () => voi
   // An agent acts as whoever connects it, and nothing acts as the built-in admin.
   const recovery = useAppData().session?.kind === "recovery";
   const [name, setName] = useState("AI agent");
-  const [scope, setScope] = useState<"full" | "readOnly">("full");
+  const [scope, setScope] = useState<"agent:full" | "agent:readOnly">("agent:full");
   const { issued, state, expired, claimed, remaining, error, busy, generate } = usePairingCode({
-    body: () => ({ client: "agent", displayName: name.trim(), scope }),
+    body: () => ({ clientType: "agent", displayName: name.trim(), scope }),
     onClaimed: onConnected,
   });
 

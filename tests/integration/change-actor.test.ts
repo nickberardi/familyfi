@@ -40,7 +40,7 @@ async function oneChange(auth: SessionAuth, id: string): Promise<Change> {
 }
 
 async function connectedAgent(admin: SessionAuth): Promise<Claim> {
-  const created = await createInvite(request("/api/v1/paired/invites", { method: "POST", auth: admin, headers: json, body: JSON.stringify({ client: "agent", displayName: "Claude Code", scope: "full" }) }));
+  const created = await createInvite(request("/api/v1/paired/invites", { method: "POST", auth: admin, headers: json, body: JSON.stringify({ clientType: "agent", displayName: "Claude Code", scope: "agent:full" }) }));
   expect(created.status).toBe(201);
   const claimed = await claimInvite(await issuedInvite(created), "Claude Code on a MacBook");
   expect(claimed.status).toBe(200);

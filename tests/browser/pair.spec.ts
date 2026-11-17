@@ -296,7 +296,7 @@ test("lists every saved Tailscale route and removes them, turning remote access 
     expect((await routes(page)).map((route) => route.url)).not.toContain(second);
 
     // A pairing code still waiting on the published route keeps it, and says why.
-    invite = ((await (await page.request.post("/api/v1/paired/invites", { headers, data: { client: "app", endpointId: published, displayName: "Waiting phone", accountId: await pairingAccountId(page) } })).json()) as { invite: { id: string } }).invite.id;
+    invite = ((await (await page.request.post("/api/v1/paired/invites", { headers, data: { clientType: "app", endpointId: published, displayName: "Waiting phone", accountId: await pairingAccountId(page) } })).json()) as { invite: { id: string } }).invite.id;
     await saved.getByRole("button", { name: "Remove" }).click();
     await expect(card.getByRole("alert")).toHaveText("A pairing code for this route is still active. Cancel it or wait for it to expire.");
     await expect(saved).toHaveCount(1);
@@ -424,13 +424,13 @@ test("lists an app's Siri and shortcuts as its own device, set up by its phone",
   await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "named", endpointId: route } });
   let phoneId = "";
   try {
-    const { invite } = (await (await page.request.post("/api/v1/paired/invites", { headers, data: { client: "app", endpointId: route, displayName: name, accountId: await pairingAccountId(page) } })).json()) as { invite: { id: string; code: string } };
+    const { invite } = (await (await page.request.post("/api/v1/paired/invites", { headers, data: { clientType: "app", endpointId: route, displayName: name, accountId: await pairingAccountId(page) } })).json()) as { invite: { id: string; code: string } };
     const phone = (await (await page.request.post(`/api/v1/paired/invites/${invite.id}/claim`, { data: { token: decodePairingCode(invite.code).token, deviceName: name } })).json()) as { device: { id: string }; token: string };
     phoneId = phone.device.id;
     // The app sets its controls up itself, with its own bearer: no browser can.
     await page.goto("/pair");
     const app = await page.context().browser()!.newContext({ extraHTTPHeaders: { authorization: `Bearer ${phone.token}` } });
-    const controls = await app.request.post(`${new URL(page.url()).origin}/api/v1/paired/invites?claim=true`, { data: { client: "app", scope: "rulesOnly", clientId: randomUUID(), displayName: `Siri and Shortcuts on ${name}` } });
+    const controls = await app.request.post(`${new URL(page.url()).origin}/api/v1/paired/invites?claim=true`, { data: { clientType: "app-controls", clientId: randomUUID(), displayName: `Siri and Shortcuts on ${name}` } });
     expect(controls.status()).toBe(201);
     await app.close();
 
@@ -459,7 +459,7 @@ test("re-pairs a revoked phone in place and removes another", { tag: "@desktop" 
   await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "named", endpointId: route } });
 
   async function pairAndRevoke(name: string) {
-    const { invite } = (await (await page.request.post("/api/v1/paired/invites", { headers, data: { client: "app", endpointId: route, displayName: name, accountId: await pairingAccountId(page) } })).json()) as { invite: { id: string; code: string } };
+    const { invite } = (await (await page.request.post("/api/v1/paired/invites", { headers, data: { clientType: "app", endpointId: route, displayName: name, accountId: await pairingAccountId(page) } })).json()) as { invite: { id: string; code: string } };
     const claimed = (await (await page.request.post(`/api/v1/paired/invites/${invite.id}/claim`, { data: { token: decodePairingCode(invite.code).token, deviceName: name } })).json()) as { device: { id: string } };
     await page.request.delete(`/api/v1/paired/devices/${claimed.device.id}`, { headers });
   }
@@ -511,11 +511,11 @@ test("re-pairs an active phone without revoking it first", { tag: "@desktop" }, 
   const devices = async () => ((await (await page.request.get("/api/v1/paired/devices")).json()) as { devices: Device[] }).devices;
 
   try {
-    const { invite } = (await (await page.request.post("/api/v1/paired/invites", { headers, data: { client: "app", endpointId: route, displayName: name, accountId: await pairingAccountId(page) } })).json()) as { invite: { id: string; code: string } };
+    const { invite } = (await (await page.request.post("/api/v1/paired/invites", { headers, data: { clientType: "app", endpointId: route, displayName: name, accountId: await pairingAccountId(page) } })).json()) as { invite: { id: string; code: string } };
     const old = (await (await page.request.post(`/api/v1/paired/invites/${invite.id}/claim`, { data: { token: decodePairingCode(invite.code).token, deviceName: name } })).json()) as { device: { id: string }; token: string };
     const bearer = { authorization: `Bearer ${old.token}` };
     const watch = (await (
-      await page.request.post("/api/v1/paired/invites?claim=true", { headers: bearer, data: { client: "watch", clientId: crypto.randomUUID(), displayName: `Watch ${tag}` } })
+      await page.request.post("/api/v1/paired/invites?claim=true", { headers: bearer, data: { clientType: "app-watch", clientId: crypto.randomUUID(), displayName: `Watch ${tag}` } })
     ).json()) as { device: { id: string } };
 
     await page.goto("/pair");

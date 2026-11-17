@@ -1,3 +1,5 @@
+import type { ClientScope, ClientType } from "./client-type";
+
 export type GroupAccess = "available" | "blocked" | "paused" | "allowed";
 
 /** Who paused a group or allowed it online, as they were named then. */
@@ -233,27 +235,19 @@ export type ConnectionRoute = {
   edgeTokenVersion: number | null;
 };
 
-/** What a paired device may call. Valid pairs: app `full` or `rulesOnly`, Watch `rulesOnly`, agent `full` or `readOnly`. */
-export type DeviceScope = "full" | "rulesOnly" | "readOnly";
-
 /**
- * What kind of paired device this is. `app` is the FamilyFi app on a phone, tablet or Mac (scope
- * `full`), or that app's Siri, Shortcuts and system controls (scope `rulesOnly`), which run outside
- * the app and so sign in as their own device, set up by the app. Read it with `isApp` and
- * `isAppControls` in `pair-device.ts`: a server older than 1.1.0 calls the app `phone`.
+ * Which client a paired device is (src/lib/client-type.ts): `app`, `app-watch`, `app-controls`, `me`
+ * or `agent`. A newer server may add one (`x-extensible-enum`); list it as a paired device like any other.
  */
-export type PairedClient = "app" | "watch" | "agent" | UnknownPairedClient;
-/** A kind this client does not know: `phone` from an older server, or one a newer server added (`x-extensible-enum`). */
-type UnknownPairedClient = string & {};
+export type PairedClientType = ClientType | (string & {});
+/** What a paired device may call, as one value such as `app:full`. A newer server may add one. */
+export type PairedScope = ClientScope | (string & {});
 
 export type PairedPhone = {
   id: string;
   displayName: string;
-  client: PairedClient;
-  /** Which client it is (src/lib/client-type.ts). Servers before API 1.6.0 leave it out: read `client` and `scope` then. */
-  clientType?: string;
-  /** Its scope without the group. A newer server may send one this client does not know. */
-  scope: DeviceScope;
+  clientType: PairedClientType;
+  scope: PairedScope;
   /** The account this device acts as. */
   actsAs: { username: string; displayName: string } | null;
   /** The device that vouched for this one: the app that set up a Watch or its own Siri and shortcuts. */
@@ -266,7 +260,7 @@ export type PairedPhone = {
   edgeTokens: { endpointId: string; version: number }[];
   /** Whether this app has turned on phone alerts; only `app:full` devices carry it. */
   alerts?: boolean;
-  sessions: { id: string; username: string; client: PairedClient; expiresAt: string; createdAt: string }[];
+  sessions: { id: string; username: string; expiresAt: string; createdAt: string }[];
 };
 
 export type PairingState = {

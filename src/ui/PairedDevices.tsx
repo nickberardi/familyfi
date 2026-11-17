@@ -60,7 +60,7 @@ export function PairedPhoneRow({
   return (
     <View style={[styles.phone, { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]} testID="phone-row">
       <View style={[styles.phoneIcon, { backgroundColor: ui.color("field") }]}>
-        <ui.Icon name={phone.client === "watch" ? "watch" : phone.client === "agent" ? "robot" : "device-mobile"} size={18} color={ui.color("ink")} />
+        <ui.Icon name={phone.clientType === "app-watch" ? "watch" : phone.clientType === "agent" ? "robot" : "device-mobile"} size={18} color={ui.color("ink")} />
       </View>
       <View style={styles.phoneWords}>
         <View style={styles.nameRow}>

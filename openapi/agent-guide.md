@@ -115,8 +115,8 @@ failed. A successful household sync is not proof that your change applied.
 
 Your scope is in `device.scope`:
 
-- `readOnly`: you may only read household state.
-- `full`: you may also manage groups, rules, pauses, allowances, devices and their
+- `agent:readOnly`: you may only read household state.
+- `agent:full`: you may also manage groups, rules, pauses, allowances, devices and their
   assignment, sync, the network checkup and DNS categories.
 
 Under any scope, you cannot reach accounts, gateway settings or resolvers, change household settings,

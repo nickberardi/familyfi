@@ -43,8 +43,6 @@ describe("openapi contract", () => {
       "Health.minAppApiVersion", // likewise
       "Health.minWatchApiVersion", // likewise
       "Health.minApiVersion", // only with ?client= naming a client type this server knows
-      "PairedDevice.clientType", // always sent, but servers before 1.6.0 leave it out: required would raise x-min-server
-      "PairedClaim.device.clientType", // likewise
       "Health.revision", // only when the database answered
       "Health.error", // only when degraded by configuration
       "Health.gateway", // only with ?gateway=true, for a session, while ready

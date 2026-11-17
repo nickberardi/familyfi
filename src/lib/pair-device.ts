@@ -1,6 +1,6 @@
 import { ALERTS_CARD_COPY } from "./alert-copy";
 import { scopeLabel } from "./agent-prompt";
-import { ApiError, type ApiRequest } from "./api-client";
+import type { ApiRequest } from "./api-client";
 import { relativeSweep } from "./sync-copy";
 import { transportLabel } from "./connection-routes";
 import type { Account, ConnectionRoute, PairedPhone, PairingState, RemoteAccess } from "./types";
@@ -95,23 +95,18 @@ export function splitPhones(phones: readonly PairedPhone[]) {
  * Whether a device's row offers Re-pair: any phone, active or revoked, while a route is published,
  * except the phone showing the list, which would sign itself out mid-flow.
  */
-export function canRepair(phone: Pick<PairedPhone, "id" | "client" | "scope" | "clientType">, { canPair, selfId }: { canPair: boolean; selfId?: string | null }): boolean {
+export function canRepair(phone: Pick<PairedPhone, "id" | "clientType">, { canPair, selfId }: { canPair: boolean; selfId?: string | null }): boolean {
   return canPair && isApp(phone) && phone.id !== selfId;
 }
 
-/**
- * Whether a paired device is the app itself, on a phone, tablet or Mac: client type `app`. A server
- * before API 1.6.0 sends no client type, and one older than 1.1.0 calls the app `phone`.
- */
-export function isApp(device: Pick<PairedPhone, "client" | "scope" | "clientType">): boolean {
-  if (device.clientType) return device.clientType === "app";
-  return (device.client === "app" || device.client === "phone") && device.scope === "full";
+/** Whether a paired device is the app itself, on a phone, tablet or Mac. */
+export function isApp(device: Pick<PairedPhone, "clientType">): boolean {
+  return device.clientType === "app";
 }
 
-/** Whether a paired device is an app's Siri, Shortcuts and system controls: client type `app-controls`. */
-export function isAppControls(device: Pick<PairedPhone, "client" | "scope" | "clientType">): boolean {
-  if (device.clientType) return device.clientType === "app-controls";
-  return device.client === "app" && device.scope === "rulesOnly";
+/** Whether a paired device is an app's Siri, Shortcuts and system controls. */
+export function isAppControls(device: Pick<PairedPhone, "clientType">): boolean {
+  return device.clientType === "app-controls";
 }
 
 /** The one route remote access publishes, once it is live: the address phones pair over. */
@@ -120,8 +115,8 @@ export function publishedRoute(tunnel: Pick<RemoteAccess, "endpointId"> | null, 
 }
 
 /** Revoking a phone also revokes the Watches, phones and agents it paired. */
-export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "client" | "scope" | "clientType">>) {
-  const kind = phone.client && phone.scope ? { client: phone.client, scope: phone.scope, clientType: phone.clientType } : null;
+export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "clientType">>) {
+  const kind = phone.clientType ? { clientType: phone.clientType } : null;
   // Nothing pairs an app's Siri and shortcuts again: the app sets them up itself when it next opens.
   if (kind && isAppControls(kind)) {
     return { title: `Revoke ${phone.displayName}?`, message: "They stop working now, until you next open FamilyFi on that device. The app itself stays paired.", confirmLabel: PAIR_COPY.revoke };
@@ -130,9 +125,9 @@ export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<
   return { title: `Revoke ${phone.displayName}?`, message: `It is signed out now and must be paired again.${paired}`, confirmLabel: PAIR_COPY.revoke };
 }
 
-export function removeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "client" | "scope" | "clientType">>) {
+export function removeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "clientType">>) {
   // An app sets its own Siri and shortcuts up again, so there is no setup to warn about.
-  const controls = phone.client && phone.scope && isAppControls({ client: phone.client, scope: phone.scope, clientType: phone.clientType });
+  const controls = phone.clientType !== undefined && isAppControls({ clientType: phone.clientType });
   return { title: `Remove ${phone.displayName} from the list?`, message: controls ? "This can't be undone." : "This can't be undone; setup would be needed again.", confirmLabel: PAIR_COPY.remove };
 }
 
@@ -145,10 +140,10 @@ function pairedDate(iso: string) {
 }
 
 /** Where a device came from when it paired through no listed route: the phone that set it up, the home network, or a removed route. */
-function origin(device: Pick<PairedPhone, "client" | "scope" | "clientType">, parentName: string | null): string {
-  if (device.client === "watch") return `Paired automatically from ${parentName ?? "an iPhone"}`;
+function origin(device: Pick<PairedPhone, "clientType">, parentName: string | null): string {
+  if (device.clientType === "app-watch") return `Paired automatically from ${parentName ?? "an iPhone"}`;
   if (isAppControls(device)) return `Set up automatically by ${parentName ?? "the FamilyFi app"}`;
-  if (device.client === "agent") return "On the home network";
+  if (device.clientType === "agent") return "On the home network";
   return "via a route that was removed";
 }
 
@@ -156,7 +151,7 @@ function origin(device: Pick<PairedPhone, "client" | "scope" | "clientType">, pa
 export type TagTone = "neutral" | "green" | "yellow" | "red" | "blue";
 
 /** Each access in its colour, as the operator chose: full green, rules only blue, read only red. */
-const SCOPE_TONES: Record<PairedPhone["scope"], TagTone> = { full: "green", rulesOnly: "blue", readOnly: "red" };
+const SCOPE_TONES: Record<string, TagTone> = { "app:full": "green", "agent:full": "green", "app:rulesOnly": "blue", "agent:readOnly": "red" };
 
 /**
  * A paired device's tags and lines, the same for phones, Watches and agents. Tags beside its name say
@@ -180,7 +175,7 @@ export function phoneLines(phone: PairedPhone, now = new Date(), parentName: str
     via: phone.pairedVia ? { url: phone.pairedVia.url, transport: transportLabel(phone.pairedVia.transport) } : null,
     origin: origin(phone, parentName),
     // A phone or agent another phone paired goes when that phone is revoked; a Watch or an app's Siri and shortcuts says so in its origin.
-    dates: `Paired ${pairedDate(phone.enrolledAt)}${parentName && phone.client !== "watch" && !isAppControls(phone) ? ` from ${parentName}` : ""}${ends ? ` · expires ${pairedDate(ends)}` : ""}`,
+    dates: `Paired ${pairedDate(phone.enrolledAt)}${parentName && phone.clientType !== "app-watch" && !isAppControls(phone) ? ` from ${parentName}` : ""}${ends ? ` · expires ${pairedDate(ends)}` : ""}`,
     expired: !phone.revokedAt && phone.sessions.length === 0,
   };
 }
@@ -266,17 +261,7 @@ export function removeRevokedPhones(send: Send) {
 /** What an administrator's invite for a phone carries. */
 export type PhoneInvite = { endpointId: string; displayName: string; accountId?: string; replacesDeviceId?: string };
 
-/**
- * Invites the app on a phone, tablet or Mac. The contract calls it `app`; a server older than 1.1.0
- * knows only `phone`, which newer servers still accept but deprecate, so it is sent only to a server
- * that refuses `app`.
- */
+/** Invites the app on a phone, tablet or Mac. */
 export async function invitePhone<T>(request: ApiRequest, invite: PhoneInvite): Promise<T> {
-  const send = (client: "app" | "phone") => request<T>("/api/v1/paired/invites", { method: "POST", body: { client, ...invite } });
-  try {
-    return await send("app");
-  } catch (caught) {
-    if (caught instanceof ApiError && caught.status === 400 && caught.code === "invalid_request") return send("phone");
-    throw caught;
-  }
+  return request<T>("/api/v1/paired/invites", { method: "POST", body: { clientType: "app", ...invite } });
 }

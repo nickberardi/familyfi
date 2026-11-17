@@ -37,7 +37,7 @@ describe("POST /paired/invites", () => {
   it("pairs a phone without a password: the claim signs it in and carries its route and manifest", async () => {
     const claim = await pairPhone(await admin());
     expect(claim).not.toHaveProperty("deviceCredential");
-    expect(claim.device).toMatchObject({ client: "app", clientType: "app", scope: "full" });
+    expect(claim.device).toMatchObject({ clientType: "app", scope: "app:full" });
     expect(claim.session.username).toBe(PAIRING_ADMIN.username);
     expect(claim.connection?.endpoint?.url).toBe("https://familyfi.local");
     expect(claim.connection?.manifest.signature).toBeTruthy();
@@ -117,7 +117,7 @@ describe("POST /paired/invites", () => {
     expect(response.status).toBe(201);
     const watch = (await response.json()) as Claim & { invite: { status: string } };
     expect(watch.invite.status).toBe("claimed");
-    expect(watch.device).toMatchObject({ client: "watch", clientType: "app-watch", scope: "rulesOnly", displayName: "Kitchen Watch" });
+    expect(watch.device).toMatchObject({ clientType: "app-watch", scope: "app:rulesOnly", displayName: "Kitchen Watch" });
     expect(watch.session.username).toBe("parent");
     expect(watch.connection?.manifest).toBeTruthy();
     const device = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: watch.device.id } });
@@ -127,12 +127,12 @@ describe("POST /paired/invites", () => {
   it("lets an app set up its own rulesOnly sign-in for Siri and shortcuts, as its child, one per app", async () => {
     const parent = await adult("parent");
     const phone = await pairPhone(await admin(), { accountId: parent.id });
-    const controls = { client: "app", scope: "rulesOnly", clientId: "0b1f6c0e-8f2e-4a55-9a0e-2f1f3f1c9d11" };
+    const controls = { clientType: "app-controls", clientId: "0b1f6c0e-8f2e-4a55-9a0e-2f1f3f1c9d11" };
     const response = await claimWatchRequest(bearer(phone.token), { ...controls, displayName: "Siri and Shortcuts on Parent's iPhone" });
     expect(response.status).toBe(201);
     const claimed = (await response.json()) as Claim & { invite: { status: string } };
     expect(claimed.invite.status).toBe("claimed");
-    expect(claimed.device).toMatchObject({ client: "app", clientType: "app-controls", scope: "rulesOnly", displayName: "Siri and Shortcuts on Parent's iPhone" });
+    expect(claimed.device).toMatchObject({ clientType: "app-controls", scope: "app:rulesOnly", displayName: "Siri and Shortcuts on Parent's iPhone" });
     expect(claimed.session.username).toBe("parent");
     // It may work away from home, as its app does.
     expect(claimed.connection?.manifest).toBeTruthy();
@@ -156,7 +156,7 @@ describe("POST /paired/invites", () => {
   it("never lets an app's rulesOnly sign-in retire a Watch by reusing its identifier, or a Watch it", async () => {
     const phone = await pairPhone(await admin());
     const watch = (await (await claimWatchRequest(bearer(phone.token))).json()) as Claim;
-    const reused = await claimWatchRequest(bearer(phone.token), { client: "app", scope: "rulesOnly" });
+    const reused = await claimWatchRequest(bearer(phone.token), { clientType: "app-controls" });
     expect(reused.status).toBe(409);
     expect(await errorCode(reused)).toBe("client_id_in_use");
     expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: watch.device.id } })).revokedAt).toBeNull();
@@ -164,7 +164,7 @@ describe("POST /paired/invites", () => {
 
   it("lets an app's rulesOnly sign-in work over remote access, as a Watch does", async () => {
     const phone = await pairPhone(await admin());
-    const controls = (await (await claimWatchRequest(bearer(phone.token), { client: "app", scope: "rulesOnly", clientId: "7c0d9a55-3c1a-4b0e-8a56-0f6a4b1f2e33" })).json()) as Claim;
+    const controls = (await (await claimWatchRequest(bearer(phone.token), { clientType: "app-controls", clientId: "7c0d9a55-3c1a-4b0e-8a56-0f6a4b1f2e33" })).json()) as Claim;
     const { GET: groups } = await import("@/app/api/v1/groups/route");
     const lan = request("/api/v1/groups", { auth: bearer(controls.token) });
     const tunnelled = new Request(lan.url, { headers: tunnelHeaders(Object.fromEntries(lan.headers.entries())) as Record<string, string> });
@@ -173,7 +173,7 @@ describe("POST /paired/invites", () => {
 
   it("ends an app's rulesOnly sign-in when the app is revoked", async () => {
     const phone = await pairPhone(await admin());
-    const controls = (await (await claimWatchRequest(bearer(phone.token), { client: "app", scope: "rulesOnly" })).json()) as Claim;
+    const controls = (await (await claimWatchRequest(bearer(phone.token), { clientType: "app-controls" })).json()) as Claim;
     const { DELETE } = await import("@/app/api/v1/paired/devices/[id]/route");
     const revoked = await DELETE(request(`/api/v1/paired/devices/${phone.device.id}`, { method: "DELETE", auth: await admin() }), { params: Promise.resolve({ id: phone.device.id }) });
     expect(revoked.status).toBeLessThan(300);
@@ -182,11 +182,11 @@ describe("POST /paired/invites", () => {
 
   it("claims an app this way only with the rulesOnly scope: never a second full app", async () => {
     const phone = await pairPhone(await admin());
-    expect((await claimWatchRequest(bearer(phone.token), { client: "app" })).status).toBe(400);
-    expect((await claimWatchRequest(bearer(phone.token), { client: "app", scope: "full" })).status).toBe(400);
+    expect((await claimWatchRequest(bearer(phone.token), { clientType: "app" })).status).toBe(400);
+    expect((await claimWatchRequest(bearer(phone.token), { clientType: "app-controls", scope: "app:full" })).status).toBe(400);
   });
 
-  it("takes clientType in place of the older client words, and puts it in the pairing code", async () => {
+  it("names the client type in the invite, the claim and the pairing code", async () => {
     const route = await homeRoute();
     const auth = await pairingAdminAuth();
     const created = await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ clientType: "app", displayName: "iPhone", endpointId: route.id }) }));
@@ -194,29 +194,25 @@ describe("POST /paired/invites", () => {
     const invited = await issuedInvite(created);
     expect(invited.payload.clientType).toBe("app");
     const phone = (await (await claimInvite(invited, "iPhone")).json()) as Claim;
-    expect(phone.device).toMatchObject({ client: "app", clientType: "app", scope: "full" });
+    expect(phone.device).toMatchObject({ clientType: "app", scope: "app:full" });
 
     const agent = await issuedInvite(await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ clientType: "agent", displayName: "Agent", scope: "agent:readOnly" }) })));
     expect(agent.payload.clientType).toBe("agent");
     expect(await prisma().pairing.findUniqueOrThrow({ where: { id: agent.inviteId } })).toMatchObject({ clientType: "agent", scope: "agent:readOnly" });
 
-    const watch = (await (await claimWatchRequest(bearer(phone.token), { client: undefined, clientType: "app-watch" })).json()) as Claim;
-    expect(watch.device).toMatchObject({ client: "watch", clientType: "app-watch", scope: "rulesOnly", displayName: "Apple Watch" });
-    const controls = (await (await claimWatchRequest(bearer(phone.token), { client: undefined, clientType: "app-controls", clientId: "3d6f1a2b-4c5d-4e6f-8a9b-0c1d2e3f4a5b" })).json()) as Claim;
-    expect(controls.device).toMatchObject({ client: "app", clientType: "app-controls", scope: "rulesOnly", displayName: "Shortcuts and controls" });
+    const watch = (await (await claimWatchRequest(bearer(phone.token), { clientType: "app-watch" })).json()) as Claim;
+    expect(watch.device).toMatchObject({ clientType: "app-watch", scope: "app:rulesOnly", displayName: "Apple Watch" });
+    const controls = (await (await claimWatchRequest(bearer(phone.token), { clientType: "app-controls", clientId: "3d6f1a2b-4c5d-4e6f-8a9b-0c1d2e3f4a5b" })).json()) as Claim;
+    expect(controls.device).toMatchObject({ clientType: "app-controls", scope: "app:rulesOnly", displayName: "Shortcuts and controls" });
 
-    // A client type that does not match the body, or one this route does not set up, is refused.
-    expect((await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ clientType: "app", client: "agent", displayName: "Agent", scope: "full" }) }))).status).toBe(400);
-    expect((await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ clientType: "me", displayName: "Kid", endpointId: route.id }) }))).status).toBe(400);
-    expect((await claimWatchRequest(bearer(phone.token), { client: "watch", clientType: "app" })).status).toBe(400);
-    expect((await claimWatchRequest(bearer(phone.token), { client: "app", scope: "rulesOnly", clientType: "app-watch" })).status).toBe(400);
-  });
-
-  it("still takes the deprecated phone for app in an invite, and answers app", async () => {
-    const route = await homeRoute();
-    const invited = await issuedInvite(await createInvite(request("/api/v1/paired/invites", { method: "POST", auth: await pairingAdminAuth(), headers: json, body: JSON.stringify({ client: "phone", displayName: "Old app's phone", endpointId: route.id }) })));
-    const claim = (await (await claimInvite(invited, "iPhone")).json()) as Claim;
-    expect(claim.device).toMatchObject({ client: "app", scope: "full" });
+    // The words before API 1.6.0, and a client type this route does not set up, are refused.
+    const invite = (body: object) => createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify(body) }));
+    expect((await invite({ client: "app", displayName: "iPhone", endpointId: route.id })).status).toBe(400);
+    expect((await invite({ client: "phone", displayName: "iPhone", endpointId: route.id })).status).toBe(400);
+    expect((await invite({ clientType: "agent", displayName: "Agent", scope: "full" })).status).toBe(400);
+    expect((await invite({ clientType: "me", displayName: "Kid", endpointId: route.id })).status).toBe(400);
+    expect((await claimWatchRequest(bearer(phone.token), { clientType: undefined, client: "watch" })).status).toBe(400);
+    expect((await claimWatchRequest(bearer(phone.token), { clientType: undefined, client: "app", scope: "rulesOnly" })).status).toBe(400);
   });
 
   it("serves claim=true only to a paired phone, and only for a Watch or its own rulesOnly sign-in", async () => {
@@ -226,26 +222,26 @@ describe("POST /paired/invites", () => {
     const browser = await claimWatchRequest(auth);
     expect(browser.status).toBe(403);
     expect(await errorCode(browser)).toBe("paired_phone_required");
-    expect((await claimWatchRequest(bearer(phone.token), { client: "app" })).status).toBe(400);
+    expect((await claimWatchRequest(bearer(phone.token), { clientType: "app" })).status).toBe(400);
 
     const watch = (await (await claimWatchRequest(bearer(phone.token))).json()) as Claim;
     expect(await errorCode(await claimWatchRequest(bearer(watch.token)))).toBe("watch_scope");
 
-    const agentInvite = await issuedInvite(await createInvite(request("/api/v1/paired/invites", { method: "POST", auth: await pairingAdminAuth(), headers: json, body: JSON.stringify({ client: "agent", displayName: "Agent", scope: "full" }) })));
+    const agentInvite = await issuedInvite(await createInvite(request("/api/v1/paired/invites", { method: "POST", auth: await pairingAdminAuth(), headers: json, body: JSON.stringify({ clientType: "agent", displayName: "Agent", scope: "agent:full" }) })));
     const agent = (await (await claimInvite(agentInvite, "Agent")).json()) as Claim;
     expect(await errorCode(await claimWatchRequest(bearer(agent.token)))).toBe("agent_scope");
   });
 
   it("asks a Watch to be invited by its phone, and a phone for its route", async () => {
     const auth = await admin();
-    const watchByAdmin = await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ client: "watch", clientId: "f626e8d1-57bc-4c88-9068-7c9ce6d4d0d1" }) }));
+    const watchByAdmin = await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ clientType: "app-watch", clientId: "f626e8d1-57bc-4c88-9068-7c9ce6d4d0d1" }) }));
     expect(watchByAdmin.status).toBe(400);
-    const controlsByAdmin = await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ client: "app", scope: "rulesOnly", clientId: "f626e8d1-57bc-4c88-9068-7c9ce6d4d0d1" }) }));
+    const controlsByAdmin = await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ clientType: "app-controls", clientId: "f626e8d1-57bc-4c88-9068-7c9ce6d4d0d1" }) }));
     expect(controlsByAdmin.status).toBe(400);
     expect((await invitePhoneRequest(auth, {})).status).toBe(400);
     expect((await invitePhoneRequest(auth, { endpointId: "missing-route" })).status).toBe(404);
     // An invite pairs the whole app: a scope on it is refused, never dropped.
-    const scoped = await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ client: "app", scope: "rulesOnly", displayName: "A phone", endpointId: "missing-route" }) }));
+    const scoped = await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ clientType: "app-controls", displayName: "A phone", endpointId: "missing-route" }) }));
     expect(scoped.status).toBe(400);
   });
 
@@ -279,7 +275,7 @@ describe("POST /paired/invites", () => {
     expect(refused.status).toBe(400);
     expect(await errorCode(refused)).toBe("personal_account_required");
     // Asking for no account means the one signed in, which is the recovery admin here.
-    const unnamed = await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ client: "app", displayName: "iPhone", endpointId: route.id }) }));
+    const unnamed = await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ clientType: "app", displayName: "iPhone", endpointId: route.id }) }));
     expect(await errorCode(unnamed)).toBe("personal_account_required");
     expect(await prisma().pairing.count()).toBe(0);
 
