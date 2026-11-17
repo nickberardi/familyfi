@@ -75,7 +75,7 @@ function requireVisible(session: Viewer) {
   return visible;
 }
 
-/** Paired devices the caller may see, narrowed by the query's `client` (repeatable) and `status`, as sent. */
+/** Paired devices the caller may see, narrowed by the query's `clientType` (repeatable) and `status`, as sent. */
 export async function listPairedDevices(session: Viewer, query: { clientType: string[]; status?: string }) {
   const visible = requireVisible(session);
   const filter = Filter.safeParse(query);
