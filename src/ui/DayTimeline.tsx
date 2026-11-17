@@ -67,7 +67,7 @@ export function DayTimeline({
           <Pressable
             key={index}
             role="button"
-            aria-label={`${band.label}, ${bandTimes(band)}. ${band.source}`}
+            aria-label={`${band.label}, ${bandTimes(band)}.${band.source && band.source !== band.label ? ` ${band.source}` : ""}`}
             aria-pressed={chosen === index}
             // React Native has no aria-pressed; this carries the same state to VoiceOver and TalkBack.
             accessibilityState={{ selected: chosen === index }}
@@ -117,7 +117,8 @@ export function DayTimeline({
       <Text aria-live="polite" style={[text, !picked && styles.empty]}>
         {picked ? (
           <>
-            <Text style={{ fontWeight: "600", color: ui.color("ink") }}>{picked.label}</Text> · {bandTimes(picked)} · {picked.source}
+            <Text style={{ fontWeight: "600", color: ui.color("ink") }}>{picked.label}</Text> · {bandTimes(picked)}
+            {picked.source && picked.source !== picked.label ? ` · ${picked.source}` : null}
           </>
         ) : null}
       </Text>

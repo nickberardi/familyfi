@@ -427,8 +427,8 @@ describe("a child's day on the household's clock", () => {
     expect(story.items).toHaveLength(1);
     expect(story.items[0].detail).toBe("No end time");
     const band = story.bands.find((entry) => entry.kind === "pause")!;
-    expect(bandTimes(band)).toBe("no end time");
-    expect(timelineLegend(story.bands)[0]?.times).toBe("no end time");
+    expect(bandTimes(band)).toBe("with no end time");
+    expect(timelineLegend(story.bands)[0]?.times).toBe("with no end time");
     const thing = tellDay(subject, now, THING_VOICE, day);
     expect(thingTile(thing)).toMatchObject({ word: "Blocked", line: "No end time" });
     expect(thingNote(thing)).toBe("Blocked with no end time. Ask here and your parents decide.");
@@ -436,7 +436,7 @@ describe("a child's day on the household's clock", () => {
     const today = meDaySubject(me({ pause: { by: "Dad", since: "2026-11-17T10:00:00Z", until: null } }), TUESDAY_MORNING);
     const told = tellDay(today.subject, today.now, PHONE_VOICE, today.clock);
     expect(told.items[0].detail).toBe("No end time");
-    expect(bandTimes(told.bands.find((entry) => entry.kind === "pause")!)).toBe("no end time");
+    expect(bandTimes(told.bands.find((entry) => entry.kind === "pause")!)).toBe("with no end time");
     // With an end: only its end.
     const ending = meDaySubject(me({ pause: { by: "Dad", since: "2026-11-16T22:00:00Z", until: "2026-11-17T13:00:00Z" } }), TUESDAY_MORNING);
     const ends = tellDay(ending.subject, ending.now, PHONE_VOICE, ending.clock);
@@ -473,15 +473,26 @@ describe("a child's day on the household's clock", () => {
     expect(subject.always).toEqual(["No internet"]);
     const story = tellDay(subject, now, PHONE_VOICE, day);
     expect(story.day).toEqual({ kind: "always", label: "No internet" });
-    expect(topAnswer(story)).toMatchObject({ title: "No internet", sentence: "No internet is on all the time." });
-    expect(story.items.map((item) => [item.title, item.detail])).toEqual([["No internet", "All the time"]]);
-    expect(story.bands).toEqual([{ kind: "window", from: 0, to: 1440, label: "No internet", source: "All the time" }]);
+    expect(topAnswer(story)).toMatchObject({ title: "No internet", sentence: "No internet all day." });
+    expect(story.items.map((item) => [item.title, item.detail])).toEqual([["No internet", "No internet all day"]]);
+    expect(story.bands).toEqual([{ kind: "window", from: 0, to: 1440, label: "No internet", source: "No internet", times: "All day" }]);
+    expect(timelineLegend(story.bands)[0]?.times).toBe("All day");
     const thing = tellDay(subject, now, THING_VOICE, day);
-    expect(thingTile(thing)).toEqual({ word: "No internet", line: "All the time", tone: "window" });
-    expect(thingNote(thing)).toBe("No internet all the time.");
+    expect(thingTile(thing)).toEqual({ word: "No internet", line: "No internet all day", tone: "window" });
+    expect(thingNote(thing)).toBe("No internet: no internet all day.");
     // A category rule alone leaves the internet on.
     const games = meDaySubject(me({ alwaysOn: [{ ruleId: "r3", name: "Games", kind: "category" }] }), MONDAY_NIGHT);
     expect(games.subject.always).toBeUndefined();
+  });
+
+  it("after a pause, skips a window lifted to its end and starts one lifted part way when the lift ends", () => {
+    const pause = { by: "Dad", since: "2026-11-17T00:00:00Z", until: "2026-11-17T02:00:00Z" }; // 7 PM until 9 PM
+    const all = meDaySubject(me({ pause, windows: [{ ...bedtime([1]), allowed: { by: "Dad", until: "2026-11-17T14:00:00Z" } }] }), new Date("2026-11-17T01:00:00Z"));
+    const skipped = tellDay(all.subject, all.now, PHONE_VOICE, all.clock);
+    expect(skipped.items.map((item) => [item.time, item.title])).toEqual([["Now", "Paused by Dad"], ["9 PM", "Not blocked"]]);
+    const part = meDaySubject(me({ pause, windows: [{ ...bedtime([1]), allowed: { by: "Dad", until: "2026-11-17T03:00:00Z" } }] }), new Date("2026-11-17T01:00:00Z"));
+    const resumed = tellDay(part.subject, part.now, PHONE_VOICE, part.clock);
+    expect(resumed.items.map((item) => [item.time, item.title])).toEqual([["Now", "Paused by Dad"], ["9 PM", "Not blocked"], ["10 PM", "Bedtime"], ["7 AM", "Not blocked"]]);
   });
 
   it("tells nothing of a window a parent lifted for the whole of it", () => {
