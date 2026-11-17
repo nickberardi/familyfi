@@ -265,8 +265,10 @@ the group's name and its `username` names the device, and a paired-device listin
 revoking the phone that invited it leaves it alone.
 
 It reads `GET /me/day`, which tells the group's own pause and allowance, the windows of its
-internet rules (each with the days it starts on and its household-time start and end), and the
-rules that block something all the time; nothing else in the household. `src/lib/child-day.ts`
+internet rules (each with the days it starts on, its household-time start and end, and `allowed`
+while its rule is lifted for the group until a time), and the rules that block something all the
+time; nothing else in the household. A rule lifted with no end, and an always-on rule while lifted,
+are left out. A `by` is `null` where FamilyFi recorded no person, or the recovery account acted. `src/lib/child-day.ts`
 (`meDaySubject`, `tellDay`) turns that answer into the day FamilyFi Me shows. It renews like any
 paired device, and may revoke itself. Deleting its group revokes it and cancels invites still
 waiting for the group, keeping the record; an import keeps it where its group comes back with the

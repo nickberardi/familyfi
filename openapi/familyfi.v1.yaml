@@ -3441,11 +3441,11 @@ components:
             until: { type: [string, "null"], format: date-time }
         windows:
           type: array
-          description: The windows of the group's scheduled internet rules that are on, in rule then window order.
+          description: "The windows of the group's scheduled internet rules that are on, in rule then window order, including a rule lifted until a time (see `allowed`)."
           items:
             type: object
             additionalProperties: false
-            required: [ruleId, ruleName, name, days, start, end]
+            required: [ruleId, ruleName, name, days, start, end, allowed]
             properties:
               ruleId: { type: string }
               ruleName: { type: string }
@@ -3453,9 +3453,17 @@ components:
               days: { type: array, items: { type: integer, minimum: 0, maximum: 6 }, description: "The days it starts on, 0 = Sunday." }
               start: { type: string, description: "HH:mm, household time." }
               end: { type: string, description: "HH:mm, household time; at or before `start`, the next morning." }
+              allowed:
+                type: [object, "null"]
+                description: "Its rule is lifted for this group until `until`: an allowance, or the rule paused or allowed. Null when it is not; a rule lifted with no end is left out."
+                additionalProperties: false
+                required: [by, until]
+                properties:
+                  by: { type: [string, "null"], description: "Who lifted it, as they were named then; null when FamilyFi recorded no person or the recovery account did." }
+                  until: { type: string, format: date-time }
         alwaysOn:
           type: array
-          description: The group's rules that block all the time.
+          description: The group's rules that block all the time, leaving out one lifted now.
           items:
             type: object
             additionalProperties: false
