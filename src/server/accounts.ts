@@ -130,6 +130,9 @@ export async function deleteAccount(id: string) {
     throw new ApiError(409, "recovery_account", "The recovery admin cannot be removed.");
   }
   await revokeAccountSessions(id);
+  // Their phones, and everything those paired, go first, and invites they made are cancelled: the
+  // account's delete would only cascade the phones, leaving what they paired and their codes behind.
+  await prisma().$transaction((db) => removeAccountDevices(id, db as never));
   await prisma().account.delete({ where: { id } });
   return { change: await enqueueChange("account") };
 }
