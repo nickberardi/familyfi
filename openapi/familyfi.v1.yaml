@@ -3191,14 +3191,20 @@ components:
             instead.
         minAppApiVersion:
           type: string
+          deprecated: true
           description: |
-            The oldest client API version this server still serves (`info.x-min-app`). A client
-            whose API version is older must ask to be updated instead of reading the household.
+            Deprecated, and will be removed in a future version: send `?clientType=` and read
+            `minApiVersion`. The oldest client API version this server still serves (`info.x-min-app`).
+            A client whose API version is older must ask to be updated instead of reading the household.
+            Apps built before 2.0.0 read only this, so it stays until they no longer need telling to update.
         minWatchApiVersion:
           type: string
+          deprecated: true
           description: |
-            The oldest watch app API version this server still serves (`info.x-min-app-watch`). A watch
-            app whose API version is older must ask to be updated once a read it needs fails.
+            Deprecated, and will be removed in a future version: send `?clientType=app-watch` and read
+            `minApiVersion`. The oldest watch app API version this server still serves
+            (`info.x-min-app-watch`). A watch app whose API version is older must ask to be updated once
+            a read it needs fails.
         minApiVersion:
           type: string
           description: |
