@@ -295,12 +295,12 @@ and about an always-on rule 409 `always_on`; after a no the child waits the hous
 No route says yes: a parent answers with the verb that lifts what the ask is about, adding its
 `askId`. `POST /groups/{id}/rules/internet/resume` ends the pause; `POST
 /groups/{id}/rules/{ruleId}/allow` lifts the rule for the group for the minutes asked, from now, or
-until the parent's own `until`, and never past the end of the window that is on. The ask is taken
+until the parent's own `until`, and never past the end of the window that is on (409 `not_in_window` once it is not). Only an administrator answers by `askId`, as only one declines (403 `administrator_required` for a Watch, the app's controls or an agent). The ask is taken
 before the write, so a second parent answering it gets 409 `ask_closed`, and is put back if the
 write fails. `POST /groups/{id}/asks/{askId}/decline` is Not now. Any other write that lifts what a
 waiting ask is about (the group's unblock or allowance, the rule paused or allowed for the group or
 for everyone) answers it yes as well, by that parent. An ask nobody answers closes at the earlier of
-the household's `askTimeoutMinutes` and the end of the block it asks about: `timedOut` or `ended`. It
+the household's `askTimeoutMinutes` and the end of the block it asks about (moved when the pause is set again or extended): `timedOut` or `ended`. It
 reads closed as soon as that time passes, and the next sync pass writes it so.
 
 An app's Siri, Shortcuts and system controls (Control Center, Quick Settings) run outside the app.
