@@ -415,9 +415,11 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       at = end;
     }
     if (at >= 1440) return morning();
+    // An always-on internet rule still on (after a pause) blocks the rest of today.
+    if (blockingAlways) return [...items, later({ time: clock(at), tone: "window", sign: "window", title: blockingAlways.label, detail: "For the rest of today" })];
     if (back !== undefined && back <= at) return [...items, alwaysAgain(at)];
     const next = nextWindow(at);
-    if (back !== undefined && (!next || back < next.from)) return [...items, notBlocked(at, undefined, liftedAlways!.label), alwaysAgain(back)];
+    if (back !== undefined && (!next || back < next.from)) return [...items, notBlocked(at, undefined, clock(back)), alwaysAgain(back)];
     return [...items, notBlocked(at, next), ...(next ? [windowItem(next)] : [])];
   };
   const afterWindow = () => onwards(windowEnd);
