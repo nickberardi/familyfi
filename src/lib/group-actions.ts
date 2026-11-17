@@ -179,11 +179,12 @@ export type GroupStatus = {
 
 /**
  * A card's status as its badge and the line under it. The badge says whether the group has the
- * internet; the line says why, in grey while its rules do what they always do, in red when someone
+ * internet, or, with a Block button default, what the button's rule is doing: Blocked while it
+ * blocks, Unblocked while it is lifted for the group, Online otherwise. The line says why, in grey while its rules do what they always do, in red when someone
  * blocked it, and in green when someone lifted a block (an unblock, or its internet rule paused).
  */
 export type GroupStatusParts = {
-  badge: "online" | "blocked";
+  badge: "online" | "blocked" | "unblocked";
   /** The line under the name, or empty when the badge says it all. */
   detail: string;
   /** Who changed what the rules normally do: nobody, a block, or a lift. */
@@ -211,10 +212,16 @@ export function groupStatusParts(group: Group, rules: Rule[], timezone: string, 
 function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): FullStatus {
   const by = (actor: Actor) => (actor ? ` by ${actor.name}` : "");
   const until = (at: string | null, open: string) => (at ? `until ${formatClock(new Date(at), timezone)}` : open);
-  const online = (tone: GroupStatus["tone"], label: string, detail: string, change: GroupStatusParts["change"] = "none"): FullStatus => ({
+  const online = (
+    tone: GroupStatus["tone"],
+    label: string,
+    detail: string,
+    change: GroupStatusParts["change"] = "none",
+    badge: GroupStatusParts["badge"] = "online",
+  ): FullStatus => ({
     tone,
     label,
-    badge: "online",
+    badge,
     detail: sentence(detail),
     change,
   });
@@ -237,23 +244,26 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
     const detail = `${internet.name} ${until(internet.until, "· always")}`;
     return blocked("off", `Blocked · ${detail}`, detail);
   }
+  // With a Block button default the badge follows that rule, as the button does: Blocked while it
+  // blocks, Unblocked while it is lifted for the group, Online otherwise.
+  const button = blockButtonRule(group, rules);
+  const buttonLift = button && buttonRuleLift(button, group.id, now);
+  const badge: GroupStatusParts["badge"] = blocking.some((rule) => rule.ruleId === button?.id) ? "blocked" : buttonLift ? "unblocked" : "online";
   if (blocking.length) {
     const last = blocking[0]!.until;
     const detail = `${names(blocking.map((rule) => rule.name))} blocked${last ? ` ${until(last, "")}` : ""}`;
-    return online("rule", `Online · ${detail}`, detail);
+    return online("rule", `Online · ${detail}`, detail, "none", badge);
   }
   // An unblock comes first, as on the button: its Resume is the one way to end it from the card.
   const unblock = groupUnblock(group, rules, now);
   if (unblock) {
     const detail = unblock.until ? `unblocked ${until(unblock.until, "")}${by(unblock.by)}` : `unblocked${by(unblock.by)} until you resume`;
-    return online("on", `Online · ${detail}`, detail, "unblocked");
+    return online("on", `Online · ${detail}`, detail, "unblocked", badge);
   }
-  const button = blockButtonRule(group, rules);
-  const buttonLift = button && buttonRuleLift(button, group.id, now);
   if (button && buttonLift?.kind === "pause") {
     const name = button.name;
     const detail = buttonLift.until ? `${name} unblocked ${until(buttonLift.until, "")}${by(buttonLift.by)}` : `${name} unblocked${by(buttonLift.by)} until you block it again`;
-    return online("on", `Online · ${detail}`, detail, "unblocked");
+    return online("on", `Online · ${detail}`, detail, "unblocked", badge);
   }
   const internetRules = groupScopedRules(rules, group.id).filter((rule) => rule.kind === "internet");
   const paused = groupRulePause(group, internetRules, now);
@@ -316,6 +326,7 @@ export function groupStatusColor(tone: GroupStatus["tone"]): string {
 /** The badge beside a card's name: its word, and the `--ff-*` ink and fill it is drawn in. */
 export function groupBadge(badge: GroupStatusParts["badge"]): { label: string; ink: string; fill: string } {
   if (badge === "blocked") return { label: "Blocked", ink: "var(--ff-status-blocked-ink)", fill: "var(--ff-status-blocked-fill)" };
+  if (badge === "unblocked") return { label: "Unblocked", ink: "var(--ff-status-online-ink)", fill: "var(--ff-status-online-fill)" };
   return { label: "Online", ink: "var(--ff-status-online-ink)", fill: "var(--ff-status-online-fill)" };
 }
 
