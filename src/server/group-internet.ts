@@ -68,8 +68,8 @@ export async function liftGroupInternet(
     });
     await followPause(groupId, end);
   } else if (action === "resume") {
-    await prisma().rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
-    await answerAsks(session, groupId, { pause: true });
+    const resumed = await prisma().rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
+    if (resumed.count) await answerAsks(session, groupId, { pause: true });
   } else if (action === "extend") {
     if (!block || !blocking) throw new ApiError(409, "not_paused", "Extend requires an active pause.");
     if (!block.expiresAt) throw new ApiError(409, "indefinite", "An indefinite pause has no expiry to extend.");

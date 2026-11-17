@@ -191,8 +191,15 @@ export async function followPause(groupId: string, end: Date | null): Promise<vo
   }
 }
 
-/** The sync pass's sweep: an ask left waiting past its end closes, `ended` with its block, else `timedOut`. */
+/** Asks are kept a week, well past the day a group shows its latest. */
+const ASK_KEPT_MS = 7 * 24 * 60 * 60_000;
+
+/**
+ * The sync pass's sweep: an ask left waiting past its end closes, `ended` with its block, else
+ * `timedOut`, and asks older than a week go.
+ */
 export async function closeLapsedAsks(now: Date): Promise<void> {
+  await prisma().ask.deleteMany({ where: { createdAt: { lt: new Date(now.getTime() - ASK_KEPT_MS) } } });
   const lapsed = { state: AskState.waiting, expiresAt: { lte: now } };
   await prisma().ask.updateMany({ where: { ...lapsed, endsWithBlock: true }, data: { state: AskState.ended } });
   await prisma().ask.updateMany({ where: { ...lapsed, endsWithBlock: false }, data: { state: AskState.timedOut } });
