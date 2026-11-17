@@ -73,16 +73,20 @@ export function alertChoiceRows(choices: AlertChoices | null): { kind: AlertKind
   return ALERT_KINDS.map((kind) => ({ kind, on: choices?.kinds[kind] !== false }));
 }
 
-/** Where a tapped alert opens in the app: new devices in Unassigned, gateway trouble on Sync. */
-export function alertDestination(kind: string): string {
+/**
+ * Where a tapped alert opens in the app: new devices in Unassigned, gateway trouble on Sync, a
+ * child's ask on that child's group, where the parent answers it.
+ */
+export function alertDestination(kind: string, data: Record<string, unknown> = {}): string {
   if (!isAlertKind(kind)) return "/";
+  if (kind === "ask.new") return typeof data.g === "string" && data.g ? `/family/${encodeURIComponent(data.g)}` : "/family";
   return kind === "device.new" ? "/devices?filter=loose" : "/sync";
 }
 
 /** The app's Alerts screen. */
 export const ALERTS_SCREEN_COPY = {
   title: "Alerts",
-  intro: "Get an alert on this device when a new device is waiting in Unassigned, or when FamilyFi can't reach your gateway.",
+  intro: "Get an alert on this device when a new device is waiting in Unassigned, when FamilyFi can't reach your gateway, or when a child asks for more time.",
   /** The one switch for this device's alerts; turning it on asks to send notifications. */
   deviceSwitch: "Alerts on this device",
   /** The system's notification permission was refused. */

@@ -74,6 +74,8 @@ const Config = z
       timezone: z.string().min(1),
       displayName: z.string().trim().min(1).max(80),
       quarantineEnforced: z.boolean(),
+      /** Asking for more time; absent in exports made before it. */
+      asks: z.object({ timeoutMinutes: z.number().int().min(5).max(1440), waitMinutes: z.number().int().min(0).max(1440) }).optional(),
       unifi: z.object({
         mode: z.string().nullable(),
         baseUrl: z.string().nullable(),
@@ -249,6 +251,7 @@ export async function householdConfig(): Promise<HouseholdConfig> {
       timezone: household.timezone,
       displayName: household.displayName,
       quarantineEnforced: household.quarantineEnforced,
+      asks: { timeoutMinutes: household.askTimeoutMinutes, waitMinutes: household.askWaitMinutes },
       unifi: {
         mode: household.unifiMode,
         baseUrl: household.unifiBaseUrl,
@@ -603,6 +606,7 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
           timezone: config.household.timezone,
           displayName: config.household.displayName,
           quarantineEnforced: config.household.quarantineEnforced,
+          ...(config.household.asks ? { askTimeoutMinutes: config.household.asks.timeoutMinutes, askWaitMinutes: config.household.asks.waitMinutes } : {}),
           ...(summary.gateway === "imported"
             ? {
                 unifiMode: unifi.mode,

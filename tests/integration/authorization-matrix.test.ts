@@ -68,8 +68,10 @@ type Outcome = "allowed" | "401" | "403";
  *   without it.
  * - `refresh-token`: a paired device's refresh token is the credential; no session helps
  *   without it.
+ * - `child`: FamilyFi Me on a child's phone alone (asking for more time); an administrator's session
+ *   is refused, 403.
  */
-type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "refresh-token";
+type Access = "public" | "home-network" | "session" | "administrator" | "csrf" | "pairing-token" | "refresh-token" | "child";
 
 type Person = Exclude<Caller, Device>;
 
@@ -86,6 +88,7 @@ const EXPECTED: Record<Access, Record<Person, Outcome>> = {
   csrf: { anonymous: "403", member: "allowed", administrator: "allowed", recovery: "allowed", tunnel: "403", "tunnel-bearer": "allowed" },
   "pairing-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403", "tunnel-bearer": "403" },
   "refresh-token": { anonymous: "403", member: "403", administrator: "403", recovery: "403", tunnel: "403", "tunnel-bearer": "403" },
+  child: { anonymous: "401", member: "401", administrator: "403", recovery: "403", tunnel: "401", "tunnel-bearer": "401" },
 };
 
 /**
@@ -95,7 +98,7 @@ const EXPECTED: Record<Access, Record<Person, Outcome>> = {
 function deviceOutcome(entry: Entry, device: Device): Outcome {
   if (entry.access === "public" || entry.access === "home-network" || entry.access === "csrf") return "allowed";
   if (entry.access === "pairing-token" || entry.access === "refresh-token") return "403";
-  if (entry.devices?.includes(device)) return entry.access === "session" ? "allowed" : "403";
+  if (entry.devices?.includes(device)) return entry.access === "session" || entry.access === "child" ? "allowed" : "403";
   return "403";
 }
 
@@ -211,6 +214,9 @@ const ACCESS: Record<string, Entry> = {
   "POST /api/v1/groups/{id}/unblock": { access: "session", devices: CONTROLLERS_AND_WATCH },
   "POST /api/v1/groups/{id}/unblock/end": { access: "session", devices: CONTROLLERS_AND_WATCH },
   "POST /api/v1/groups/{id}/unblock/extend": { access: "session", devices: CONTROLLERS_AND_WATCH },
+  // A child asks for more time on its own group; a parent's Not now is the app's or the web's alone.
+  "POST /api/v1/groups/{id}/asks": { access: "child", devices: ["me"] },
+  "POST /api/v1/groups/{id}/asks/{askId}/decline": { access: "administrator" },
   "GET /api/v1/settings/export": { access: "administrator" },
   "GET /api/v1/settings/household": { access: "session", devices: READERS },
   "PUT /api/v1/settings/household": { access: "session" },
@@ -244,7 +250,7 @@ const BODIES: Record<string, unknown> = {
   "POST /api/v1/auth/refresh": { refreshToken: "not-a-refresh-token" },
 };
 
-const PARAMS: Record<string, string> = { id: "matrix-missing-id", ruleId: "matrix-missing-rule", sessionId: "matrix-missing-session", mac: "02:00:00:00:0a:99" };
+const PARAMS: Record<string, string> = { id: "matrix-missing-id", ruleId: "matrix-missing-rule", askId: "matrix-missing-ask", sessionId: "matrix-missing-session", mac: "02:00:00:00:0a:99" };
 
 type Handler = (request: Request, context: { params: Promise<Record<string, string>> }) => Promise<Response>;
 type Route = { key: string; method: (typeof METHODS)[number]; template: string; handler: Handler };

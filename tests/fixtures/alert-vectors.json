@@ -72,6 +72,48 @@
         "title": "Gateway reached",
         "body": "FamilyFi can reach your gateway again."
       }
+    },
+    {
+      "name": "a child asks to be unpaused",
+      "nonce": "303132333435363738393a3b",
+      "envelope": {
+        "v": 1,
+        "i": "q7w8e9",
+        "t": 1794787320,
+        "k": "ask.new",
+        "d": {
+          "g": "g1",
+          "n": "Sam",
+          "a": "pause"
+        }
+      },
+      "ciphertext": "ATAxMjM0NTY3ODk6O8gXR-LTXmYhQxG0zmOuSVD5Hm174UpmPxaJaHjfi0kNcVAgRkfioYXPV3lnFKOkD4JuOWsRyudAj3pDM3FqfdY-RIStx8haHdw5-HRcTQyhSapVIf64PleBDk-fD2LIVfOs__zrAA",
+      "text": {
+        "title": "Sam asked to be unpaused",
+        "body": "Open FamilyFi to answer."
+      }
+    },
+    {
+      "name": "a child asks for more time in a window",
+      "nonce": "3c3d3e3f4041424344454647",
+      "envelope": {
+        "v": 1,
+        "i": "r4t5y6",
+        "t": 1794787380,
+        "k": "ask.new",
+        "d": {
+          "g": "g1",
+          "n": "Sam",
+          "a": "rule",
+          "r": "Bedtime",
+          "m": 30
+        }
+      },
+      "ciphertext": "ATw9Pj9AQUJDREVGRwz8T9LOfvmVxYBVDlx-CBTcKrlZAPkCcxMxnfIfwSdj2xgNpxP5fp417wmEKoYcRIXG3uJ3MQ9Zr4HB-W5KvdsCsFbGJlHdIJGL3usMdRHg19vaC5kqbLvKnAm7bFLPAJbxhhSKSO8J7YEzqFk5NagtUbCMs8RVaMM8",
+      "text": {
+        "title": "Sam asked for more time",
+        "body": "30 minutes of Bedtime. Open FamilyFi to answer."
+      }
     }
   ]
 }

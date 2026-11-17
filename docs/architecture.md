@@ -117,8 +117,9 @@ narrower `app:rulesOnly` scope. Only administrators sign in or have paired devic
 administrator access has no sign-in, session or device, and demoting one ends all three (see the
 [invariant](../AGENTS.md#invariants)). The one exception is FamilyFi Me on a child's phone (`me`,
 `me:askOnly`): its invite names a family group, it signs in for that group as no account, and it
-reads only that group's day ([`src/server/child-day.ts`](../src/server/child-day.ts)); deleting
-the group revokes it ([API](api.md#familyfi-me-on-a-childs-phone)).
+reads only that group's day ([`src/server/child-day.ts`](../src/server/child-day.ts)) and asks for
+more time on it ([`src/server/asks.ts`](../src/server/asks.ts)), which only a parent's own write
+answers; deleting the group revokes it ([API](api.md#familyfi-me-on-a-childs-phone)).
 
 Remote routes reach the [phone-only gateway](../src/server/tunnel/phone-gateway.ts), which forwards
 only API traffic, strips cookies and stamps tunnel provenance. The ordinary web UI is not exposed

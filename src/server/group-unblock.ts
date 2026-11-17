@@ -2,6 +2,7 @@ import { RuleLiftKind } from "@prisma/client";
 import { standingRule } from "@/lib/group-actions";
 import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { extendSuspensionUntil } from "@/lib/schedule";
+import { answerAsks } from "./asks";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
 import { blockButtonRuleOf, blockRuleOf, groupInclude, lifted, publicGroup, sessionActor } from "./groups";
@@ -70,6 +71,8 @@ export async function unblockGroup(
       }
       await tx.rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
     });
+    // Whatever a child asked about that this unblock lifted is answered yes.
+    await answerAsks(session, groupId, { pause: blockedByPause, ruleIds: targets.map(({ rule }) => rule.id) });
   } else if (action === "end") {
     await prisma().ruleGroup.updateMany({
       where: { groupId, rule: { systemGroupId: null }, ruleId: { notIn: [LOCK_DNS_RULE_ID, COUNTRIES_RULE_ID] }, pauseActive: true, pauseKind: RuleLiftKind.allow },

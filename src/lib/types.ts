@@ -29,6 +29,30 @@ export type Group = {
    * category, app or website rules (its Block button default). Absent: all internet.
    */
   blockButtonRuleId?: string;
+  /** Its latest ask for more time from FamilyFi Me in the last day; absent when there is none. */
+  ask?: GroupAsk;
+};
+
+/**
+ * A child's ask for more time, filed by FamilyFi Me on its own group: to end the group's pause
+ * (`pause`) or to lift one rule's window (`rule`, with `ruleId` and `minutes`). `waiting` until a
+ * parent answers (`yes`, `no`) or it closes: `ended` when the block it asked about ended first,
+ * `timedOut` when nobody answered in time.
+ */
+export type GroupAsk = {
+  id: string;
+  about: "pause" | "rule";
+  ruleId?: string;
+  minutes?: number;
+  state: "waiting" | "yes" | "no" | "timedOut" | "ended";
+  at: string;
+  /** While waiting: when it closes unanswered. */
+  expiresAt?: string;
+  answeredAt?: string;
+  /** Who answered yes or no. */
+  by?: Actor;
+  /** After a no: when the child can ask again. */
+  askAgainAt?: string;
 };
 
 export type Device = {

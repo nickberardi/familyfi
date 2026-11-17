@@ -1,7 +1,7 @@
 import type { TimelineBand } from "@/lib/day-timeline";
 import { daysLabel, formatHhmm } from "@/lib/display";
 import { groupLift, rulePaused, type Rule, type RulePause } from "@/lib/rules";
-import type { Actor, Group } from "@/lib/types";
+import type { Actor, Group, GroupAsk } from "@/lib/types";
 import {
   isWindowActive,
   localWeekday,
@@ -14,9 +14,9 @@ import {
 /**
  * A child's day, as FamilyFi Me tells it on the child's phone: what blocks this phone or a Thing now, what comes later
  * today, and where asking fits. One rule for the phone and every Thing: during a pause the child
- * asks to end it, and a yes ends it (familyfi's unblock ends a pause); during a window (Bedtime,
- * Homework time) the child asks for 15 minutes, 30 minutes or 1 hour, and a yes allows that long
- * before the window carries on.
+ * asks to end it, and a yes ends it (the group's resume); during a window (Bedtime, Homework time)
+ * the child asks for some minutes (30, an hour, or a length of their own), and a yes allows that
+ * long before the window carries on (the rule's allow for the group).
  *
  * Times are minutes after the household's midnight. A window that runs past midnight ends after
  * 1440 ("9 PM until 7 AM" is 1260 to 1860). A window runs on its `days` (0 = Sunday, the days it
@@ -55,10 +55,13 @@ function pauseUntil(pause: DayPause): string {
 function pauseTimes(pause: DayPause, to = pause.to): string {
   return pause.open && to === pause.to ? "with no end time" : `until ${clock(to)}`;
 }
-export type AskLength = 15 | 30 | 60;
+/** Minutes asked for during a window. */
+export type AskLength = number;
 /**
  * A request and its answer: `at` is when it was sent, `answeredAt` when a parent answered, `by`
  * who. `minutes` is the length asked for during a window; a request to end a pause has none.
+ * After a no, `againAt` is when the child can ask again (FamilyFi's household wait). A request no
+ * one answered in time is `timedOut`; one whose block ended first is `ended`.
  */
 export type DayAsk =
   | { state: "waiting"; at: Clock; minutes?: AskLength }
@@ -68,7 +71,9 @@ export type DayAsk =
       answeredAt: Clock;
       by: string;
       minutes?: AskLength;
-    };
+      againAt?: Clock;
+    }
+  | { state: "timedOut" | "ended"; at: Clock; minutes?: AskLength };
 
 export type DaySubject = {
   pause?: DayPause;
@@ -139,15 +144,19 @@ export type DayStory = {
   voice: DayVoice;
 };
 
-/** The askable lengths during a window. */
+/** The askable lengths offered during a window; the child can also pick a length of their own. */
 export const ASK_LENGTHS: { value: `${AskLength}`; label: string }[] = [
-  { value: "15", label: "15 minutes" },
   { value: "30", label: "30 minutes" },
   { value: "60", label: "1 hour" },
 ];
 
-/** A child can ask again this long after a no. */
+/** A child can ask again this long after a no, when FamilyFi does not say (`againAt`). */
 export const ASK_AGAIN_AFTER = 30;
+
+/** When the child can ask again after a no. */
+function againAt(ask: { answeredAt: Clock; againAt?: Clock }): Clock {
+  return ask.againAt ?? ask.answeredAt + ASK_AGAIN_AFTER;
+}
 
 /** "5 PM", "9:30 PM": familyfi's clock, for minutes after midnight. */
 export function clock(minutes: Clock): string {
@@ -155,9 +164,13 @@ export function clock(minutes: Clock): string {
   return formatHhmm(`${String(Math.floor(whole / 60)).padStart(2, "0")}:${String(whole % 60).padStart(2, "0")}`);
 }
 
-/** "15 more minutes", "1 more hour". */
+/** "15 more minutes", "1 more hour", "2 more hours", "1 hour 30 more minutes". */
 export function lengthText(minutes: AskLength): string {
-  return minutes === 60 ? "1 more hour" : `${minutes} more minutes`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (!hours) return `${rest} more minutes`;
+  if (!rest) return hours === 1 ? "1 more hour" : `${hours} more hours`;
+  return `${hours} ${hours === 1 ? "hour" : "hours"} ${rest} more minutes`;
 }
 
 /*
@@ -280,6 +293,8 @@ export type GroupDay = {
   /** `allowed`: the window's rule is lifted for this group until a time (an allowance, or a rule paused or allowed). */
   windows: { ruleId: string; ruleName: string; name: string; days: number[]; start: string; end: string; allowed: { by: string | null; until: string } | null }[];
   alwaysOn: { ruleId: string; name: string; kind: "internet" | "category" | "app" | "domain"; allowed: { by: string | null; until: string } | null }[];
+  /** The group's latest ask for more time (`Group.ask`), with who answered by name. */
+  ask?: (Omit<GroupAsk, "by"> & { by: string | null }) | null;
 };
 
 /**
@@ -293,7 +308,7 @@ export type GroupDay = {
  * FamilyFi names no person for the recovery account to a child's phone, so a `by` it sends as null
  * stays unnamed.
  */
-export function groupDayOf(group: Pick<Group, "id" | "name" | "suspension" | "allowance">, rules: Rule[], timezone: string, now: Date): GroupDay {
+export function groupDayOf(group: Pick<Group, "id" | "name" | "suspension" | "allowance" | "ask">, rules: Rule[], timezone: string, now: Date): GroupDay {
   const name = (by: Actor) => by?.name ?? null;
   // How long a rule is lifted for this group, for everyone or for it alone: the later end, null when
   // it has none; undefined when it is not lifted.
@@ -317,6 +332,7 @@ export function groupDayOf(group: Pick<Group, "id" | "name" | "suspension" | "al
         return (rule.windows ?? []).map((window) => ({ ruleId: rule.id, ruleName: rule.name, name: window.name, days: [...window.days].sort((a, b) => a - b), start: window.start, end: window.end, allowed }));
       }),
     alwaysOn: own.filter((rule) => rule.mode === "always").map((rule) => ({ ruleId: rule.id, name: rule.name, kind: rule.kind, allowed: allowedOf(liftOf(rule) ?? undefined) })),
+    ask: group.ask ? { ...group.ask, by: name(group.ask.by ?? null) } : null,
   };
 }
 
@@ -360,14 +376,32 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
     }))
     // Lifted for the rest of today: nothing to tell today.
     .filter((rule) => !rule.allowed || rule.allowed.until < 1440);
-  return { subject: { windows, ...(pause ? { pause } : {}), ...(always.length ? { always } : {}) }, now: minutes, clock };
+  const ask = me.ask ? dayAsk(me.ask, minutesOf) : undefined;
+  return { subject: { windows, ...(pause ? { pause } : {}), ...(always.length ? { always } : {}), ...(ask ? { ask } : {}) }, now: minutes, clock };
+}
+
+/** FamilyFi's ask as the day tells it; a parent FamilyFi has no name for is "A parent". */
+function dayAsk(ask: NonNullable<GroupDay["ask"]>, minutesOf: (iso: string) => Clock): DayAsk {
+  const at = minutesOf(ask.at);
+  const minutes = ask.minutes !== undefined ? { minutes: ask.minutes } : {};
+  if (ask.state === "waiting" || ask.state === "timedOut" || ask.state === "ended") return { state: ask.state, at, ...minutes };
+  return {
+    state: ask.state,
+    at,
+    answeredAt: ask.answeredAt ? minutesOf(ask.answeredAt) : at,
+    by: ask.by ?? "A parent",
+    ...minutes,
+    ...(ask.askAgainAt ? { againAt: minutesOf(ask.askAgainAt) } : {}),
+  };
 }
 
 /** Tells a day from what blocks it, the time now, and the child's request, on the household's day (the sample's by default). */
 export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: DayClock = SAMPLE_CLOCK): DayStory {
   const { inWindow, endOf, windowBands, firstWindowFrom } = onDay(on);
   // A no stands until the child can ask again; after that the Now block is askable again.
-  const ask = subject.ask?.state === "no" && now >= subject.ask.answeredAt + ASK_AGAIN_AFTER ? undefined : subject.ask;
+  // A request whose block ended on its own is over.
+  const ask =
+    (subject.ask?.state === "no" && now >= againAt(subject.ask)) || subject.ask?.state === "ended" ? undefined : subject.ask;
   const pause = subject.pause && now >= subject.pause.from && now < subject.pause.to ? subject.pause : undefined;
   // A window a parent lifted gives way to another that still blocks now.
   const blocking = subject.windows.filter((candidate) => inWindow(candidate, now));
@@ -479,14 +513,11 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   // The Now block: askable with no request, else the request's state under it.
   const withAskFor = (request: DayAsk | undefined, item: DayItem, withLength: boolean): DayItem => {
     const ask = request;
-    if (!ask)
-      return {
-        ...item,
-        ask: {
-          withLength,
-          label: withLength ? "Ask for more time" : voice.endAsk,
-        },
-      };
+    const askable = { withLength, label: withLength ? "Ask for more time" : voice.endAsk };
+    if (!ask) return { ...item, ask: askable };
+    // No one answered in time: the child can ask again.
+    if (ask.state === "timedOut" || ask.state === "ended")
+      return { ...item, ask: askable, status: { sign: "declined", text: "No one answered in time. You can ask again." } };
     if (ask.state === "waiting")
       return {
         ...item,
@@ -503,7 +534,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
         ...item,
         status: {
           sign: "declined",
-          text: `${ask.by} said not this time. You can ask again at ${clock(ask.answeredAt + ASK_AGAIN_AFTER)}.`,
+          text: `${ask.by} said not this time. You can ask again at ${clock(againAt(ask))}.`,
         },
       };
     return item;
@@ -831,7 +862,7 @@ export function askNote({ day, ask }: DayStory): { sign: DaySign; text: string }
   if (ask?.state === "no")
     return {
       sign: "declined",
-      text: `Ask again at ${clock(ask.answeredAt + ASK_AGAIN_AFTER)}`,
+      text: `Ask again at ${clock(againAt(ask))}`,
     };
   return undefined;
 }

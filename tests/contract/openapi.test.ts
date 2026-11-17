@@ -47,6 +47,8 @@ describe("openapi contract", () => {
       "Health.error", // only when degraded by configuration
       "Health.gateway", // only with ?gateway=true, for a session, while ready
       "Household.alertsRelay", // always sent, but servers before 1.4.0 leave it out: required would raise x-min-server
+      "Household.askTimeoutMinutes", // likewise, servers before 2.0.0
+      "Household.askWaitMinutes", // likewise
       "PairedDevice.alerts", // only for app:full devices, the only ones that register for alerts
       "PairedDevice.group", // only for a child's phone (me), which signs in for its group
       "Change.actor", // never to an agent, nor once the adult's account is removed; servers before 1.5.0 leave it out
@@ -71,6 +73,13 @@ describe("openapi contract", () => {
       "CheckupFinding.details.drift.changes.familyfi", // every change but `other`
       "CheckupFinding.details.drift.changes.gateway", // every change but `other`
       "Group.blockButtonRuleId", // only when the group's Block button blocks one of its rules, not all internet
+      "Group.ask", // only when a child's phone asked in the last day
+      "GroupAsk.ruleId", // only for an ask about a rule
+      "GroupAsk.minutes", // only for an ask about a rule
+      "GroupAsk.expiresAt", // only while waiting
+      "GroupAsk.answeredAt", // only for yes and no
+      "GroupAsk.by", // only for yes and no
+      "GroupAsk.askAgainAt", // only for no
       "Rule.groupIds", // only when scope is group, never on quarantine
       "Rule.groupPauses", // only when scope is group, never on quarantine
       "Rule.networkIds", // only when scope is network

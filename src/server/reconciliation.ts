@@ -2,6 +2,7 @@ import { isDeepStrictEqual } from "node:util";
 import { AssignmentState, ChangeStatus, IpVersion, PolicyOperationIntent, PolicyOwnerScope, Prisma, RuleScope, type Household } from "@prisma/client";
 import { LOCK_DNS_RULE_ID, QUARANTINE_RULE_ID } from "@/lib/rules";
 import { isSuspended } from "@/lib/schedule";
+import { closeLapsedAsks } from "./asks";
 import { randomToken } from "./crypto";
 import { prisma } from "./db";
 import { env } from "./env";
@@ -240,6 +241,8 @@ async function tick(owner: string): Promise<boolean> {
     where: { pauseActive: true, pauseUntil: { not: null, lte: now } },
     data: { pauseActive: false, pauseUntil: null, pausedByAccountId: null, pausedByName: null },
   });
+  // A child's ask nobody answered in time closes.
+  await closeLapsedAsks(now);
 
   const household = await prisma().household.findUnique({ where: { id: "default" } });
   if (!household || household.connectionStatus === "unconfigured" || !household.unifiSiteId) return true;

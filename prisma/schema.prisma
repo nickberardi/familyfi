@@ -166,6 +166,10 @@ model Household {
   /// were told sync is in trouble; both clear on the next pass that reaches it.
   syncFailingSince       DateTime? @db.Timestamptz(3)
   syncTroubleAlertedAt   DateTime? @db.Timestamptz(3)
+  /// Asking for more time (FamilyFi Me): how long an ask waits for an answer before it times out,
+  /// and how long after a parent's Not now the child can ask again. Minutes.
+  askTimeoutMinutes      Int       @default(60)
+  askWaitMinutes         Int       @default(30)
   revision               Int       @default(0)
   createdAt              DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime  @updatedAt @db.Timestamptz(3)
@@ -243,6 +247,7 @@ model PairedDevice {
   edgeTokens      DeviceEdgeToken[]
   pushRegistration PushRegistration?
   alertEvents     AlertEvent[]
+  asks            Ask[]
 }
 
 /// The last Access token version a device was handed for a route, so rotation can tell who still has the old one.
@@ -371,6 +376,7 @@ model Group {
   /// FamilyFi Me on the child's phones (`me` paired devices), and their invites.
   pairedDevices    PairedDevice[]  @relation("pairedDeviceGroup")
   pairings         Pairing[]       @relation("pairingGroup")
+  asks             Ask[]
 }
 
 model Account {
@@ -738,4 +744,41 @@ model UpstreamCheck {
   @@unique([categoryId, groupId])
   @@index([checkedAt])
   @@index([groupId])
+}
+
+enum AskState {
+  waiting
+  yes
+  no
+  timedOut
+  ended
+}
+
+/// A child's ask for more time (FamilyFi Me), filed by its phone on its own group: to end the group's
+/// pause (`about` pause) or to lift one rule's window for it (`about` rule). At most one waits per
+/// group. A parent answers yes with the group's resume or the rule's allow, or no with decline; an
+/// ask left waiting closes at `expiresAt`: `ended` when that is the block's end, else `timedOut`.
+model Ask {
+  id                  String        @id @default(cuid())
+  groupId             String
+  group               Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  deviceId            String?
+  device              PairedDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  about               String
+  /// The rule asked about, for `about` rule. No foreign key: a deleted rule leaves the ask as it was.
+  ruleId              String?
+  minutes             Int?
+  state               AskState      @default(waiting)
+  createdAt           DateTime      @default(now()) @db.Timestamptz(3)
+  expiresAt           DateTime      @db.Timestamptz(3)
+  /// Whether `expiresAt` is the end of the block asked about rather than the household's timeout.
+  endsWithBlock       Boolean       @default(false)
+  answeredAt          DateTime?     @db.Timestamptz(3)
+  answeredByAccountId String?
+  answeredByName      String?
+  /// After a no: when the child may ask again.
+  askAgainAt          DateTime?     @db.Timestamptz(3)
+
+  @@index([groupId, createdAt])
+  @@index([state, expiresAt])
 }

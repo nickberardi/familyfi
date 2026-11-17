@@ -13,6 +13,8 @@ import {
   askNote,
   householdDay,
   meDaySubject,
+  groupDayOf,
+  lengthText,
   type DaySubject,
   type GroupDay,
 } from "@/lib/child-day";
@@ -168,6 +170,22 @@ describe("a child's day", () => {
     );
     expect(story.items[0]?.ask).toBeUndefined();
     expect(story.items[0]?.status?.text).toBe("Dad said not this time. You can ask again at 4:15 PM.");
+  });
+
+  it("asks again when FamilyFi says, after no one answered in time, and not about a block that ended", () => {
+    const declined = tellDay({ ...paused, ask: { state: "no", at: NOW - 5, answeredAt: NOW, by: "Dad", againAt: NOW + 60 } }, NOW + 45, PHONE_VOICE);
+    expect(declined.items[0]?.status?.text).toBe("Dad said not this time. You can ask again at 4:45 PM.");
+    expect(declined.items[0]?.ask).toBeUndefined();
+    const lapsed = tellDay({ ...paused, ask: { state: "timedOut", at: NOW - 60 } }, NOW, PHONE_VOICE);
+    expect(lapsed.items[0]?.status?.text).toBe("No one answered in time. You can ask again.");
+    expect(lapsed.items[0]?.ask).toMatchObject({ withLength: false, label: "Ask to unpause" });
+    const ended = tellDay({ ...paused, ask: { state: "ended", at: NOW - 60 } }, NOW, PHONE_VOICE);
+    expect(ended.ask).toBeUndefined();
+    expect(ended.items[0]?.status).toBeUndefined();
+  });
+
+  it("says any length a child asked for", () => {
+    expect([15, 30, 60, 90, 120].map(lengthText)).toEqual(["15 more minutes", "30 more minutes", "1 more hour", "1 hour 30 more minutes", "2 more hours"]);
   });
 
   it("tells a Thing's day in its own words", () => {
@@ -621,6 +639,20 @@ describe("a child's day on the household's clock", () => {
     expect(thingTile(tellDay(subject, now, THING_VOICE, day))).toMatchObject({ line: "For the rest of today" });
     expect(story.items.some((item) => item.sign === "window")).toBe(false);
     expect(story.bands.filter((band) => band.kind === "window")).toEqual([]);
+  });
+
+  it("reads FamilyFi's ask on the household's clock, naming a parent it has no name for", () => {
+    const at = "2026-11-17T03:10:00Z";
+    const answered = "2026-11-17T03:20:00Z";
+    const again = "2026-11-17T03:50:00Z";
+    const ask = { id: "a1", about: "rule" as const, ruleId: "r1", minutes: 30, state: "no" as const, at, answeredAt: answered, by: null, askAgainAt: again };
+    const { subject } = meDaySubject(me({ windows: [bedtime([1])], ask }), MONDAY_NIGHT);
+    expect(subject.ask).toEqual({ state: "no", at: 22 * 60 + 10, answeredAt: 22 * 60 + 20, by: "A parent", minutes: 30, againAt: 22 * 60 + 50 });
+    const waiting = meDaySubject(me({ ask: { id: "a2", about: "pause", state: "waiting", at, expiresAt: again, by: null } }), MONDAY_NIGHT);
+    expect(waiting.subject.ask).toEqual({ state: "waiting", at: 22 * 60 + 10 });
+    const group = { id: "g1", name: "Emma", suspension: { active: false, until: null, by: null }, allowance: { active: false, until: null, by: null } };
+    expect(groupDayOf({ ...group, ask: { ...ask, by: { accountId: "mom", name: "Mom" } } }, [], ZONE, MONDAY_NIGHT).ask?.by).toBe("Mom");
+    expect(groupDayOf(group, [], ZONE, MONDAY_NIGHT).ask).toBeNull();
   });
 
   it("names a window by its own name, or else its rule's, and says a pause without a name when FamilyFi did not record who", () => {

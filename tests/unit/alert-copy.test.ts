@@ -17,6 +17,17 @@ describe("alert copy", () => {
     expect(alertText("sync.up", {})?.body).toBe("FamilyFi can reach your gateway again.");
   });
 
+  it("says who asked for more time, and for what", () => {
+    expect(alertText("ask.new", { g: "g1", n: "Sam", a: "pause" })).toEqual({ title: "Sam asked to be unpaused", body: "Open FamilyFi to answer." });
+    expect(alertText("ask.new", { g: "g1", n: "Sam", a: "rule", r: "Bedtime", m: 30 })).toEqual({
+      title: "Sam asked for more time",
+      body: "30 minutes of Bedtime. Open FamilyFi to answer.",
+    });
+    expect(alertText("ask.new", { g: "g1", n: "Sam", a: "rule", r: "Homework", m: 90 })?.body).toBe("1 hour 30 minutes of Homework. Open FamilyFi to answer.");
+    // Data a reader cannot use still makes a sentence.
+    expect(alertText("ask.new", { a: "rule", m: "lots" })).toEqual({ title: "Your child asked for more time", body: "Open FamilyFi to answer." });
+  });
+
   it("has words for every kind, and none for a kind it does not know", () => {
     for (const kind of ALERT_KINDS) {
       expect(alertText(kind, { n: 1 }), kind).not.toBeNull();
