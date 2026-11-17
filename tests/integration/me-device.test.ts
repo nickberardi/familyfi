@@ -138,13 +138,16 @@ describe("FamilyFi Me on a child's phone", () => {
 
   it("tells the group's pause, windows and always-on rules, and leaves out a paused rule", async () => {
     const group = await childGroup();
+    await prisma().group.update({ where: { id: group.id }, data: { dohOverrideUrl: "https://dns.example/profile-123" } });
     const sam = await prisma().group.create({ data: { kind: GroupKind.family, name: "Sam" } });
+    const mom = await prisma().account.findFirstOrThrow({ where: { kind: "personal" } });
     await prisma().rule.create({
       data: {
         name: "Bedtime",
         kind: RuleKind.internet,
         mode: RuleMode.scheduled,
-        groups: { create: [{ groupId: group.id }, { groupId: sam.id }] },
+        // Sam's own lift, by a parent's account: the child's phone sees neither.
+        groups: { create: [{ groupId: group.id }, { groupId: sam.id, pauseActive: true, pauseUntil: new Date(Date.now() + 60 * 60_000), pauseKind: "allow", pausedByAccountId: mom.id, pausedByName: "Mom" }] },
         windows: { create: [{ position: 0, name: "", days: [5, 0, 1], start: "21:00", end: "07:00" }] },
       },
     });
@@ -153,18 +156,25 @@ describe("FamilyFi Me on a child's phone", () => {
     await prisma().rule.create({ data: { name: "Sam only", kind: RuleKind.internet, mode: RuleMode.always, groups: { create: { groupId: sam.id } } } });
     const until = new Date(Date.now() + 60 * 60_000);
     await prisma().rule.create({
-      data: { name: "Emma paused", kind: RuleKind.internet, mode: RuleMode.always, systemGroupId: group.id, enabled: true, expiresAt: until, blockedByName: "Dad", groups: { create: { groupId: group.id } } },
+      data: { name: "Emma paused", kind: RuleKind.internet, mode: RuleMode.always, systemGroupId: group.id, enabled: true, expiresAt: until, blockedByAccountId: mom.id, blockedByName: "Dad", groups: { create: { groupId: group.id } } },
     });
+    // A rule-wide lift by the same account, on a rule the group has.
+    await prisma().rule.create({ data: { name: "Video", kind: RuleKind.category, mode: RuleMode.always, targetIds: [5], pauseActive: true, pauseUntil: until, pauseKind: "allow", pausedByAccountId: mom.id, pausedByName: "Mom", groups: { create: { groupId: group.id } } } });
     const claim = await pairMe(admin, group.id);
+    const read = ((await (await meDay(bearer(claim.token), group.id)).json()) as { group: Group }).group;
+    expect(read.dohOverrideUrl).toBeNull();
+    expect(read.suspension.by).toEqual({ accountId: null, name: "Dad" });
     const rules = await childRules(claim.token);
-    expect(rules.map((rule) => rule.name).sort()).toEqual(["Bedtime", "Games", "Paused rule"]);
+    expect(JSON.stringify([read, rules])).not.toContain(mom.id);
+    expect(rules.find((rule) => rule.name === "Bedtime")?.groupPauses).toEqual([]);
+    expect(rules.find((rule) => rule.name === "Video")?.pause.by).toEqual({ accountId: null, name: "Mom" });
+    expect(rules.map((rule) => rule.name).sort()).toEqual(["Bedtime", "Games", "Paused rule", "Video"]);
     expect(rules.find((rule) => rule.name === "Bedtime")?.groupIds).toEqual([group.id]);
     const day = await childDay(claim.token, group.id);
     expect(day.pause).toMatchObject({ by: "Dad", until: until.toISOString() });
-    expect(JSON.stringify(rules)).not.toContain("accountId\":\"");
     expect(day.allowance).toBeNull();
     expect(day.windows).toEqual([expect.objectContaining({ ruleName: "Bedtime", name: "", days: [0, 1, 5], start: "21:00", end: "07:00" })]);
-    expect(day.alwaysOn).toEqual([expect.objectContaining({ name: "Games", kind: "category" })]);
+    expect(day.alwaysOn).toEqual([expect.objectContaining({ name: "Games", kind: "category" }), expect.objectContaining({ name: "Video", allowed: { by: "Mom", until: until.toISOString() } })]);
     // FamilyFi Me tells it with the shared day: paused now, by Dad.
     const { subject, now, clock } = meDaySubject(day, new Date());
     expect(tellDay(subject, now, PHONE_VOICE, clock).day.kind).toBe("paused");
