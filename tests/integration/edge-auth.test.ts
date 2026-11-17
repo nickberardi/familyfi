@@ -158,7 +158,7 @@ describe("Cloudflare Access service tokens", () => {
     const { payload, claimed, bearer } = await pairPhone(auth, id, "Kitchen iPhone");
 
     // Only what pairing needs: no route id, version or instance id — the signed manifest carries those.
-    expect(payload).toEqual({ version: 1, url: "https://familyfi.example.com", code: expect.any(String), fingerprint: expect.any(String), access: TOKEN });
+    expect(payload).toEqual({ version: 1, clientType: "app", url: "https://familyfi.example.com", code: expect.any(String), fingerprint: expect.any(String), access: TOKEN });
 
     // The route says Access guards it; only the signed payload carries the token.
     expect(claimed.manifest.endpoints).toEqual([expect.objectContaining({ id, edgeAuth: "serviceToken", edgeTokenVersion: 1 })]);
@@ -225,7 +225,7 @@ describe("Cloudflare Access service tokens", () => {
     const id = created.body.endpoint.id;
     expect((await setTunnel(request("/api/v1/connection/tunnel", json(auth, "PUT", { mode: "named", endpointId: id })))).status).toBe(200);
     const { payload, claimed, bearer } = await pairPhone(auth, id, "Kitchen iPhone");
-    expect(Object.keys(payload).sort()).toEqual(["code", "fingerprint", "url", "version"]);
+    expect(Object.keys(payload).sort()).toEqual(["clientType", "code", "fingerprint", "url", "version"]);
     expect((await verifiedPayload(claimed.manifest)).edgeCredentials).toEqual([]);
     const phone = await manifestFor(bearer);
     expect(phone.payload.endpoints).toEqual([expect.objectContaining({ id, edgeAuth: "none" })]);

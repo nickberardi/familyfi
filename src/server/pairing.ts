@@ -1,5 +1,5 @@
 import { ConnectionTrustMode, SessionKind, type Account, type Pairing } from "@prisma/client";
-import { legacyClient, scopeWord, type ClientType, type DeviceScope } from "@/lib/client-type";
+import { legacyClient, scopeWord, type ClientType, type ClientScope } from "@/lib/client-type";
 import { bearerSessionData, isAdministratorAccount, mayPairAs, toPublicSession, type SignedInSession } from "./auth";
 import { ensureConnectionIdentity, instanceFingerprint, publicEndpoint, removeDevice, signedEndpointManifest } from "./connection";
 import { randomToken, safeEqual, sha256 } from "./crypto";
@@ -78,7 +78,7 @@ async function invitePhone(input: { endpointId: string; displayName: string; acc
  * An agent invite. It has no route: the code carries `url`, the address the adult made it from, which
  * is on the home network because browser sign-in is. It never carries a pin or an Access token.
  */
-export async function inviteAgent(input: { url: string; displayName: string; scope: DeviceScope; createdByAccountId: string; parentDeviceId?: string | null }) {
+export async function inviteAgent(input: { url: string; displayName: string; scope: ClientScope; createdByAccountId: string; parentDeviceId?: string | null }) {
   if (!isValidScope("agent", input.scope)) throw new Error(`An agent cannot hold the ${input.scope} scope.`);
   const token = randomToken();
   const invite = await prisma().pairing.create({
@@ -258,7 +258,7 @@ function inviteBody(invite: { id: string; expiresAt: Date }, code: string) {
 
 export type InviteInput =
   | { clientType: "app"; displayName: string; endpointId: string; accountId?: string; replacesDeviceId?: string }
-  | { clientType: "agent"; displayName: string; scope: DeviceScope };
+  | { clientType: "agent"; displayName: string; scope: ClientScope };
 
 /**
  * An administrator invites a phone or an agent and gets a single-use code. An invite a paired phone

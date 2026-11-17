@@ -110,10 +110,12 @@ export async function getPairedDevice(session: Viewer, id: string) {
  * Rename a paired device, or change an agent's scope. No other kind changes scope: an app is `full` or
  * its own `rulesOnly` sign-in from the moment it joins, and one must never become the other.
  */
-export async function updatePairedDevice(id: string, input: { displayName?: string; scope?: "full" | "rulesOnly" | "readOnly" }) {
+export async function updatePairedDevice(id: string, input: { displayName?: string; scope?: string }) {
   const device = await prisma().pairedDevice.findUnique({ where: { id } });
   if (!device) throw deviceNotFound();
-  const scope = input.scope && input.scope !== scopeWord(device.scope) ? (device.clientType === "agent" ? scopeFor("agent", input.scope) : null) : undefined;
+  // An agent's scope may come as its word (`full`) or whole (`agent:full`).
+  const word = input.scope === undefined ? undefined : scopeWord(input.scope);
+  const scope = word && word !== scopeWord(device.scope) ? (device.clientType === "agent" && !input.scope!.startsWith("app:") && !input.scope!.startsWith("me:") ? scopeFor("agent", word) : null) : undefined;
   if (scope === null) throw new ApiError(400, "invalid_scope", `A ${legacyClient(device.clientType)} cannot hold the ${input.scope} scope.`);
   await prisma().pairedDevice.update({ where: { id }, data: { displayName: input.displayName, ...(scope ? { scope } : {}) } });
   const updated = await prisma().pairedDevice.findUniqueOrThrow({ where: { id }, include: deviceInclude() });

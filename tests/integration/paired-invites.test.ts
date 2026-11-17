@@ -209,6 +209,7 @@ describe("POST /paired/invites", () => {
     expect((await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ clientType: "app", client: "agent", displayName: "Agent", scope: "full" }) }))).status).toBe(400);
     expect((await createInvite(request("/api/v1/paired/invites", { method: "POST", auth, headers: json, body: JSON.stringify({ clientType: "me", displayName: "Kid", endpointId: route.id }) }))).status).toBe(400);
     expect((await claimWatchRequest(bearer(phone.token), { client: "watch", clientType: "app" })).status).toBe(400);
+    expect((await claimWatchRequest(bearer(phone.token), { client: "app", scope: "rulesOnly", clientType: "app-watch" })).status).toBe(400);
   });
 
   it("still takes the deprecated phone for app in an invite, and answers app", async () => {

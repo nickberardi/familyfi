@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLIENT_TYPES, DEVICE_SCOPES } from "@/lib/client-type";
+import { CLIENT_TYPES, CLIENT_SCOPE_VALUES } from "@/lib/client-type";
 import { deviceRouteAllowed, isFullApp, isValidScope } from "@/server/device-scope";
 
 function allowed(clientType: string, scope: string, method: string, path: string) {
@@ -38,7 +38,7 @@ const NEVER_FOR_AGENTS: [string, string][] = [
 
 describe("device scopes", () => {
   it("lets each client type hold only its own scopes", () => {
-    const valid = CLIENT_TYPES.flatMap((clientType) => DEVICE_SCOPES.filter((scope) => isValidScope(clientType, scope)).map((scope) => `${clientType} ${scope}`));
+    const valid = CLIENT_TYPES.flatMap((clientType) => CLIENT_SCOPE_VALUES.filter((scope) => isValidScope(clientType, scope)).map((scope) => `${clientType} ${scope}`));
     expect(valid.sort()).toEqual(["agent agent:full", "agent agent:readOnly", "app app:full", "app-controls app:rulesOnly", "app-watch app:rulesOnly", "me me:askOnly"]);
   });
 
