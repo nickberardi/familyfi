@@ -17,10 +17,10 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(request: Request, ctx: Ctx) {
   return withSession(request, async (session) => {
     const { id } = await ctx.params;
-    // A child's phone (FamilyFi Me) reads its own group alone; any other is not there for it.
-    if (session.device?.clientType === "me" && id !== session.device.groupId) throw new ApiError(404, "not_found", "Group not found.");
-    const group = await getGroup(id);
-    return Response.json({ group, day: await childDay(group.id) });
+    if (session.device?.clientType !== "me") return Response.json({ group: await getGroup(id) });
+    // A child's phone (FamilyFi Me) reads its own group alone, with its day; any other is not there for it.
+    if (id !== session.device.groupId) throw new ApiError(404, "not_found", "Group not found.");
+    return Response.json({ group: await getGroup(id), day: await childDay(id) });
   });
 }
 

@@ -838,10 +838,10 @@ paths:
     get:
       operationId: getGroup
       tags: [Groups]
-      summary: Get a group and its day
+      summary: Get a group
       description: |
-        The group, and `day`: what its people see of it, as FamilyFi Me tells it on a child's phone.
-        A child's phone (`me:askOnly`) reads its own group alone; any other group is 404 for it.
+        A child's phone (`me:askOnly`) reads its own group alone, and any other group is 404 for it.
+        Only a child's phone gets `day`: what its group's people see of it, as FamilyFi Me tells it.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ $ref: "#/components/parameters/GroupId" }]
       responses:
@@ -852,10 +852,12 @@ paths:
               schema:
                 type: object
                 additionalProperties: false
-                required: [group, day]
+                required: [group]
                 properties:
                   group: { $ref: "#/components/schemas/Group" }
-                  day: { $ref: "#/components/schemas/GroupDay" }
+                  day:
+                    description: Sent only to a child's phone (`me:askOnly`).
+                    allOf: [{ $ref: "#/components/schemas/GroupDay" }]
         "401":
           $ref: "#/components/responses/Error"
         "403": { $ref: "#/components/responses/Error" }
@@ -3386,9 +3388,9 @@ components:
         displayName: { type: string }
         kind:
           type: string
-          x-extensible-enum: [recovery, personal, me]
+          x-extensible-enum: [recovery, personal, group]
           description: |
-            `recovery` or `personal`: the account the session signs in as. `me`: FamilyFi Me on a
+            `recovery` or `personal`: the account the session signs in as. `group`: FamilyFi Me on a
             child's phone, which signs in for its family group and never as an account; its
             `displayName` is the group's name and its `username` names the device. New kinds may be added.
         expiresAt:

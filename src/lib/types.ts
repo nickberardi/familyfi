@@ -67,7 +67,7 @@ export type Session = {
   username: string;
   displayName: string;
   /** `me`: FamilyFi Me on a child's phone, signed in for its family group. A newer server may add one. */
-  kind: "recovery" | "personal" | "me" | (string & {});
+  kind: "recovery" | "personal" | "group" | (string & {});
   expiresAt: string;
 };
 

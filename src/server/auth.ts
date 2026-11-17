@@ -34,7 +34,7 @@ export type PublicSession = {
   username: string;
   displayName: string;
   /** `me`: a child's phone (FamilyFi Me), signed in for its family group rather than as an account. */
-  kind: "recovery" | "personal" | "me";
+  kind: "recovery" | "personal" | "group";
   expiresAt: string;
 };
 
@@ -412,7 +412,7 @@ export type SessionView = {
 export function toPublicSession(session: SessionView): PublicSession {
   // A child's phone has no account: it is named for the group it signs in for.
   if (session.device?.clientType === "me" && !session.account) {
-    return { username: session.username, displayName: session.device.group?.name ?? "", kind: "me", expiresAt: session.expiresAt.toISOString() };
+    return { username: session.username, displayName: session.device.group?.name ?? "", kind: "group", expiresAt: session.expiresAt.toISOString() };
   }
   return {
     username: session.username,
