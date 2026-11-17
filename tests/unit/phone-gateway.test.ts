@@ -21,7 +21,7 @@ describe("phone-only gateway rules", () => {
   });
 
   it("refuses a backslash anywhere in the path, which Next.js reads as a slash", () => {
-    for (const path of ["/api/v1\\..\\..\\login", "/api/v1/x\\..\\..\\..\\login", "/api/v1/..\\..\\login", "/api/v1\\groups", "/api/v1/groups\\", "/api/v1/x%5C..%5Clogin"]) {
+    for (const path of ["/api/v1\\..\\..\\login", "/api/v1/x\\..\\..\\..\\login", "/api/v1/..\\..\\login", "/api/v1/groups\\x", "/api/v1/groups\\", "/api/v1/x%5C..%5Clogin"]) {
       expect(allowedThroughTunnel(path)).toBe(false);
     }
     expect(allowedThroughTunnel("/api/v1/groups?q=a\\b")).toBe(true);
