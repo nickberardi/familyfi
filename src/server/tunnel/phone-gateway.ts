@@ -18,8 +18,9 @@ const HOP_BY_HOP = new Set(["connection", "keep-alive", "proxy-connection", "tra
 export function allowedThroughTunnel(url: string | undefined): boolean {
   if (!url) return false;
   const path = url.split("?")[0];
-  // Reject dot segments outright rather than trusting what normalisation downstream does with them.
-  if (/(^|\/)\.\.?(\/|$)/.test(path) || /%2e|%2f|%5c/i.test(path)) return false;
+  // Reject dot segments, backslashes and encoded separators outright rather than trusting what
+  // normalisation downstream does with them: Next.js reads a backslash as a slash.
+  if (/(^|\/)\.\.?(\/|$)/.test(path) || path.includes("\\") || /%2e|%2f|%5c/i.test(path)) return false;
   return path.startsWith("/api/v1/");
 }
 
