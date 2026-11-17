@@ -122,6 +122,8 @@ export type Day =
       minutes?: AskLength;
       /** Who said yes, when FamilyFi has a person's name. */
       by?: string;
+      /** Another window that starts at `until`, cutting the allowed time short. */
+      then?: DayWindow;
     }
   | { kind: "open"; next?: DayWindow }
   /** A rule blocks all internet all the time: `label` is its name. */
@@ -248,12 +250,14 @@ function onDay(day: DayClock) {
           const start = minutesOf(found);
           const end = start + (window.to - window.from);
           const lifted = window.allowed && window.allowed.until > start ? Math.min(window.allowed.until, end) : start;
-          if (lifted < end) return [{ ...window, from: lifted, to: end }];
+          if (lifted < end) return [{ told: { ...window, from: lifted, to: end }, start }];
           from = end;
         }
         return [];
       })
-      .filter((found) => found.from < 1440)
+      // Today's occurrences, even one a lift pushes past midnight.
+      .filter((found) => found.start < 1440)
+      .map((found) => found.told)
       .sort((a, b) => a.from - b.from)[0];
   return { inWindow, endOf, windowBands, firstWindowFrom };
 }
@@ -346,7 +350,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     });
   // What comes from `start` on: a window on then carries on to its end (and any window overlapping
   // it after that), then nothing blocks until the next window or tomorrow morning.
-  const onwards = (start: Clock): DayItem[] => {
+  const onwards = (start: Clock, again?: DayWindow): DayItem[] => {
     const items: DayItem[] = [];
     let at = start;
     const morning = () => [...items, later({ time: clock(at), tone: "on", sign: "morning", title: "Not blocked", detail: "Tomorrow morning" })];
@@ -385,7 +389,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
           tone: "window",
           sign: "window",
           window: covering,
-          title: covering.label,
+          title: covering === again && at === start ? `${covering.label} again` : covering.label,
           detail: `Until ${clock(end)}`,
         }),
       );
@@ -517,7 +521,14 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     story = undefined;
   } else if (window && ((ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil) || lift)) {
     const asked = ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil ? { ...ask, minutes: ask.minutes } : undefined;
-    const until = asked ? allowedUntil! : Math.min(lift!.until, windowEnd);
+    const allowedTo = asked ? allowedUntil! : Math.min(lift!.until, windowEnd);
+    // Another window that blocks before then ends the allowed time there.
+    const sooner = firstWindowFrom(
+      subject.windows.filter((other) => other !== window),
+      now,
+    );
+    const then = sooner && sooner.from < allowedTo ? sooner : undefined;
+    const until = then ? then.from : allowedTo;
     const by = asked ? asked.by : lift!.by;
     // A lift has no answer time: its band covers the window up to then.
     const occurrence = Math.max(0, windowEnd - (window.to - window.from));
@@ -538,25 +549,14 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
         detail: asked ? `${asked.by} said yes to ${lengthText(asked.minutes)}` : by ? `${by} said yes` : `${window.label} is off for now`,
         ...(asked ? { status: { sign: "allowed" as const, text: `Answered at ${clock(asked.answeredAt)}` } } : {}),
       },
-      ...(until < windowEnd
-        ? [
-            later({
-              time: clock(until),
-              tone: "window",
-              sign: "window",
-              window,
-              title: `${window.label} again`,
-              detail: `Until ${clock(windowEnd)}`,
-            }),
-          ]
-        : []),
-      ...afterWindow(),
+      ...onwards(until, window),
     ];
     day = {
       kind: "extended",
       window,
       until,
       end: windowEnd,
+      ...(then ? { then } : {}),
       ...(asked ? { minutes: asked.minutes } : {}),
       ...(by ? { by } : {}),
     };
@@ -672,7 +672,9 @@ export function topAnswer({ day, voice }: DayStory): TopAnswer {
         sign: "allowed",
         tone: "on",
         title: `Allowed until ${clock(day.until)}`,
-        sentence: `${extendedSentence(day)}${day.until < day.end ? ` ${day.window.label} starts again at ${clock(day.until)}.` : ""}`,
+        sentence: `${extendedSentence(day)}${
+          day.then ? ` ${day.then.label} starts at ${clock(day.until)}.` : day.until < day.end ? ` ${day.window.label} starts again at ${clock(day.until)}.` : ""
+        }`,
       };
     case "always":
       return { sign: "window", tone: "window", title: day.label, sentence: "No internet all day." };

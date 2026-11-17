@@ -524,6 +524,24 @@ describe("a child's day on the household's clock", () => {
     ]);
   });
 
+  it("tells a window lifted past midnight from an open day, and ends an allowance where another window starts", () => {
+    const lifted = { ...bedtime([1]), allowed: { by: "Dad", until: "2026-11-17T05:30:00Z" } }; // until 12:30 AM
+    const open = meDaySubject(me({ windows: [lifted] }), new Date("2026-11-17T00:00:00Z")); // 7 PM
+    const evening = tellDay(open.subject, open.now, PHONE_VOICE, open.clock);
+    expect(topAnswer(evening)).toMatchObject({ title: "Nothing is blocked", sentence: "Bedtime starts at 12:30 AM." });
+    // Bedtime lifted until 11:30 PM, Late 11 PM to 12 AM; it is 9:30 PM.
+    const late = { ruleId: "r2", ruleName: "Late", name: "", days: [1], start: "23:00", end: "00:00", allowed: null };
+    const both = meDaySubject(me({ windows: [{ ...bedtime([1]), allowed: { by: "Dad", until: "2026-11-17T04:30:00Z" } }, late] }), new Date("2026-11-17T02:30:00Z"));
+    const story = tellDay(both.subject, both.now, PHONE_VOICE, both.clock);
+    expect(topAnswer(story)).toMatchObject({ title: "Allowed until 11 PM", sentence: "Dad said yes. Late starts at 11 PM." });
+    expect(story.items.map((item) => [item.time, item.title])).toEqual([
+      ["Now", "Allowed until 11 PM"],
+      ["11 PM", "Late"],
+      ["12 AM", "Bedtime"],
+      ["7 AM", "Not blocked"],
+    ]);
+  });
+
   it("tells nothing of a window a parent lifted for the whole of it", () => {
     // Bedtime lifted until 9 AM tomorrow; it is 7 PM.
     const lifted = { ...bedtime([1]), allowed: { by: "Dad", until: "2026-11-17T14:00:00Z" } };
