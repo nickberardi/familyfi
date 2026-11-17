@@ -86,7 +86,7 @@ export function alertDestination(kind: string, data: Record<string, unknown> = {
 /** The app's Alerts screen. */
 export const ALERTS_SCREEN_COPY = {
   title: "Alerts",
-  intro: "Get an alert on this device when a new device is waiting in Unassigned, when FamilyFi can't reach your gateway, or when a child asks for more time.",
+  intro: "Get an alert on this device when a new device is waiting in Unassigned, when FamilyFi can't reach your gateway or when a child asks for more time.",
   /** The one switch for this device's alerts; turning it on asks to send notifications. */
   deviceSwitch: "Alerts on this device",
   /** The system's notification permission was refused. */

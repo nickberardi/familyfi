@@ -21,9 +21,10 @@ describe("alert copy", () => {
     expect(alertText("ask.new", { g: "g1", n: "Sam", a: "pause" })).toEqual({ title: "Sam asked to be unpaused", body: "Open FamilyFi to answer." });
     expect(alertText("ask.new", { g: "g1", n: "Sam", a: "rule", r: "Bedtime", m: 30 })).toEqual({
       title: "Sam asked for more time",
-      body: "30 minutes of Bedtime. Open FamilyFi to answer.",
+      body: "30 minutes off Bedtime.",
     });
-    expect(alertText("ask.new", { g: "g1", n: "Sam", a: "rule", r: "Homework", m: 90 })?.body).toBe("1 hour 30 minutes of Homework. Open FamilyFi to answer.");
+    expect(alertText("ask.new", { g: "g1", n: "Sam", a: "rule", r: "Homework", m: 90 })?.body).toBe("1 hour 30 minutes off Homework.");
+    expect(alertText("ask.new", { n: "Sam", a: "rule", r: "Bedtime" })?.body).toBe("Time off Bedtime.");
     // Data a reader cannot use still makes a sentence.
     expect(alertText("ask.new", { a: "rule", m: "lots" })).toEqual({ title: "Your child asked for more time", body: "Open FamilyFi to answer." });
   });

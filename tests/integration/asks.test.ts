@@ -19,10 +19,12 @@ import { PUT as putHousehold } from "@/app/api/v1/settings/household/route";
 import type { Group, GroupAsk } from "@/lib/types";
 import { registerPush } from "@/server/alerts/registrations";
 import { ASKS_PER_HOUR, closeLapsedAsks } from "@/server/asks";
+import { liftGroupRule } from "@/server/group-internet";
 import { prisma } from "@/server/db";
 import { resetDatabase } from "../helpers/db";
 import { request, type SessionAuth } from "../helpers/http";
 import { bearer, pairChildPhone, pairingAdminAuth, pairPhone } from "../helpers/pairing";
+import { adminSession } from "../helpers/session";
 
 const json = { "content-type": "application/json" };
 const MINUTE = 60_000;
@@ -231,6 +233,39 @@ describe("asking for more time", () => {
     expect((await readGroup(admin, emma.id)).ask).toMatchObject({ id: open.id, state: "timedOut" });
     await closeLapsedAsks(new Date());
     expect((await prisma().ask.findMany({ orderBy: { createdAt: "asc" } })).map((row) => row.state)).toEqual(["ended", "timedOut"]);
+  });
+
+  it("names no one to the child when the recovery account answers", async () => {
+    await verb(pauseRoute, "pause", admin, emma.id, "internet");
+    const waiting = await askOf(await ask(child, emma.id, { about: "pause" }));
+    await liftGroupRule(await adminSession(), "resume", { groupId: emma.id, ruleId: "internet" }, { askId: waiting.id });
+    expect((await readGroup(admin, emma.id)).ask).toMatchObject({ state: "yes", by: { name: "Recovery admin" } });
+    expect((await readGroup(child, emma.id)).ask).toMatchObject({ state: "yes", by: null });
+  });
+
+  it("answers by id only for a parent, and only while the window it asks about is on", async () => {
+    const homework = await windowRule(emma.id);
+    const waiting = await askOf(await ask(child, emma.id, { about: "rule", ruleId: homework.id, minutes: 30 }));
+    const parent = await adminSession();
+    for (const device of [{ clientType: "app-watch", scope: "app:rulesOnly" }, { clientType: "agent", scope: "agent:full" }]) {
+      await expect(liftGroupRule({ ...parent, device }, "allow", { groupId: emma.id, ruleId: homework.id }, { askId: waiting.id })).rejects.toMatchObject({ status: 403 });
+    }
+    // The window was moved to later since the child asked: a yes by id would have no end, so it is refused and the ask left waiting.
+    await prisma().ruleWindow.updateMany({ where: { ruleId: homework.id }, data: { start: hhmm(new Date(Date.now() + 3 * 60 * MINUTE)), end: hhmm(new Date(Date.now() + 4 * 60 * MINUTE)) } });
+    await expect(liftGroupRule(parent, "allow", { groupId: emma.id, ruleId: homework.id }, { askId: waiting.id, until: null })).rejects.toMatchObject({ status: 409 });
+    expect((await prisma().ask.findUniqueOrThrow({ where: { id: waiting.id } })).state).toBe("waiting");
+  });
+
+  it("follows a pause set again or extended, so a waiting ask is not closed while the child is still paused", async () => {
+    await verb(pauseRoute, "pause", admin, emma.id, "internet", { until: new Date(Date.now() + 10 * MINUTE).toISOString() });
+    const waiting = await askOf(await ask(child, emma.id, { about: "pause" }));
+    expect(Date.parse(waiting.expiresAt!) - Date.parse(waiting.at)).toBeLessThanOrEqual(10 * MINUTE);
+    const extendRoute = (await import("@/app/api/v1/groups/[id]/rules/[ruleId]/extend/route")).POST;
+    expect((await verb(extendRoute, "extend", admin, emma.id, "internet", { minutes: 120 })).status).toBe(200);
+    const moved = (await readGroup(child, emma.id)).ask!;
+    // Now the household's hour comes first.
+    expect(Date.parse(moved.expiresAt!) - Date.parse(moved.at)).toBe(60 * MINUTE);
+    expect((await prisma().ask.findUniqueOrThrow({ where: { id: waiting.id } })).endsWithBlock).toBe(false);
   });
 
   it("keeps the household's timeout and wait in its settings, within bounds", async () => {

@@ -69,7 +69,8 @@ export type DayAsk =
       state: "yes" | "no";
       at: Clock;
       answeredAt: Clock;
-      by: string;
+      /** Who answered, when FamilyFi has a person's name. */
+      by?: string;
       minutes?: AskLength;
       againAt?: Clock;
     }
@@ -92,9 +93,12 @@ export type DayVoice = {
   /** "Ask to unpause", "Ask to unblock". */
   endAsk: string;
   endWaiting: (at: string) => string;
-  endDone: (by: string, at: string) => string;
+  /** The pause ended by a yes; `by` absent when FamilyFi has no person's name. */
+  endDone: (by: string | undefined, at: string) => string;
   /** The sentence for a pause FamilyFi has no person's name for: "Your apps are paused." */
   pausedByNoOne: string;
+  /** The sentence for a pause ended with no person's name: "Your apps are unpaused." */
+  unpausedByNoOne: string;
 };
 
 /** A state's colour: a pause in the paused ink, a window in plain ink (accent is for actions), allowed in green. */
@@ -119,7 +123,7 @@ export type DayItem = {
 export type Day =
   | { kind: "paused"; pause: DayPause; next?: DayWindow }
   | { kind: "window"; window: DayWindow; end: Clock }
-  | { kind: "unpaused"; by: string; next?: DayWindow }
+  | { kind: "unpaused"; by?: string; next?: DayWindow }
   | {
       kind: "extended";
       window: DayWindow;
@@ -164,13 +168,14 @@ export function clock(minutes: Clock): string {
   return formatHhmm(`${String(Math.floor(whole / 60)).padStart(2, "0")}:${String(whole % 60).padStart(2, "0")}`);
 }
 
-/** "15 more minutes", "1 more hour", "2 more hours", "1 hour 30 more minutes". */
+/** "15 more minutes", "1 more hour", "2 more hours", "1 hour 30 minutes more". */
 export function lengthText(minutes: AskLength): string {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  if (!hours) return `${rest} more minutes`;
+  const restWord = rest === 1 ? "minute" : "minutes";
+  if (!hours) return `${rest} more ${restWord}`;
   if (!rest) return hours === 1 ? "1 more hour" : `${hours} more hours`;
-  return `${hours} ${hours === 1 ? "hour" : "hours"} ${rest} more minutes`;
+  return `${hours} ${hours === 1 ? "hour" : "hours"} ${rest} ${restWord} more`;
 }
 
 /*
@@ -376,11 +381,17 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
     }))
     // Lifted for the rest of today: nothing to tell today.
     .filter((rule) => !rule.allowed || rule.allowed.until < 1440);
-  const ask = me.ask ? dayAsk(me.ask, minutesOf) : undefined;
+  // A request no one answered is told only while what it asked about still blocks.
+  const stillOn = (ask: NonNullable<GroupDay["ask"]>) =>
+    ask.state !== "timedOut" ||
+    (ask.about === "pause"
+      ? Boolean(me.pause)
+      : me.windows.some((window) => window.ruleId === ask.ruleId && !window.allowed && isWindowActive(window, now, me.timezone)));
+  const ask = me.ask && stillOn(me.ask) ? dayAsk(me.ask, minutesOf) : undefined;
   return { subject: { windows, ...(pause ? { pause } : {}), ...(always.length ? { always } : {}), ...(ask ? { ask } : {}) }, now: minutes, clock };
 }
 
-/** FamilyFi's ask as the day tells it; a parent FamilyFi has no name for is "A parent". */
+/** FamilyFi's ask as the day tells it; a parent FamilyFi has no name for goes unnamed. */
 function dayAsk(ask: NonNullable<GroupDay["ask"]>, minutesOf: (iso: string) => Clock): DayAsk {
   const at = minutesOf(ask.at);
   const minutes = ask.minutes !== undefined ? { minutes: ask.minutes } : {};
@@ -389,7 +400,7 @@ function dayAsk(ask: NonNullable<GroupDay["ask"]>, minutesOf: (iso: string) => C
     state: ask.state,
     at,
     answeredAt: ask.answeredAt ? minutesOf(ask.answeredAt) : at,
-    by: ask.by ?? "A parent",
+    ...(ask.by ? { by: ask.by } : {}),
     ...minutes,
     ...(ask.askAgainAt ? { againAt: minutesOf(ask.askAgainAt) } : {}),
   };
@@ -515,9 +526,9 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     const ask = request;
     const askable = { withLength, label: withLength ? "Ask for more time" : voice.endAsk };
     if (!ask) return { ...item, ask: askable };
-    // No one answered in time: the child can ask again.
+    // No one answered in time: the child can ask again. Nobody said no, so it is not drawn as one.
     if (ask.state === "timedOut" || ask.state === "ended")
-      return { ...item, ask: askable, status: { sign: "declined", text: "No one answered in time. You can ask again." } };
+      return { ...item, ask: askable, status: { sign: "waiting", text: "No one answered in time. You can ask again." } };
     if (ask.state === "waiting")
       return {
         ...item,
@@ -534,7 +545,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
         ...item,
         status: {
           sign: "declined",
-          text: `${ask.by} said not this time. You can ask again at ${clock(againAt(ask))}.`,
+          text: `${ask.by ? `${ask.by} said not this time.` : "Not this time."} You can ask again at ${clock(againAt(ask))}.`,
         },
       };
     return item;
@@ -657,7 +668,13 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
         tone: "on",
         sign: "allowed",
         title: `Allowed until ${clock(until)}`,
-        detail: asked ? `${asked.by} said yes to ${lengthText(asked.minutes)}` : by ? `${by} said yes` : `${window.label} is off for now`,
+        detail: asked
+          ? asked.by
+            ? `${asked.by} said yes to ${lengthText(asked.minutes)}`
+            : `You got ${lengthText(asked.minutes)}`
+          : by
+            ? `${by} said yes`
+            : `${window.label} is off for now`,
         ...(asked ? { status: { sign: "allowed" as const, text: `Answered at ${clock(asked.answeredAt)}` } } : {}),
       },
       ...onwards(until, window),
@@ -717,16 +734,18 @@ export const PHONE_VOICE: DayVoice = {
   pauseWord: "Paused",
   endAsk: "Ask to unpause",
   endWaiting: (at) => `You asked to be unpaused at ${at}. Waiting for an answer.`,
-  endDone: (by, at) => `${by} unpaused your apps at ${at}.`,
+  endDone: (by, at) => (by ? `${by} unpaused your apps at ${at}.` : `Your apps were unpaused at ${at}.`),
   pausedByNoOne: "Your apps are paused.",
+  unpausedByNoOne: "Your apps are unpaused.",
 };
 
 /** An Android phone's voice: FamilyFi blocks its internet at home, not its apps (no Screen Time there). */
 export const INTERNET_VOICE: DayVoice = {
   ...PHONE_VOICE,
   whose: "your internet",
-  endDone: (by, at) => `${by} unpaused your internet at ${at}.`,
+  endDone: (by, at) => (by ? `${by} unpaused your internet at ${at}.` : `Your internet was unpaused at ${at}.`),
   pausedByNoOne: "Your internet is paused.",
+  unpausedByNoOne: "Your internet is unpaused.",
 };
 
 /** A Thing's voice: it. */
@@ -735,8 +754,9 @@ export const THING_VOICE: DayVoice = {
   pauseWord: "Blocked",
   endAsk: "Ask to unblock",
   endWaiting: (at) => `You asked to unblock it at ${at}. Waiting for an answer.`,
-  endDone: (by, at) => `${by} unblocked it at ${at}.`,
+  endDone: (by, at) => (by ? `${by} unblocked it at ${at}.` : `It was unblocked at ${at}.`),
   pausedByNoOne: "It is blocked.",
+  unpausedByNoOne: "It is unblocked.",
 };
 
 /**
@@ -776,7 +796,7 @@ export function topAnswer({ day, voice }: DayStory): TopAnswer {
         sign: "allowed",
         tone: "on",
         title: day.next ? `Not blocked until ${clock(day.next.from)}` : "Not blocked",
-        sentence: `${day.by} unpaused ${voice.whose}.${day.next ? ` ${day.next.label} starts at ${clock(day.next.from)}.` : ""}`,
+        sentence: `${day.by ? `${day.by} unpaused ${voice.whose}.` : voice.unpausedByNoOne}${day.next ? ` ${day.next.label} starts at ${clock(day.next.from)}.` : ""}`,
       };
     case "extended":
       return {
