@@ -511,6 +511,12 @@ describe("a child's day on the household's clock", () => {
       ["Now", "Homework"],
       ["6 PM", "Grounded again"],
     ]);
+    // A pause over a rule still on: after the pause, the rule, never "Not blocked".
+    const paused = meDaySubject(me({ pause: { by: "Dad", since: "2026-11-16T20:00:00Z", until: "2026-11-16T21:00:00Z" }, alwaysOn: [{ ruleId: "r2", name: "Grounded", kind: "internet", allowed: null }] }), new Date("2026-11-16T20:30:00Z"));
+    expect(tellDay(paused.subject, paused.now, PHONE_VOICE, paused.clock).items.map((item) => [item.time, item.title])).toEqual([
+      ["Now", "Paused by Dad"],
+      ["4 PM", "Grounded"],
+    ]);
     // A category rule alone leaves the internet on.
     const games = meDaySubject(me({ alwaysOn: [{ ruleId: "r3", name: "Games", kind: "category", allowed: null }] }), MONDAY_NIGHT);
     expect(games.subject.always).toBeUndefined();
