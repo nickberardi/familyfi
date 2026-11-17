@@ -23,6 +23,8 @@ async function publicHousehold(household: Household) {
     quarantinePolicyCount: live.policyCount,
     displayName: household.displayName,
     alertsRelay: household.alertsRelayEnabled,
+    askTimeoutMinutes: household.askTimeoutMinutes,
+    askWaitMinutes: household.askWaitMinutes,
   };
 }
 
@@ -30,7 +32,14 @@ export async function getHouseholdSettings() {
   return publicHousehold(await loadHousehold());
 }
 
-export async function updateHouseholdSettings(input: { timezone?: string; displayName?: string; quarantineEnforced?: boolean; alertsRelay?: boolean }) {
+export async function updateHouseholdSettings(input: {
+  timezone?: string;
+  displayName?: string;
+  quarantineEnforced?: boolean;
+  alertsRelay?: boolean;
+  askTimeoutMinutes?: number;
+  askWaitMinutes?: number;
+}) {
   if (input.timezone) {
     try {
       new Intl.DateTimeFormat("en-US", { timeZone: input.timezone });
@@ -42,6 +51,8 @@ export async function updateHouseholdSettings(input: { timezone?: string; displa
     ...(input.timezone ? { timezone: input.timezone } : {}),
     ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
     ...(input.alertsRelay !== undefined ? { alertsRelayEnabled: input.alertsRelay } : {}),
+    ...(input.askTimeoutMinutes !== undefined ? { askTimeoutMinutes: input.askTimeoutMinutes } : {}),
+    ...(input.askWaitMinutes !== undefined ? { askWaitMinutes: input.askWaitMinutes } : {}),
   };
   // The same switch as the built-in quarantine rule's: turning it off ends a pause on it.
   const household =

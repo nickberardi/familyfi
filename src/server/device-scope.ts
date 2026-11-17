@@ -30,6 +30,8 @@ const RULE_VERBS = /^\/api\/v1\/rules\/[^/]+\/(pause|resume|extend|allow|disallo
 const GROUP_RULE_VERBS = /^\/api\/v1\/groups\/[^/]+\/rules\/[^/]+\/(pause|resume|extend|allow|disallow)$/;
 /** One group (the route answers a child's phone for its own group only). */
 const ONE_GROUP = /^\/api\/v1\/groups\/[^/]+$/;
+/** A child's ask for more time, on a group (`POST /groups/{id}/asks`). */
+const GROUP_ASKS = /^\/api\/v1\/groups\/[^/]+\/asks$/;
 /** A group's unblock, which lifts whatever blocks it now, and its end and extend. */
 const GROUP_UNBLOCK = /^\/api\/v1\/groups\/[^/]+\/unblock(\/(end|extend))?$/;
 
@@ -104,6 +106,8 @@ function agentFull(request: ScopedCall): boolean {
 /** `me:askOnly`: the child's own day, and the calls every paired device needs to stay signed in. */
 function meAskOnly({ method, path, deviceId }: ScopedCall): boolean {
   if (method === "GET") return path === "/api/v1/auth/session" || path === "/api/v1/connection" || ONE_GROUP.test(path) || path === "/api/v1/rules";
+  // Asking for more time; the route answers only for the device's own group.
+  if (method === "POST") return GROUP_ASKS.test(path);
   return method === "DELETE" && path === `/api/v1/paired/devices/${encodeURIComponent(deviceId)}`;
 }
 

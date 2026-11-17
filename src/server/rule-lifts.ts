@@ -3,6 +3,7 @@ import { z } from "zod";
 import { mapLimited } from "@/lib/concurrency";
 import { QUARANTINE_RULE_ID, type BuiltInRule } from "@/lib/rules";
 import { extendSuspensionUntil } from "@/lib/schedule";
+import { answerAsks } from "./asks";
 import { enqueueChange } from "./changes";
 import { deviceScopeRefusal } from "./auth";
 import { prisma } from "./db";
@@ -32,10 +33,14 @@ import { GATEWAY_CONCURRENCY } from "./unifi/networks";
 
 export type LiftAction = "pause" | "resume" | "extend" | "allow" | "disallow";
 
-/** What a verb's request may carry: `minutes` for extend, an optional `until` for pause and allow. */
-export type LiftBody = { until?: string | null; minutes?: number };
+/**
+ * What a verb's request may carry: `minutes` for extend, an optional `until` for pause and allow,
+ * and `askId` for a group's resume or allow that answers a child's ask yes (`liftGroupRule`).
+ */
+export type LiftBody = { until?: string | null; minutes?: number; askId?: string };
 
-const UntilBody = z.object({ until: z.string().datetime().nullable().optional() });
+const UntilBody = z.object({ until: z.string().datetime().nullable().optional(), askId: z.string().min(1).optional() });
+const ResumeBody = z.object({ askId: z.string().min(1).optional() });
 const ExtendBody = z.object({ minutes: z.number().int().positive() });
 
 export const CLEARED = { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null };
@@ -52,6 +57,8 @@ export async function liftRule(
   target: { ruleId: string; groupId?: string },
   body: LiftBody,
 ) {
+  // An ask is answered on its group's own verbs (liftGroupRule), which take askId off first.
+  if (body.askId) throw new ApiError(400, "invalid_request", "askId answers an ask on its group's resume or allow.");
   const rule = await prisma().rule.findUnique({ where: { id: target.ruleId }, include: ruleInclude });
   if (!rule || rule.systemGroupId) throw new ApiError(404, "not_found", "Rule not found.");
   const quarantine = isQuarantineRule(rule);
@@ -100,6 +107,8 @@ export async function liftRule(
     if (link) await prisma().ruleGroup.update({ where: { ruleId_groupId: { ruleId: rule.id, groupId: link.groupId } }, data });
     else await prisma().rule.update({ where: { id: rule.id }, data });
   }
+  // A pause or allowance lifts the rule: a child's waiting ask about it is answered.
+  if (data && (action === "pause" || action === "allow")) await answerAsks(session, target.groupId ?? null, { ruleIds: [rule.id] });
   const fresh = await prisma().rule.findUniqueOrThrow({ where: { id: rule.id }, include: ruleInclude });
   const change = await enqueueChange(action === "disallow" ? "allow" : action);
   return { rule: await presentRule(fresh), change };
@@ -164,6 +173,18 @@ export async function readLiftBody(
     }
     const parsed = UntilBody.safeParse(value);
     if (!parsed.success) return { ok: false, response: jsonError(400, "invalid_request", `Invalid ${action} request.`) };
+    return { ok: true, body: parsed.data };
+  }
+  if (action === "resume") {
+    // No body, or an askId when a group's resume answers a child's ask.
+    let value: unknown = {};
+    try {
+      value = await request.json();
+    } catch {
+      value = {};
+    }
+    const parsed = ResumeBody.safeParse(value ?? {});
+    if (!parsed.success) return { ok: false, response: jsonError(400, "invalid_request", "Invalid resume request.") };
     return { ok: true, body: parsed.data };
   }
   return { ok: true, body: {} };

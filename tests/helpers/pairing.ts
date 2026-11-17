@@ -89,3 +89,19 @@ export async function pairPhone(admin: SessionAuth, options: { endpointId?: stri
 export function claimWatchRequest(phone: SessionAuth, body: Record<string, unknown> = {}) {
   return invite(request("/api/v1/paired/invites?claim=true", { method: "POST", auth: phone, headers: { "content-type": "application/json" }, body: JSON.stringify({ clientType: "app-watch", clientId: "f626e8d1-57bc-4c88-9068-7c9ce6d4d0d1", ...body }) }));
 }
+
+/** A child's phone (FamilyFi Me) paired for a family group: an administrator invites it, and it claims the code. */
+export async function pairChildPhone(admin: SessionAuth, groupId: string): Promise<Claim> {
+  const created = await invite(
+    request("/api/v1/paired/invites", {
+      method: "POST",
+      auth: admin,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ clientType: "me", displayName: "Child's iPhone", endpointId: (await homeRoute()).id, groupId }),
+    }),
+  );
+  if (created.status !== 201) throw new Error(`Child invite failed: ${created.status}`);
+  const claimed = await claimInvite(await issuedInvite(created), "iPhone");
+  if (claimed.status !== 200) throw new Error(`Child claim failed: ${claimed.status}`);
+  return (await claimed.json()) as Claim;
+}

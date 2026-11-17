@@ -54,7 +54,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET/POST | `/api/v1/accounts` | Personal adult accounts; recovery `admin` is listed and cannot be created here |
 | GET/PUT/DELETE | `/api/v1/accounts/{id}` | Recovery admin cannot be edited or deleted; an adult who stops being an administrator (`isAdmin: false`) is signed out everywhere: their sessions end, every phone, Watch and agent acting as them is removed, and their pending invites are cancelled |
 | PUT | `/api/v1/accounts/{id}/password` | Revokes that account's sessions; recovery uses `.env` |
-| GET/PUT | `/api/v1/settings/household` | IANA timezone; `quarantineEnforced` false (a new household's default) keeps quarantine policies on UniFi with `enabled: false`. It is the built-in quarantine rule's switch, and turning it off ends a pause on that rule. `alertsRelay` turns [phone alerts](#phone-alerts) on or off (off by default) |
+| GET/PUT | `/api/v1/settings/household` | IANA timezone; `quarantineEnforced` false (a new household's default) keeps quarantine policies on UniFi with `enabled: false`. It is the built-in quarantine rule's switch, and turning it off ends a pause on that rule. `alertsRelay` turns [phone alerts](#phone-alerts) on or off (off by default). `askTimeoutMinutes` (5 to 1440, default 60) and `askWaitMinutes` (0 to 1440, default 30) time a child's [asks](#asking-for-more-time) |
 | GET | `/api/v1/connection/identity` | Public household identity for pairing; never returns a credential or UniFi state |
 | GET | `/api/v1/connection` | Authenticated endpoint manifest, FamilyFi-to-UniFi status, and the account's last attributed change |
 | GET/POST | `/api/v1/connection/endpoints` | Every saved route with its `kind` (`quick`, `domain`, `own`), and whether Cloudflare Access guards it (`edgeAuth`, `edgeTokenVersion`). POST adds a route the household runs; publish it through `/connection/tunnel` |
@@ -81,6 +81,8 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
 | GET/POST | `/api/v1/groups` | Family/Things |
 | GET/PUT/DELETE | `/api/v1/groups/{id}` | PUT sets `blockButtonRuleId`, the group's Block button default (one of its own category, app or website rules, or null for all internet; 400 `invalid_block_button_rule` otherwise). The card unblocks and puts back that rule with the per-group `pause` and `resume` below; what the card does is [Group states](group-states.md). Delete quarantines member devices |
+| POST | `/api/v1/groups/{id}/asks` | FamilyFi Me on a child's phone asks, on its own group, to be unpaused or for minutes in a rule's window; see [Asking for more time](#asking-for-more-time) |
+| POST | `/api/v1/groups/{id}/asks/{askId}/decline` | A parent's Not now to the group's waiting ask |
 | POST | `/api/v1/groups/{id}/unblock`, `/unblock/end`, `/unblock/extend` | Unblock lifts whatever blocks the group now, for it alone and of any kind but an always-on category, app or website rule, which it leaves on unless it is the group's Block button default: its own pause ends, and each rule blocking it is allowed for the group until its active windows end, or every rule it has until `until`. `end` ends those allowances; `extend` gives each timed one the same new end, the latest plus `minutes`. Only rules that name the group are lifted; a rule for whole networks is paused for everyone from its rule. The rules themselves are untouched. The response is `{ group, rules, change }`, `rules` being the group's own |
 | GET/PUT/DELETE | `/api/v1/groups/{id}/resolver` | GET shows a group's effective source and discovered networks; PUT/DELETE set or remove its DoH override and invalidate affected verdicts |
 | GET/POST | `/api/v1/rules` | Household rules: `kind` (`internet`, `category`, `app`, `domain`), `groupIds` or managed `networkIds`, `mode` and named `windows`. `policyNames` is what UniFi's policy table shows. `?groupId` narrows the list. The list leads with the built-in quarantine rule (id `quarantine`, `builtIn: "quarantine"`, no `groupIds`): its `enabled` is `quarantineEnforced`, its policies the quarantine policies; it is switched, paused, extended and resumed, never edited, deleted or allowed (409 `rule_built_in`). A Watch or agent may pause it but not switch it. The built-in Lock DNS rule (id `dns`, `builtIn: "dns"`) follows: it blocks other DNS servers and known encrypted DNS services (listed as its `domains`) for its `groupIds` or whole `networkIds`, always while on, leaving the DNS servers the household's networks hand out and the resolvers set in FamilyFi reachable. Only `enabled`, what it applies to and `blockPrivateRelay` change: `scope` with `groupIds` or managed `networkIds`, checked as for any rule, and a patch naming only one of the lists takes that scope; `blockPrivateRelay` (experimental) adds a fifth policy blocking Apple's relay names, so iPhones turn iCloud Private Relay off for the network; `openDns` lists the DNS it left open at its last sync, by where each comes from; switched on with no group, and none named in the same request, it covers every family group; it is paused and allowed like any rule and cannot be deleted. Next comes Block countries (id `countries`, `builtIn: "countries"`): one always-on policy with UniFi's region filter that stops its groups' devices, or everything on its networks, reaching servers in `countries` (ISO codes). PATCH takes only its `enabled`, what it applies to (as Lock DNS) and `countries`; switched on with no groups it covers every group, and a new group joins while it covers every group. It is never deleted. Every other rule keeps the `scope` it was made with |
@@ -170,7 +172,8 @@ Administrators do all of this from **System → Pair Device** in the web app. Ad
 
 FamilyFi can tell administrators' phones when devices join a managed network and wait in
 Unassigned (`device.new`), when no sync pass has reached the gateway for 10 minutes (`sync.down`),
-and when one does again (`sync.up`, only to phones told `sync.down`). Kinds are listed once in
+when one does again (`sync.up`, only to phones told `sync.down`), and when a child asks for more
+time in FamilyFi Me (`ask.new`, made by the child's request rather than a sync pass). Kinds are listed once in
 `src/lib/alert-kinds.ts`. Reminders that a pause or allowance is ending are scheduled on the phone
 and never sent by the server.
 
@@ -183,7 +186,9 @@ and never sent by the server.
   registration.
 - Each alert is a short JSON envelope, `{"v":1,"i":"<event id>","t":<unix seconds>,"k":"<kind>","d":{...}}`,
   with no sentence in it: the phone writes the words from `k` and `d` (`src/lib/alert-copy.ts`).
-  `device.new` carries `n`, the number of new devices, and `h`, the hostname when `n` is 1. Readers
+  `device.new` carries `n`, the number of new devices, and `h`, the hostname when `n` is 1.
+  `ask.new` carries `g` and `n`, the group's id and name, `a` (`pause` or `rule`), and for a rule
+  `r`, its name, and `m`, the minutes asked for; a tap opens the group. Readers
   ignore keys they do not know; `v` rises only for an incompatible envelope.
 - FamilyFi encrypts the envelope for each phone with its key: base64url of
   `0x01 || 12-byte nonce || AES-256-GCM ciphertext || 16-byte tag`, additional data
@@ -276,6 +281,28 @@ paired device, and may revoke itself. Deleting its group revokes it and cancels 
 waiting for the group, keeping the record; an import keeps it where its group comes back with the
 same id and revokes it otherwise.
 
+#### Asking for more time
+
+FamilyFi Me asks on its own group with `POST /groups/{id}/asks`: `{ "about": "pause" }` to be
+unpaused, or `{ "about": "rule", "ruleId", "minutes" }` (5 to 240) for time in the window of one of
+the group's rules that is blocking it now. Only a child's phone asks (403 `child_only`), and only on
+its own group (404). The ask shows as the group's `ask` (`GroupAsk`) on `GET /groups/{id}` and
+`GET /groups` for a day, and phones with alerts on hear `ask.new`. A group has one waiting ask at a
+time (409 `ask_waiting`); asking about something that is not blocking it now is 409 `not_blocked`,
+and about an always-on rule 409 `always_on`; after a no the child waits the household's
+`askWaitMinutes` (409 `ask_too_soon`); more than six asks an hour is 429 `too_many_asks`.
+
+No route says yes: a parent answers with the verb that lifts what the ask is about, adding its
+`askId`. `POST /groups/{id}/rules/internet/resume` ends the pause; `POST
+/groups/{id}/rules/{ruleId}/allow` lifts the rule for the group for the minutes asked, from now, or
+until the parent's own `until`, and never past the end of the window that is on. The ask is taken
+before the write, so a second parent answering it gets 409 `ask_closed`, and is put back if the
+write fails. `POST /groups/{id}/asks/{askId}/decline` is Not now. Any other write that lifts what a
+waiting ask is about (the group's unblock or allowance, the rule paused or allowed for the group or
+for everyone) answers it yes as well, by that parent. An ask nobody answers closes at the earlier of
+the household's `askTimeoutMinutes` and the end of the block it asks about: `timedOut` or `ended`. It
+reads closed as soon as that time passes, and the next sync pass writes it so.
+
 An app's Siri, Shortcuts and system controls (Control Center, Quick Settings) run outside the app.
 They never use the app's own tokens: two holders of one rotating refresh token end the sign-in
 (403 `refresh_reused`). The app instead sets up a second sign-in for them with the same call
@@ -339,7 +366,7 @@ allowlist in [`src/server/device-scope.ts`](../src/server/device-scope.ts), not 
 | `app:rulesOnly` | Its session, connection manifest, groups, rules and changes; the rule and group-rule verbs; revoking itself (403 `watch_scope` for a Watch, `app_scope` for the app's controls, beyond that) |
 | `agent:full` | Household reads and controls; never accounts, UniFi settings, resolvers, household-settings changes or connection management |
 | `agent:readOnly` | Household reads |
-| `me:askOnly` | Its session, connection manifest and its own group and the rules that cover it (`GET /groups/{id}`, `GET /rules`); revoking itself (403 `me_scope` beyond that) |
+| `me:askOnly` | Its session, connection manifest and its own group and the rules that cover it (`GET /groups/{id}`, `GET /rules`); asking for more time on its group (`POST /groups/{id}/asks`); revoking itself (403 `me_scope` beyond that) |
 
 A client type holds only the scopes in its row, and a device holding any other allows nothing. A
 phone, tablet or Mac always pairs as `app`, and a Watch and an app's Siri and shortcuts enroll with

@@ -492,6 +492,16 @@ paths:
                 alertsRelay:
                   type: boolean
                   description: Turns phone alerts through the push relay on or off. Off drops alerts still waiting to be sent.
+                askTimeoutMinutes:
+                  type: integer
+                  minimum: 5
+                  maximum: 1440
+                  description: How long a child's ask for more time waits for an answer before it times out.
+                askWaitMinutes:
+                  type: integer
+                  minimum: 0
+                  maximum: 1440
+                  description: How long after a parent's Not now a child can ask again.
       responses:
         "200":
           description: Updated
@@ -1062,6 +1072,108 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/asks:
+    post:
+      operationId: askForMoreTime
+      tags: [Groups]
+      summary: Ask for more time (FamilyFi Me)
+      description: |
+        A child's ask, from FamilyFi Me on its own group (404 for any other; 403 `child_only` for
+        anyone but a child's phone): `pause` to be unpaused, or `rule` for `minutes` in the window of
+        one of the group's rules that is blocking it now. Parents with alerts on are told (`ask.new`),
+        and the ask shows as the group's `ask` until answered. It waits until a parent answers, the
+        household's `askTimeoutMinutes` pass, or the block it asks about ends, whichever comes first.
+        One ask waits at a time for a group (409 `ask_waiting`); after a no, the child asks again only
+        after the household's `askWaitMinutes` (409 `ask_too_soon`); more than six an hour is 429
+        `too_many_asks`. 409 `not_blocked` when what it asks about is not blocking the group now, and
+        `always_on` for an always-on rule, which asking does not lift.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  additionalProperties: false
+                  required: [about]
+                  properties:
+                    about: { type: string, enum: [pause] }
+                - type: object
+                  additionalProperties: false
+                  required: [about, ruleId, minutes]
+                  properties:
+                    about: { type: string, enum: [rule] }
+                    ruleId: { type: string }
+                    minutes: { type: integer, minimum: 5, maximum: 240 }
+      responses:
+        "200":
+          description: Asked. The group as the child's phone reads it, with its `ask`.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/asks/{askId}/decline:
+    post:
+      operationId: declineAsk
+      tags: [Groups]
+      summary: Say not this time to a child's ask
+      description: |
+        A parent's Not now to the group's waiting ask: it closes as `no`, and the child can ask again
+        after the household's `askWaitMinutes`. A yes is not here: it is the verb that lifts what the
+        ask is about, with its `askId` (see `GroupAsk`). 409 `ask_closed` when the ask is no longer
+        waiting; 404 when the group has no such ask.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: askId
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Declined
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /api/v1/groups/{id}/resolver:
     parameters:
       - name: id
@@ -1495,6 +1607,8 @@ paths:
                 properties:
                   rule: { $ref: "#/components/schemas/Rule" }
                   change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -1778,7 +1892,7 @@ paths:
       tags: [Groups, Rules]
       summary: Resume a rule for one group
       description: |
-        Ends a pause for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it.
+        Ends a pause for one group alone. 404 when the group does not have the rule. On `internet`, `askId` answers yes to the group's waiting ask to be unpaused (`GroupAsk`); 409 `ask_closed` when it is no longer waiting. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -1798,6 +1912,17 @@ paths:
             replace each other. The response carries `group` instead of `rule`.
           schema: { type: string }
         - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                askId:
+                  type: string
+                  description: The child's ask this answers yes; only with the reserved `internet`.
       responses:
         "200":
           description: Done
@@ -1819,11 +1944,15 @@ paths:
                     properties:
                       group: { $ref: "#/components/schemas/Group" }
                       change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+        "409":
           $ref: "#/components/responses/Error"
   /api/v1/groups/{id}/rules/{ruleId}/extend:
     post:
@@ -1898,7 +2027,7 @@ paths:
       tags: [Groups, Rules]
       summary: Allow a rule for one group
       description: |
-        Overrides the rule for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it. Same request and errors as `/rules/{id}/allow`.
+        Overrides the rule for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it. Same request and errors as `/rules/{id}/allow`, and `askId`: it answers yes to the group's waiting ask for minutes in this rule's window (`GroupAsk`), lifting the rule for the group for those minutes from now, or until `until` when given, and never past the end of the window that is on; 409 `ask_closed` when the ask is no longer waiting.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -1929,6 +2058,9 @@ paths:
                 until:
                   type: [string, "null"]
                   format: date-time
+                askId:
+                  type: string
+                  description: The child's ask this answers yes; not with the reserved `internet`.
       responses:
         "200":
           description: Done
@@ -3483,6 +3615,18 @@ components:
           description: >-
             Whether FamilyFi sends phone alerts through the project push relay. Off until an
             administrator turns it on. Servers before API 1.4.0 leave it out.
+        askTimeoutMinutes:
+          type: integer
+          minimum: 5
+          description: >-
+            How long a child's ask for more time (FamilyFi Me) waits for an answer before it times out;
+            60 unless changed. Servers before API 2.0.0 leave it out.
+        askWaitMinutes:
+          type: integer
+          minimum: 0
+          description: >-
+            How long after a parent's Not now a child can ask again; 30 unless changed. Servers before
+            API 2.0.0 leave it out.
     ConnectionIdentity:
       type: object
       additionalProperties: false
@@ -3623,8 +3767,8 @@ components:
         Shortcuts and system controls, reads its session, connection manifest, groups, rules and changes, and pauses, resumes,
         extends, allows, disallows and turns rules on and off (403 `watch_scope` for a Watch beyond
         that, 403 `app_scope` for the app's controls). `me:askOnly`, held by FamilyFi Me on a child's
-        phone, reads its session, connection manifest, its own group and the rules that cover it, and
-        un-pairs itself; beyond that 403 `me_scope`. New scopes may be added.
+        phone, reads its session, connection manifest, its own group and the rules that cover it, asks
+        for more time on its group, and un-pairs itself; beyond that 403 `me_scope`. New scopes may be added.
         `agent:readOnly` reads household state: groups, rules, devices, sync, changes, DNS categories
         and household settings (its timezone). `agent:full` also changes groups, rules and their
         verbs, devices and their assignment, sync and DNS categories. No agent reaches accounts,
@@ -3876,8 +4020,10 @@ components:
       description: |
         An alert a phone can get. `device.new`: devices joined a managed network and wait in Unassigned.
         `sync.down`: no sync pass has reached the gateway for 10 minutes. `sync.up`: one has again, sent
-        only to phones told `sync.down`. New kinds may be added; FamilyFi sends a phone only the kinds it registered.
-      x-extensible-enum: [device.new, sync.down, sync.up]
+        only to phones told `sync.down`. `ask.new`: a child asked for more time in FamilyFi Me (data `g` the
+        group's id, `n` its name, `a` `pause` or `rule`, with `r` the rule's name and `m` the minutes). New
+        kinds may be added; FamilyFi sends a phone only the kinds it registered.
+      x-extensible-enum: [device.new, sync.down, sync.up, ask.new]
     PushRegistration:
       type: object
       additionalProperties: false
@@ -4386,6 +4532,42 @@ components:
             blocking all internet. The group's unblock lifts it even when it is always on. Absent
             for all internet, and whenever the rule it named no longer covers the group or was
             deleted. Set with `PUT /groups/{id}`.
+        ask:
+          $ref: "#/components/schemas/GroupAsk"
+    GroupAsk:
+      type: object
+      additionalProperties: false
+      required: [id, about, state, at]
+      description: |
+        The group's latest ask for more time from FamilyFi Me, filed in the last day; absent when
+        there is none. A parent shows it while `waiting`, answering no with
+        `/groups/{id}/asks/{askId}/decline` or yes with the verb that lifts what it asks about and
+        the ask's `askId`: `/groups/{id}/rules/internet/resume` for `pause`, and
+        `/groups/{id}/rules/{ruleId}/allow` for `rule`.
+      properties:
+        id: { type: string }
+        about:
+          type: string
+          x-extensible-enum: [pause, rule]
+          description: "`pause`: to be unpaused. `rule`: minutes in `ruleId`'s window, which is on now."
+        ruleId: { type: string, description: "The rule asked about, for `rule`." }
+        minutes: { type: integer, minimum: 1, description: "The minutes asked for, for `rule`." }
+        state:
+          type: string
+          x-extensible-enum: [waiting, "yes", "no", timedOut, ended]
+          description: |
+            `waiting` for an answer; `yes` or `no` from a parent; `timedOut` when nobody answered
+            within the household's `askTimeoutMinutes`; `ended` when the block it asked about
+            ended first. An ask past its end reads as closed at once.
+        at: { type: string, format: date-time, description: When the child asked. }
+        expiresAt: { type: string, format: date-time, description: "While `waiting`: when it closes unanswered." }
+        answeredAt: { type: string, format: date-time, description: "For `yes` and `no`: when a parent answered." }
+        by:
+          $ref: "#/components/schemas/Actor"
+        askAgainAt:
+          type: string
+          format: date-time
+          description: "For `no`: when the child can ask again, after the household's `askWaitMinutes`."
     GroupCreate:
       type: object
       additionalProperties: false

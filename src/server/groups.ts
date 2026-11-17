@@ -1,4 +1,4 @@
-import { AssignmentState, FamilyRole, GroupKind, Prisma, RuleLiftKind } from "@prisma/client";
+import { AskState, AssignmentState, FamilyRole, GroupKind, Prisma, RuleLiftKind, type Ask } from "@prisma/client";
 import { mapLimited } from "@/lib/concurrency";
 import { internetState, isWindowActive, type InternetWindow } from "@/lib/rule-windows";
 import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
@@ -18,6 +18,7 @@ export type GroupAccess = "available" | "blocked" | "paused" | "allowed";
 export const groupInclude = {
   _count: { select: { devices: true } },
   rules: { include: { rule: { include: { windows: true } } } },
+  asks: { orderBy: { createdAt: "desc" }, take: 1 },
 } satisfies Prisma.GroupInclude;
 
 export type GroupWithRules = Prisma.GroupGetPayload<{ include: typeof groupInclude }>;
@@ -112,9 +113,34 @@ export function blockButtonCandidate(rule: Pick<GroupWithRules["rules"][number][
   return rule.kind !== "internet" && rule.systemGroupId === null && builtInRule(rule) === null;
 }
 
+/** How long a group shows its latest ask for more time. */
+export const ASK_SHOWN_MS = 24 * 60 * 60_000;
+
+/**
+ * An ask as the API shows it. One left waiting past `expiresAt` reads as closed, before the next
+ * sync pass's sweep writes it: `ended` when that was the block's end, else `timedOut`.
+ */
+export function presentAsk(ask: Ask, now: Date) {
+  const lapsed = ask.state === AskState.waiting && ask.expiresAt <= now;
+  const state = lapsed ? (ask.endsWithBlock ? AskState.ended : AskState.timedOut) : ask.state;
+  const answered = state === AskState.yes || state === AskState.no;
+  return {
+    id: ask.id,
+    about: ask.about as "pause" | "rule",
+    ...(ask.ruleId ? { ruleId: ask.ruleId } : {}),
+    ...(ask.minutes !== null ? { minutes: ask.minutes } : {}),
+    state,
+    at: ask.createdAt.toISOString(),
+    ...(state === AskState.waiting ? { expiresAt: ask.expiresAt.toISOString() } : {}),
+    ...(answered && ask.answeredAt ? { answeredAt: ask.answeredAt.toISOString(), by: actor(ask.answeredByAccountId, ask.answeredByName) } : {}),
+    ...(state === AskState.no && ask.askAgainAt ? { askAgainAt: ask.askAgainAt.toISOString() } : {}),
+  };
+}
+
 export function publicGroup(group: GroupWithRules, timezone: string, now = new Date()) {
   const internet = internetGroup(group, now, timezone);
   const blockButton = blockButtonRuleOf(group);
+  const latestAsk = group.asks.find((ask) => now.getTime() - ask.createdAt.getTime() < ASK_SHOWN_MS);
   return {
     id: group.id,
     kind: group.kind as GroupKind,
@@ -134,6 +160,7 @@ export function publicGroup(group: GroupWithRules, timezone: string, now = new D
     access: groupAccess(group, now, timezone),
     /** The rule the group's Block button blocks and unblocks; absent for all internet. */
     ...(blockButton ? { blockButtonRuleId: blockButton.id } : {}),
+    ...(latestAsk ? { ask: presentAsk(latestAsk, now) } : {}),
   };
 }
 

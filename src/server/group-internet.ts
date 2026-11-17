@@ -1,5 +1,6 @@
 import { RuleKind, RuleLiftKind, RuleMode, RuleScope } from "@prisma/client";
 import { extendSuspensionUntil } from "@/lib/schedule";
+import { answerAsks, claimAsk, releaseAsk } from "./asks";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
 import { blockRuleOf, groupInclude, internetLinks, lifted, publicGroup, sessionActor } from "./groups";
@@ -66,6 +67,7 @@ export async function liftGroupInternet(
     });
   } else if (action === "resume") {
     await prisma().rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
+    await answerAsks(session, groupId, { pause: true });
   } else if (action === "extend") {
     if (!block || !blocking) throw new ApiError(409, "not_paused", "Extend requires an active pause.");
     if (!block.expiresAt) throw new ApiError(409, "indefinite", "An indefinite pause has no expiry to extend.");
@@ -102,6 +104,7 @@ export async function liftGroupInternet(
       // Read and cleared here, so a pause that lands meanwhile is replaced, not left beside the allow.
       await tx.rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
     });
+    await answerAsks(session, groupId, { pause: true, ruleIds: targets.map(({ rule }) => rule.id) });
   } else {
     await clearAllowances();
   }
@@ -111,13 +114,45 @@ export async function liftGroupInternet(
   return { group: publicGroup(fresh, household.timezone, now), change };
 }
 
-/** A verb on one of a group's rules, for that group alone: on `internet`, the group's own pause or allowance. */
+/**
+ * A verb on one of a group's rules, for that group alone: on `internet`, the group's own pause or
+ * allowance. With `askId` it answers a child's ask yes: `resume` on `internet` for an ask to be
+ * unpaused, `allow` on the rule for an ask for minutes in its window.
+ */
 export async function liftGroupRule(
   session: Parameters<typeof liftRule>[0],
   action: LiftAction,
   target: { groupId: string; ruleId: string },
   body: LiftBody,
 ) {
+  if (body.askId) return liftForAsk(session, action, target, body);
   if (target.ruleId === INTERNET_RULE_ID) return liftGroupInternet(session, action, target.groupId, body);
   return liftRule(session, action, target, body);
+}
+
+/**
+ * A parent's yes to a child's ask, given with its id. The ask is taken first, so a second parent
+ * answering it gets 409 `ask_closed`, and put back if the lift fails. A window's yes lasts the
+ * minutes asked for from now, or the parent's own `until`, and never past the window's end.
+ */
+async function liftForAsk(session: Parameters<typeof liftRule>[0], action: LiftAction, target: { groupId: string; ruleId: string }, body: LiftBody) {
+  const internet = target.ruleId === INTERNET_RULE_ID;
+  const about = action === "resume" && internet ? "pause" : action === "allow" && !internet ? "rule" : null;
+  if (!about) throw new ApiError(400, "invalid_request", "askId answers an ask with the group's resume on internet, or allow on the rule it asks about.");
+  const ask = await claimAsk(session, body.askId!, { groupId: target.groupId, about, ruleId: target.ruleId });
+  try {
+    const rest: LiftBody = { ...body, askId: undefined };
+    if (about === "pause") return await liftGroupInternet(session, action, target.groupId, rest);
+    const rule = await prisma().rule.findUnique({ where: { id: target.ruleId }, include: { windows: true } });
+    if (!rule) throw new ApiError(404, "not_found", "Rule not found.");
+    const now = new Date();
+    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    const windowEnd = activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone) ?? null;
+    const wanted = body.until === undefined ? new Date(now.getTime() + (ask.minutes ?? 0) * 60_000) : body.until ? new Date(body.until) : null;
+    const until = windowEnd && (!wanted || windowEnd < wanted) ? windowEnd : wanted;
+    return await liftRule(session, action, target, { ...rest, until: until?.toISOString() ?? null });
+  } catch (error) {
+    await releaseAsk(ask.id);
+    throw error;
+  }
 }

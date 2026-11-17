@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import type { AlertKind, NewDeviceData } from "@/lib/alert-kinds";
+import type { AlertKind, AskData, NewDeviceData } from "@/lib/alert-kinds";
 import { randomToken } from "../crypto";
 import { prisma } from "../db";
 import { wakeAlertSender } from "./sender";
@@ -159,6 +159,30 @@ export async function recordSyncBackFor(deviceId: string, now = new Date()): Pro
     if (!household?.alertsRelayEnabled || household.syncTroubleAlertedAt) return;
     if (!(await recipients("sync.up", now)).includes(deviceId)) return;
     await writeEvents("sync.up", [deviceId], {}, now);
+  } catch (error) {
+    warn(error);
+  }
+}
+
+/**
+ * A child asked for more time (FamilyFi Me): every phone that takes asks hears it, and the first
+ * parent to answer in the app answers it. Made by the ask's request, not a sync pass, and like every
+ * producer it reads and writes nothing on the gateway.
+ */
+export async function recordAsk(
+  ask: { groupId: string; groupName: string; about: "pause" | "rule"; ruleName?: string; minutes?: number },
+  now = new Date(),
+): Promise<void> {
+  try {
+    if (!(await relayEnabled())) return;
+    const detail: AskData = {
+      g: ask.groupId,
+      n: ask.groupName,
+      a: ask.about,
+      ...(ask.ruleName ? { r: ask.ruleName } : {}),
+      ...(ask.minutes ? { m: ask.minutes } : {}),
+    };
+    await writeEvents("ask.new", await recipients("ask.new", now), detail, now);
   } catch (error) {
     warn(error);
   }

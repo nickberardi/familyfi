@@ -5,7 +5,7 @@
  * envelope, the encryption and the relay are kind-agnostic, and a phone is only ever sent the kinds
  * it registered as understanding.
  */
-export const ALERT_KINDS = ["device.new", "sync.down", "sync.up"] as const;
+export const ALERT_KINDS = ["device.new", "sync.down", "sync.up", "ask.new"] as const;
 
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
@@ -31,3 +31,10 @@ export type AlertEnvelope = {
 
 /** `device.new`: `n` new devices waiting in Unassigned; `h` is the hostname when `n` is 1 and it has one. */
 export type NewDeviceData = { n: number; h?: string };
+
+/**
+ * `ask.new`: a child asked for more time in FamilyFi Me. `g` the group's id and `n` its name; `a`
+ * `pause` (to be unpaused) or `rule` (more time in a rule's window), with `r` the rule's name and `m`
+ * the minutes asked for.
+ */
+export type AskData = { g: string; n: string; a: "pause" | "rule"; r?: string; m?: number };
