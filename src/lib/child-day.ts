@@ -545,8 +545,9 @@ export function thingNote({ day, ask, items }: DayStory): string {
 
 /** The short line beside "See my day" while a request waits, or after a no until the child can ask again. */
 export function askNote({ day, ask }: DayStory): { sign: DaySign; text: string } | undefined {
+  if (day.kind !== "paused" && day.kind !== "window") return undefined;
   if (ask?.state === "waiting") return { sign: "waiting", text: "Waiting for an answer" };
-  if (ask?.state === "no" && (day.kind === "paused" || day.kind === "window"))
+  if (ask?.state === "no")
     return {
       sign: "declined",
       text: `Ask again at ${clock(ask.answeredAt + ASK_AGAIN_AFTER)}`,

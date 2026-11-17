@@ -209,6 +209,10 @@ describe("a child's day", () => {
       text: "Ask again at 4:15 PM",
     });
     expect(askNote(tellDay(paused, NOW, PHONE_VOICE))).toBeUndefined();
+    // A request still waiting once the pause has ended has nothing left to unblock.
+    expect(
+      askNote(tellDay({ ...paused, ask: { state: "waiting", at: NOW } }, 17 * 60 + 5, PHONE_VOICE)),
+    ).toBeUndefined();
   });
 
   it("lets the child ask again once the ask-again time comes", () => {
