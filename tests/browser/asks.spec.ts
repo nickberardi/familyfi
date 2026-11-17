@@ -158,10 +158,14 @@ test("a child's ask for time off a rule offers what they asked, the window's end
   await signIn(page);
   const group = await cassie(page);
   const headers = await csrf(page);
-  // A window that is on whenever the test runs.
+  // A window from an hour ago to two hours from now in the household's time zone, so it is on, with
+  // more than the asked 30 minutes left, whenever the test runs (overnight windows wrap).
+  const { household } = (await (await page.request.get("/api/v1/settings/household")).json()) as { household: { timezone: string } };
+  const clock = (offsetMinutes: number) =>
+    new Intl.DateTimeFormat("en-GB", { timeZone: household.timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(Date.now() + offsetMinutes * 60_000));
   const created = await page.request.post("/api/v1/rules", {
     headers,
-    data: { name: "Browser bedtime", kind: "internet", groupIds: [group.id], mode: "scheduled", windows: [{ name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" }] },
+    data: { name: "Browser bedtime", kind: "internet", groupIds: [group.id], mode: "scheduled", windows: [{ name: "", days: [0, 1, 2, 3, 4, 5, 6], start: clock(-60), end: clock(120) }] },
   });
   expect(created.status()).toBe(201);
   const ruleId = ((await created.json()) as { rule: { id: string } }).rule.id;
