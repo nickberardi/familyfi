@@ -42,7 +42,7 @@ describe("openapi contract", () => {
       "Health.apiVersion", // always sent, but servers before 0.41.0 leave it out: required would raise x-min-server
       "Health.minAppApiVersion", // likewise
       "Health.minWatchApiVersion", // likewise
-      "Health.minApiVersion", // only with ?client= naming a client type this server knows
+      "Health.minApiVersion", // only with ?clientType= naming a client type this server knows
       "Health.revision", // only when the database answered
       "Health.error", // only when degraded by configuration
       "Health.gateway", // only with ?gateway=true, for a session, while ready

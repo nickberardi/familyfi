@@ -13,7 +13,7 @@ info:
   # as `minWatchApiVersion`.
   x-min-app-watch: 0.30.0
   # The oldest FamilyFi Me API version this server still serves. Set by hand, like x-min-app-watch.
-  # GET /api/v1/health?client=me reports it as `minApiVersion`.
+  # GET /api/v1/health?clientType=me reports it as `minApiVersion`.
   x-min-me: 1.6.0
   # scripts/ci/check-openapi-floors.mjs enforces all three (docs/api.md, "Versioning the contract"):
   # none falls or passes `version`, and CI raises x-min-app and x-min-server where a change needs it.
@@ -89,7 +89,7 @@ paths:
           required: false
           description: "`true` adds the UniFi devices' latest load and FamilyFi's requests to the console. Needs a session."
           schema: { type: string, enum: ["true", "false"] }
-        - name: client
+        - name: clientType
           in: query
           required: false
           description: |
@@ -3202,7 +3202,7 @@ components:
         minApiVersion:
           type: string
           description: |
-            Only with `?client=`: the oldest API version this server serves that client type. A client
+            Only with `?clientType=`: the oldest API version this server serves that client type. A client
             whose API version is older must ask to be updated. Absent for a client type the server does
             not know, and from servers before 1.6.0; read `minAppApiVersion` or `minWatchApiVersion` then.
         revision:
@@ -3589,7 +3589,7 @@ components:
         its own scopes: `app` `app:full`, `app-watch` and `app-controls` `app:rulesOnly`, `me`
         `me:askOnly`, `agent` `agent:full` or `agent:readOnly`. New client types may be added; a
         client lists one it does not know as a paired device like any other.
-    DeviceScope:
+    ClientScope:
       type: string
       x-extensible-enum: ["app:full", "app:rulesOnly", "agent:full", "agent:readOnly", "me:askOnly"]
       description: |
@@ -3730,7 +3730,7 @@ components:
             id: { type: string }
             displayName: { type: string }
             clientType: { $ref: "#/components/schemas/ClientType" }
-            scope: { $ref: "#/components/schemas/DeviceScope" }
+            scope: { $ref: "#/components/schemas/ClientScope" }
         session: { $ref: "#/components/schemas/Session" }
         token: { type: string, description: The one-hour bearer. }
         tokenType: { type: string, enum: [Bearer] }
@@ -3789,7 +3789,7 @@ components:
         id: { type: string }
         displayName: { type: string }
         clientType: { $ref: "#/components/schemas/ClientType" }
-        scope: { $ref: "#/components/schemas/DeviceScope" }
+        scope: { $ref: "#/components/schemas/ClientScope" }
         actsAs:
           type: [object, "null"]
           description: The account this device acts as, named by its invite.

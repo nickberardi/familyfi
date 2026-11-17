@@ -26,7 +26,7 @@ export const MIN_WATCH_API_VERSION = "0.30.0";
 export const MIN_ME_API_VERSION = "1.6.0";
 
 /**
- * The oldest API version this server serves each client type, which `GET /api/v1/health?client=`
+ * The oldest API version this server serves each client type, which `GET /api/v1/health?clientType=`
  * answers as `minApiVersion`. The app and agents read the whole API; the Watch and the app's Siri,
  * Shortcuts and controls share the Watch's few calls; FamilyFi Me has its own floor.
  */
@@ -65,7 +65,7 @@ export function apiCompatibility(
   // A version that can't be read decides nothing: the household load reports whatever goes wrong.
   if (!server || !app) return { status: "ok" };
   const mismatch = { appApiVersion: app.version, serverApiVersion: server.version };
-  // A client that named its type to `/health?client=` gets its own floor; otherwise the app's or the watches'.
+  // A client that named its type to `/health?clientType=` gets its own floor; otherwise the app's or the watches'.
   const served = health.minApiVersion ?? (client.watch ? health.minWatchApiVersion : health.minAppApiVersion);
   const minAppApi = served ? parseSemver(served) : null;
   if (minAppApi && compareSemver(app, minAppApi) < 0) return { status: "update_app", ...mismatch };
