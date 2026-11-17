@@ -20,6 +20,7 @@ import { createRule, getRule as getRuleFn, listRules as listRulesFn, RuleCreateB
 import type { Rule } from "@/lib/rules";
 import { getSharedDevMockClient, resetDevMockClientForTests } from "@/server/unifi/dev-mock";
 import { setLockDnsResolverForTests } from "@/server/unifi/lock-dns";
+import { GATEWAY_CONCURRENCY } from "@/server/unifi/networks";
 import type { FirewallPolicy } from "@/server/unifi/types";
 import { answered, documented } from "../helpers/answered";
 import { authFromLogin, request } from "../helpers/http";
@@ -228,8 +229,10 @@ describe("household rules", () => {
     await runReconcileOnce();
 
     // In test mode the server reaches the console through the shared mock, once a key is stored.
-    // Each delete is held until a second one is in flight, so overlap shows however fast the
-    // ownership queries are; deletes made one after another wait out the fallback and fail on peak.
+    // Deletes are held in waves: a wave is released once as many are in flight as the limit allows
+    // (or as are left), and a moment later, so a delete beyond the limit has time to arrive and push
+    // the peak over it. Deletes made one after another never fill a wave, wait out the fallback and
+    // fail on peak; a correct limiter passes however fast the ownership queries are.
     process.env.FAMILYFI_MODE = "test";
     await prisma().household.update({
       where: { id: "default" },
@@ -239,17 +242,29 @@ describe("household rules", () => {
     const deleted: string[] = [];
     let inFlight = 0;
     let peak = 0;
+    let expected = 0;
     let open = () => {};
-    let overlap = Promise.resolve();
-    const hold = () => {
-      overlap = new Promise<void>((done) => (open = done));
+    let wave = Promise.resolve();
+    const nextWave = () => {
+      wave = new Promise<void>((done) => (open = done));
     };
-    hold();
+    const hold = (count: number) => {
+      expected = count;
+      deleted.length = 0;
+      peak = 0;
+      nextWave();
+    };
+    hold(6);
     gateway.deletePolicy = async (_siteId: string, id: string) => {
       inFlight += 1;
       peak = Math.max(peak, inFlight);
-      if (inFlight >= 2) open();
-      await Promise.race([overlap, new Promise((done) => setTimeout(done, 1_000))]);
+      const mine = wave;
+      if (inFlight >= Math.min(GATEWAY_CONCURRENCY, expected - deleted.length)) {
+        const release = open;
+        nextWave();
+        setTimeout(release, 100);
+      }
+      await Promise.race([mine, new Promise((done) => setTimeout(done, 1_000))]);
       inFlight -= 1;
       deleted.push(id);
     };
@@ -258,11 +273,9 @@ describe("household rules", () => {
     await deleteRule(both.id);
     expect(deleted.sort()).toEqual([...bothIds].sort());
     expect(peak).toBeGreaterThan(1);
-    expect(peak).toBeLessThanOrEqual(4);
+    expect(peak).toBeLessThanOrEqual(GATEWAY_CONCURRENCY);
 
-    deleted.length = 0;
-    peak = 0;
-    hold();
+    hold(3);
     expect(await prisma().rulePolicy.count()).toBe(3);
     await deleteGroup(emma.id);
     expect(deleted).toHaveLength(3);
