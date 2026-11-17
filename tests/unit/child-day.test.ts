@@ -542,6 +542,24 @@ describe("a child's day on the household's clock", () => {
     ]);
   });
 
+  it("tells the lifted window that comes back first, whichever rule came first", () => {
+    // Homework 4 to 6 PM lifted until 5:30, Snack 4:30 to 5 PM lifted until 4:50; it is 4:45 PM.
+    const homework = { ruleId: "r1", ruleName: "Homework", name: "", days: [1], start: "16:00", end: "18:00", allowed: { by: "Dad", until: "2026-11-16T22:30:00Z" } };
+    const snack = { ruleId: "r2", ruleName: "Snack", name: "", days: [1], start: "16:30", end: "17:00", allowed: { by: "Dad", until: "2026-11-16T21:50:00Z" } };
+    for (const windows of [[homework, snack], [snack, homework]]) {
+      const told = meDaySubject(me({ windows }), new Date("2026-11-16T21:45:00Z"));
+      const story = tellDay(told.subject, told.now, PHONE_VOICE, told.clock);
+      expect(topAnswer(story).title).toBe("Allowed until 4:50 PM");
+    }
+  });
+
+  it("ends an allowance past midnight where a window after midnight starts", () => {
+    // Bedtime lifted until 2 AM, Early 1 to 3 AM; it is 11 PM.
+    const early = { ruleId: "r2", ruleName: "Early", name: "", days: [2], start: "01:00", end: "03:00", allowed: null };
+    const told = meDaySubject(me({ windows: [{ ...bedtime([1]), allowed: { by: "Dad", until: "2026-11-17T07:00:00Z" } }, early] }), new Date("2026-11-17T04:00:00Z"));
+    expect(topAnswer(tellDay(told.subject, told.now, PHONE_VOICE, told.clock)).title).toBe("Allowed until 1 AM");
+  });
+
   it("tells nothing of a window a parent lifted for the whole of it", () => {
     // Bedtime lifted until 9 AM tomorrow; it is 7 PM.
     const lifted = { ...bedtime([1]), allowed: { by: "Dad", until: "2026-11-17T14:00:00Z" } };

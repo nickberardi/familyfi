@@ -239,7 +239,7 @@ function onDay(day: DayClock) {
    * The first window that blocks at or after `after` and before midnight, as that occurrence runs today:
    * one a parent lifted past its start starts when the lift ends, and one the lift covers is skipped.
    */
-  const firstWindowFrom = (windows: DayWindow[], after: Clock): DayWindow | undefined =>
+  const firstWindowFrom = (windows: DayWindow[], after: Clock, before = 1440): DayWindow | undefined =>
     windows
       .flatMap((window) => {
         let from = after;
@@ -255,8 +255,8 @@ function onDay(day: DayClock) {
         }
         return [];
       })
-      // Today's occurrences, even one a lift pushes past midnight.
-      .filter((found) => found.start < 1440)
+      // Today's occurrences (or up to `before`), even one a lift pushes past midnight.
+      .filter((found) => found.start < before)
       .map((found) => found.told)
       .sort((a, b) => a.from - b.from)[0];
   return { inWindow, endOf, windowBands, firstWindowFrom };
@@ -324,7 +324,11 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   const pause = subject.pause && now >= subject.pause.from && now < subject.pause.to ? subject.pause : undefined;
   // A window a parent lifted gives way to another that still blocks now.
   const blocking = subject.windows.filter((candidate) => inWindow(candidate, now));
-  const window = blocking.find((candidate) => !(candidate.allowed && now < candidate.allowed.until)) ?? blocking[0];
+  // When every one is lifted, the one whose lift ends first is the one to tell.
+  const liftEnd = (candidate: DayWindow) => Math.min(candidate.allowed?.until ?? now, endOf(candidate, now));
+  const window =
+    blocking.find((candidate) => !(candidate.allowed && now < candidate.allowed.until)) ??
+    [...blocking].sort((a, b) => liftEnd(a) - liftEnd(b))[0];
   const windowEnd = window ? endOf(window, now) : 0;
   const nextWindow = (after: Clock) => firstWindowFrom(subject.windows, after);
   const later = (item: Omit<DayItem, "now">): DayItem => ({
@@ -526,6 +530,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     const sooner = firstWindowFrom(
       subject.windows.filter((other) => other !== window),
       now,
+      Math.max(1440, allowedTo),
     );
     const then = sooner && sooner.from < allowedTo ? sooner : undefined;
     const until = then ? then.from : allowedTo;
