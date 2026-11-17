@@ -62,8 +62,6 @@ tags:
     description: What FamilyFi can see about the network that is worth changing. It only reads the gateway.
   - name: Paired
     description: Phones, Watches and agents that call the API. Invites join them; devices manage them.
-  - name: Me
-    description: What FamilyFi Me reads on a child's phone, for the family group it signs in for.
   - name: Connection
     description: |
       Paired native devices, trusted HTTPS endpoints, and connection status.
@@ -264,23 +262,6 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "403": { $ref: "#/components/responses/Error" }
-  /api/v1/me/day:
-    get:
-      operationId: getMeDay
-      tags: [Me]
-      summary: A child's own day, for FamilyFi Me
-      description: |
-        The family group a child's phone (`me:askOnly`) signs in for, and nothing else in the
-        household: its pause and allowance now, the windows of its internet rules, and the rules
-        that block something all the time. A rule paused or allowed, for everyone or for this group,
-        blocks nothing and is left out while it is lifted. Scheduled category, app and website
-        rules are not listed yet. Any other caller gets 403 `me_required`.
-      security: [{ bearerAuth: [] }]
-      responses:
-        "200": { description: The child's day, content: { application/json: { schema: { $ref: "#/components/schemas/MeDay" } } } }
-        "401": { $ref: "#/components/responses/Error" }
-        "403": { $ref: "#/components/responses/Error" }
-        "404": { $ref: "#/components/responses/Error" }
   /api/v1/accounts:
     get:
       operationId: listAccounts
@@ -857,7 +838,10 @@ paths:
     get:
       operationId: getGroup
       tags: [Groups]
-      summary: Get a group
+      summary: Get a group and its day
+      description: |
+        The group, and `day`: what its people see of it, as FamilyFi Me tells it on a child's phone.
+        A child's phone (`me:askOnly`) reads its own group alone; any other group is 404 for it.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ $ref: "#/components/parameters/GroupId" }]
       responses:
@@ -868,9 +852,10 @@ paths:
               schema:
                 type: object
                 additionalProperties: false
-                required: [group]
+                required: [group, day]
                 properties:
                   group: { $ref: "#/components/schemas/Group" }
+                  day: { $ref: "#/components/schemas/GroupDay" }
         "401":
           $ref: "#/components/responses/Error"
         "403": { $ref: "#/components/responses/Error" }
@@ -3409,7 +3394,12 @@ components:
         expiresAt:
           type: string
           format: date-time
-    MeDay:
+    GroupDay:
+      description: |
+        A group's day as its people see it: its pause and allowance now, the windows of its
+        internet rules, and the rules that block something all the time. A rule paused or allowed,
+        for everyone or for this group, with no end, blocks nothing and is left out. Scheduled
+        category, app and website rules are not listed yet. People are named, never accounts.
       type: object
       additionalProperties: false
       required: [group, timezone, pause, allowance, windows, alwaysOn]
@@ -3705,7 +3695,7 @@ components:
         Shortcuts and system controls, reads its session, connection manifest, groups, rules and changes, and pauses, resumes,
         extends, allows, disallows and turns rules on and off (403 `watch_scope` for a Watch beyond
         that, 403 `app_scope` for the app's controls). `me:askOnly`, held by FamilyFi Me on a child's
-        phone, reads its session, connection manifest and its own group's day (`GET /me/day`), and
+        phone, reads its session, connection manifest and its own group and its day (`GET /groups/{id}`), and
         un-pairs itself; beyond that 403 `me_scope`. New scopes may be added.
         `agent:readOnly` reads household state: groups, rules, devices, sync, changes, DNS categories
         and household settings (its timezone). `agent:full` also changes groups, rules and their

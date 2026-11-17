@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { deleteGroup, getGroup, updateGroup } from "@/server/groups";
+import { childDay } from "@/server/child-day";
 import { readBody, withMutation, withSession } from "@/server/guard";
+import { ApiError } from "@/server/http";
 
 const Update = z.object({
   name: z.string().min(1).optional(),
@@ -13,9 +15,12 @@ const Update = z.object({
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(request: Request, ctx: Ctx) {
-  return withSession(request, async () => {
+  return withSession(request, async (session) => {
     const { id } = await ctx.params;
-    return Response.json({ group: await getGroup(id) });
+    // A child's phone (FamilyFi Me) reads its own group alone; any other is not there for it.
+    if (session.device?.clientType === "me" && id !== session.device.groupId) throw new ApiError(404, "not_found", "Group not found.");
+    const group = await getGroup(id);
+    return Response.json({ group, day: await childDay(group.id) });
   });
 }
 

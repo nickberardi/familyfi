@@ -263,13 +263,13 @@ function onDay(day: DayClock) {
 }
 
 /**
- * A child's own day as FamilyFi reads it (`GET /api/v1/me/day`): the group the phone signs in for,
+ * A child's own day as FamilyFi reads it (`day` in `GET /api/v1/groups/{id}`): the group the phone signs in for,
  * the household's time zone, the group's pause and allowance now, the windows of its internet rules
  * (`days` are the days a window starts on, 0 = Sunday; `start` and `end` are the household's
  * HH:mm, and an end at or before the start is the next morning), and the rules that block
  * something all the time.
  */
-export type MeDay = {
+export type GroupDay = {
   group: { id: string; name: string };
   timezone: string;
   /** `since` is when the pause was last set (started, or extended), not when it began: it places the band, and no start is told. `until` null: until a parent ends it. */
@@ -289,7 +289,7 @@ function minutesOfHhmm(value: string): Clock {
  * The child's phone's day from FamilyFi's answer, on the household's day: what `tellDay` tells.
  * A pause with no end is drawn to the end of today.
  */
-export function meDaySubject(me: MeDay, now: Date): { subject: DaySubject; now: Clock; clock: DayClock } {
+export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; now: Clock; clock: DayClock } {
   const { clock, now: minutes } = householdDay(now, me.timezone);
   const minutesOf = (iso: string) => Math.round((new Date(iso).getTime() - clock.midnight.getTime()) / 60_000);
   const windows = me.windows.map((window): DayWindow => {
