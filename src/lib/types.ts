@@ -66,7 +66,8 @@ export type Change = {
 export type Session = {
   username: string;
   displayName: string;
-  kind: "recovery" | "personal";
+  /** `me`: FamilyFi Me on a child's phone, signed in for its family group. A newer server may add one. */
+  kind: "recovery" | "personal" | "me" | (string & {});
   expiresAt: string;
 };
 
@@ -250,6 +251,8 @@ export type PairedPhone = {
   scope: PairedScope;
   /** The account this device acts as. */
   actsAs: { username: string; displayName: string } | null;
+  /** A child's phone (`me`) only: the family group it signs in for; null once that group is deleted. */
+  group?: { id: string; name: string } | null;
   /** The device that vouched for this one: the app that set up a Watch or its own Siri and shortcuts. */
   parentDeviceId: string | null;
   enrolledAt: string;
