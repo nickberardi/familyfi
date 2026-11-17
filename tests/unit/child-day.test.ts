@@ -318,14 +318,14 @@ describe("a child's day", () => {
   it("tells the not-blocked answers in each voice", () => {
     const open = tellDay({ windows: [] }, NOW, PHONE_VOICE);
     expect(topAnswer(open)).toMatchObject({ title: "Nothing is blocked", sentence: "Nothing is planned for today." });
-    expect(thingTile(open)).toEqual({ word: "Not blocked", line: "All day", tone: "on" });
+    expect(thingTile(open)).toEqual({ word: "Not blocked", line: "For the rest of today", tone: "on" });
     expect(thingNote(open)).toBe("Not blocked today.");
 
     const yes = { state: "yes" as const, at: NOW, answeredAt: NOW + 5, by: "Dad" };
     const unpaused = tellDay({ ...paused, windows: [], ask: yes }, NOW + 10, THING_VOICE);
     expect(unpaused.day.kind).toBe("unpaused");
     expect(topAnswer(unpaused)).toMatchObject({ title: "Not blocked", sentence: "Dad unpaused it." });
-    expect(thingTile(unpaused)).toEqual({ word: "Not blocked", line: "All day", tone: "on" });
+    expect(thingTile(unpaused)).toEqual({ word: "Not blocked", line: "For the rest of today", tone: "on" });
     expect(unpaused.items[0]?.status?.text).toBe("Dad unblocked it at 3:50 PM.");
     expect(tellDay({ ...paused, ask: yes }, NOW + 10, INTERNET_VOICE).items[0]?.status?.text).toBe(
       "Dad unpaused your internet at 3:50 PM.",
@@ -474,12 +474,12 @@ describe("a child's day on the household's clock", () => {
     const story = tellDay(subject, now, PHONE_VOICE, day);
     expect(story.day).toEqual({ kind: "always", label: "No internet" });
     expect(topAnswer(story)).toMatchObject({ title: "No internet", sentence: "No internet all day." });
-    expect(story.items.map((item) => [item.title, item.detail])).toEqual([["No internet", "No internet all day"]]);
+    expect(story.items.map((item) => [item.title, item.detail])).toEqual([["No internet", "All day"]]);
     expect(story.bands).toEqual([{ kind: "window", from: 0, to: 1440, label: "No internet", source: "No internet", times: "All day" }]);
     expect(timelineLegend(story.bands)[0]?.times).toBe("All day");
     const thing = tellDay(subject, now, THING_VOICE, day);
-    expect(thingTile(thing)).toEqual({ word: "No internet", line: "No internet all day", tone: "window" });
-    expect(thingNote(thing)).toBe("No internet: no internet all day.");
+    expect(thingTile(thing)).toEqual({ word: "No internet", line: "All day", tone: "window" });
+    expect(thingNote(thing)).toBe("No internet all day.");
     // A category rule alone leaves the internet on.
     const games = meDaySubject(me({ alwaysOn: [{ ruleId: "r3", name: "Games", kind: "category" }] }), MONDAY_NIGHT);
     expect(games.subject.always).toBeUndefined();
@@ -495,13 +495,25 @@ describe("a child's day on the household's clock", () => {
     expect(resumed.items.map((item) => [item.time, item.title])).toEqual([["Now", "Paused by Dad"], ["9 PM", "Not blocked"], ["10 PM", "Bedtime"], ["7 AM", "Not blocked"]]);
   });
 
+  it("after a pause, tells a window coming back after midnight when its lift ends then", () => {
+    const pause = { by: "Dad", since: "2026-11-17T00:00:00Z", until: "2026-11-17T03:00:00Z" }; // until 10 PM
+    const part = meDaySubject(me({ pause, windows: [{ ...bedtime([1]), allowed: { by: "Dad", until: "2026-11-17T05:30:00Z" } }] }), new Date("2026-11-17T01:00:00Z"));
+    const told = tellDay(part.subject, part.now, PHONE_VOICE, part.clock);
+    expect(told.items.map((item) => [item.time, item.title, item.detail])).toEqual([
+      ["Now", "Paused by Dad", "Until 10 PM"],
+      ["10 PM", "Not blocked", "Until Bedtime"],
+      ["12:30 AM", "Bedtime", "Until 7 AM"],
+      ["7 AM", "Not blocked", "Tomorrow morning"],
+    ]);
+  });
+
   it("tells nothing of a window a parent lifted for the whole of it", () => {
     // Bedtime lifted until 9 AM tomorrow; it is 7 PM.
     const lifted = { ...bedtime([1]), allowed: { by: "Dad", until: "2026-11-17T14:00:00Z" } };
     const { subject, now, clock: day } = meDaySubject(me({ windows: [lifted] }), new Date("2026-11-17T00:00:00Z"));
     const story = tellDay(subject, now, PHONE_VOICE, day);
     expect(topAnswer(story)).toMatchObject({ title: "Nothing is blocked", sentence: "Nothing is planned for today." });
-    expect(thingTile(tellDay(subject, now, THING_VOICE, day))).toMatchObject({ line: "All day" });
+    expect(thingTile(tellDay(subject, now, THING_VOICE, day))).toMatchObject({ line: "For the rest of today" });
     expect(story.items.some((item) => item.sign === "window")).toBe(false);
     expect(story.bands.filter((band) => band.kind === "window")).toEqual([]);
   });
