@@ -246,7 +246,7 @@ describe("the versions GET /api/v1/health reports", () => {
         version: API_VERSION,
         apiVersion: info.version,
         minAppApiVersion: info["x-min-app"],
-        minWatchApiVersion: info["x-min-watch"],
+        minWatchApiVersion: info["x-min-app-watch"],
       });
     }
   });
@@ -256,8 +256,8 @@ describe("the versions GET /api/v1/health reports", () => {
     const floors: Record<string, string | undefined> = {
       app: info["x-min-app"],
       agent: info["x-min-app"],
-      "app-watch": info["x-min-watch"],
-      "app-controls": info["x-min-watch"],
+      "app-watch": info["x-min-app-watch"],
+      "app-controls": info["x-min-app-watch"],
       me: info["x-min-me"],
     };
     for (const [client, floor] of Object.entries(floors)) {

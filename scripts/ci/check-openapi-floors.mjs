@@ -7,7 +7,7 @@
 //     this records which apps it leaves behind, label or not.
 //   - oasdiff `changelog` reports a response gaining a required field: info.x-min-server must
 //     be the new info.version, since an older server never sends it.
-//   - info.x-min-watch, the watches' floor, is set by hand.
+//   - info.x-min-app-watch, the watches' floor, is set by hand.
 //   - No floor goes backwards, or past info.version.
 //
 // Usage: node scripts/ci/check-openapi-floors.mjs [base-ref]
@@ -38,7 +38,7 @@ export function checkFloors({ baseSpec, headSpec, breaking, requiredAdded }) {
     { key: "x-min-app", raise: breaking, why: "breaks apps built from older contracts" },
     { key: "x-min-server", raise: requiredAdded, why: "adds required response fields, which older servers don't send" },
     // The watches read only a few routes; until CI can tell which changes reach them, theirs is set by hand.
-    { key: "x-min-watch", raise: [], why: "" },
+    { key: "x-min-app-watch", raise: [], why: "" },
     // FamilyFi Me's floor is set by hand too. A base from before it existed has none to compare.
     { key: "x-min-me", raise: [], why: "" },
   ];
@@ -122,7 +122,7 @@ function main() {
         [
           "### OpenAPI floors",
           "",
-          `x-min-app \`${info["x-min-app"]}\`, x-min-server \`${info["x-min-server"]}\`, x-min-watch \`${info["x-min-watch"]}\`, x-min-me \`${info["x-min-me"]}\`, version \`${info.version}\`.`,
+          `x-min-app \`${info["x-min-app"]}\`, x-min-server \`${info["x-min-server"]}\`, x-min-app-watch \`${info["x-min-app-watch"]}\`, x-min-me \`${info["x-min-me"]}\`, version \`${info.version}\`.`,
           "",
           outcome.ok ? "Passed." : ["```", ...outcome.problems, "```"].join("\n"),
           "",
@@ -133,7 +133,7 @@ function main() {
       for (const problem of outcome.problems) console.error(problem);
       return 1;
     }
-    console.log(`Floors hold against ${baseName}: x-min-app ${info["x-min-app"]}, x-min-server ${info["x-min-server"]}, x-min-watch ${info["x-min-watch"]}, x-min-me ${info["x-min-me"]}.`);
+    console.log(`Floors hold against ${baseName}: x-min-app ${info["x-min-app"]}, x-min-server ${info["x-min-server"]}, x-min-app-watch ${info["x-min-app-watch"]}, x-min-me ${info["x-min-me"]}.`);
     return 0;
   } finally {
     rmSync(work, { recursive: true, force: true });

@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { checkFloors, SERVER_FLOOR_IDS } from "../../scripts/ci/check-openapi-floors.mjs";
 
 const spec = (version: string, client: string, server: string, watch = "0.30.0", me = "0.30.0") => ({
-  info: { version, "x-min-app": client, "x-min-server": server, "x-min-watch": watch, "x-min-me": me },
+  info: { version, "x-min-app": client, "x-min-server": server, "x-min-app-watch": watch, "x-min-me": me },
 });
 
 const base = spec("0.41.0", "0.36.0", "0.36.0");
@@ -67,10 +67,10 @@ describe("OpenAPI floors", () => {
     expect(checkFloors({ baseSpec: base, headSpec: spec("0.42.0", "0.42.0", "0.36.0"), breaking, requiredAdded: [] }).ok).toBe(true);
     expect(checkFloors({ baseSpec: base, headSpec: spec("0.42.0", "0.36.0", "0.36.0", "0.42.0"), ...none }).ok).toBe(true);
     expect(checkFloors({ baseSpec: base, headSpec: spec("0.42.0", "0.36.0", "0.36.0", "0.29.0"), ...none }).problems).toEqual([
-      "info.x-min-watch went backwards, from 0.30.0 to 0.29.0: a floor only rises.",
+      "info.x-min-app-watch went backwards, from 0.30.0 to 0.29.0: a floor only rises.",
     ]);
     expect(checkFloors({ baseSpec: base, headSpec: spec("0.42.0", "0.36.0", "0.36.0", "0.43.0"), ...none }).problems).toEqual([
-      "info.x-min-watch 0.43.0 is newer than info.version 0.42.0.",
+      "info.x-min-app-watch 0.43.0 is newer than info.version 0.42.0.",
     ]);
   });
 
@@ -82,7 +82,7 @@ describe("OpenAPI floors", () => {
     expect(checkFloors({ baseSpec: base, headSpec: { info: { version: "0.42.0" } }, ...none }).problems).toEqual([
       'info.x-min-app "" is not semver MAJOR.MINOR.PATCH.',
       'info.x-min-server "" is not semver MAJOR.MINOR.PATCH.',
-      'info.x-min-watch "" is not semver MAJOR.MINOR.PATCH.',
+      'info.x-min-app-watch "" is not semver MAJOR.MINOR.PATCH.',
       'info.x-min-me "" is not semver MAJOR.MINOR.PATCH.',
     ]);
     expect(checkFloors({ baseSpec: { info: { version: "0.40.0" } }, headSpec: spec("0.41.0", "0.36.0", "0.36.0"), ...none }).ok).toBe(true);
