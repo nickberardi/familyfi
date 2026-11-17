@@ -56,10 +56,7 @@ describe("a child's day", () => {
       from: 15 * 60 + 30,
       to: NOW - 2,
     });
-    expect(story.items.map((item) => item.title)).toEqual([
-      "Not blocked",
-      "Bedtime",
-    ]);
+    expect(story.items.map((item) => item.title)).toEqual(["Not blocked", "Bedtime"]);
     expect(topAnswer(story).title).toBe("Not blocked until 9 PM");
   });
 
@@ -84,11 +81,7 @@ describe("a child's day", () => {
       PHONE_VOICE,
     );
     expect(yes.day).toMatchObject({ kind: "extended", until: 21 * 60 + 30 });
-    expect(yes.items.map((item) => item.title)).toEqual([
-      "Allowed until 9:30 PM",
-      "Bedtime again",
-      "Not blocked",
-    ]);
+    expect(yes.items.map((item) => item.title)).toEqual(["Allowed until 9:30 PM", "Bedtime again", "Not blocked"]);
     expect(yes.bands.find((band) => band.kind === "allowance")).toMatchObject({
       from: 21 * 60,
       to: 21 * 60 + 30,
@@ -133,10 +126,7 @@ describe("a child's day", () => {
       );
     const during = yes(21 * 60 + 40);
     expect(during.day).toMatchObject({ kind: "extended", until: 22 * 60 });
-    expect(during.items.map((item) => item.title)).toEqual([
-      "Allowed until 10 PM",
-      "Not blocked",
-    ]);
+    expect(during.items.map((item) => item.title)).toEqual(["Allowed until 10 PM", "Not blocked"]);
     expect(topAnswer(during).sentence).toBe("Dad said yes to 1 more hour.");
 
     const short = tellDay(
@@ -168,9 +158,7 @@ describe("a child's day", () => {
       PHONE_VOICE,
     );
     expect(story.items[0]?.ask).toBeUndefined();
-    expect(story.items[0]?.status?.text).toBe(
-      "Dad said not this time. You can ask again at 4:15 PM.",
-    );
+    expect(story.items[0]?.status?.text).toBe("Dad said not this time. You can ask again at 4:15 PM.");
   });
 
   it("tells a Thing's day in its own words", () => {
@@ -188,14 +176,8 @@ describe("a child's day", () => {
       line: "Until 6 PM",
       tone: "paused",
     });
-    expect(thingNote(story)).toBe(
-      "Blocked until 6 PM. Ask here and your parents decide.",
-    );
-    const waiting = tellDay(
-      { ...thing, ask: { state: "waiting", at: NOW } },
-      NOW,
-      THING_VOICE,
-    );
+    expect(thingNote(story)).toBe("Blocked until 6 PM. Ask here and your parents decide.");
+    const waiting = tellDay({ ...thing, ask: { state: "waiting", at: NOW } }, NOW, THING_VOICE);
     expect(thingTile(waiting)).toEqual({
       word: "You asked",
       line: "Waiting for an answer",
@@ -205,30 +187,16 @@ describe("a child's day", () => {
 
   it("signs each line for the app to draw", () => {
     const story = tellDay(paused, NOW, PHONE_VOICE);
-    expect(story.items.map((item) => item.sign)).toEqual([
-      "pause",
-      "allowed",
-      "window",
-    ]);
+    expect(story.items.map((item) => item.sign)).toEqual(["pause", "allowed", "window"]);
     expect(story.items[2]?.window).toEqual(BEDTIME);
-    expect(
-      topAnswer(tellDay({ windows: [BEDTIME] }, 22 * 60, PHONE_VOICE)),
-    ).toMatchObject({
+    expect(topAnswer(tellDay({ windows: [BEDTIME] }, 22 * 60, PHONE_VOICE))).toMatchObject({
       sign: "window",
       window: BEDTIME,
     });
   });
 
   it("notes a waiting request and when a child can ask again", () => {
-    expect(
-      askNote(
-        tellDay(
-          { ...paused, ask: { state: "waiting", at: NOW } },
-          NOW,
-          PHONE_VOICE,
-        ),
-      ),
-    ).toEqual({
+    expect(askNote(tellDay({ ...paused, ask: { state: "waiting", at: NOW } }, NOW, PHONE_VOICE))).toEqual({
       sign: "waiting",
       text: "Waiting for an answer",
     });
@@ -248,9 +216,7 @@ describe("a child's day", () => {
       ...paused,
       ask: { state: "no", at: NOW - 5, answeredAt: NOW, by: "Dad" },
     };
-    expect(
-      tellDay(subject, NOW + 29, PHONE_VOICE).items[0]?.ask,
-    ).toBeUndefined();
+    expect(tellDay(subject, NOW + 29, PHONE_VOICE).items[0]?.ask).toBeUndefined();
     const later = tellDay(subject, NOW + 30, PHONE_VOICE);
     expect(later.ask).toBeUndefined();
     expect(later.items[0]).toMatchObject({
@@ -272,9 +238,7 @@ describe("a child's day", () => {
   });
 
   it("names the internet on Android, where FamilyFi blocks no apps", () => {
-    expect(topAnswer(tellDay(paused, NOW, INTERNET_VOICE)).sentence).toBe(
-      "Dad paused your internet.",
-    );
+    expect(topAnswer(tellDay(paused, NOW, INTERNET_VOICE)).sentence).toBe("Dad paused your internet.");
   });
 
   it("ends a pause on a yes even when a window has started since", () => {
@@ -335,5 +299,30 @@ describe("a child's day", () => {
     );
     expect(waitingToUnpause.day.kind).toBe("window");
     expect(waitingToUnpause.items[0]?.ask).toMatchObject({ withLength: true });
+  });
+
+  it("tells the not-blocked answers in each voice", () => {
+    const open = tellDay({ windows: [] }, NOW, PHONE_VOICE);
+    expect(topAnswer(open)).toMatchObject({ title: "Nothing is blocked", sentence: "Nothing is planned for today." });
+    expect(thingTile(open)).toEqual({ word: "Not blocked", line: "All day", tone: "on" });
+    expect(thingNote(open)).toBe("Not blocked today.");
+
+    const yes = { state: "yes" as const, at: NOW, answeredAt: NOW + 5, by: "Dad" };
+    const unpaused = tellDay({ ...paused, windows: [], ask: yes }, NOW + 10, THING_VOICE);
+    expect(unpaused.day.kind).toBe("unpaused");
+    expect(topAnswer(unpaused)).toMatchObject({ title: "Not blocked", sentence: "Dad unpaused it." });
+    expect(thingTile(unpaused)).toEqual({ word: "Not blocked", line: "All day", tone: "on" });
+    expect(unpaused.items[0]?.status?.text).toBe("Dad unblocked it at 3:50 PM.");
+    expect(tellDay({ ...paused, ask: yes }, NOW + 10, INTERNET_VOICE).items[0]?.status?.text).toBe(
+      "Dad unpaused your internet at 3:50 PM.",
+    );
+
+    const extended = tellDay(
+      { windows: [BEDTIME], ask: { state: "yes", at: 21 * 60, answeredAt: 21 * 60 + 5, by: "Mom", minutes: 30 } },
+      21 * 60 + 10,
+      THING_VOICE,
+    );
+    expect(thingTile(extended)).toEqual({ word: "Allowed", line: "Until 9:35 PM", tone: "on" });
+    expect(thingNote(extended)).toBe("Allowed until 9:35 PM.");
   });
 });
