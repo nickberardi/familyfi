@@ -47,7 +47,7 @@ tags:
   - name: Update
     description: Installing a newer release through the Watchtower sidecar, now or on a schedule. Administrators only.
   - name: Groups
-    description: Family and Things
+    description: Family and Things, unblocking a group, and the resolver its category checks use
   - name: Devices
     description: Assigned and quarantined devices
   - name: Sync
@@ -55,7 +55,7 @@ tags:
   - name: DPI
     description: UniFi DPI category and application catalog (server-side proxy)
   - name: Rules
-    description: Category and app rules including network scope (Internet parents remain groups)
+    description: Internet, category, app and website rules, and their pauses and allowances for everyone or for one group
   - name: Upstream
     description: Domain-list categories checked against the household resolver (reporting only)
   - name: Checkup
@@ -918,6 +918,243 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
 
+  /api/v1/groups/{id}/unblock:
+    post:
+      operationId: unblockGroup
+      tags: [Groups]
+      summary: Unblock a group
+      description: |
+        Lifts whatever blocks the group now, for this group alone, whatever kind of rule it is, except an always-on category, app or website rule: that is how the group is set up rather than a block on it, so an unblock never lifts it (pause or allow it for the group from its rule instead), unless it is the group's Block button default (`Group.blockButtonRuleId`). The group's pause ends, and each rule blocking it now is allowed for the group until that rule's active windows end; an always-on rule until the unblock is ended. Given `until`, every other enabled rule the group has is allowed until then, including windows that start meanwhile. Each lift is the rule's allowance for this group, as `/groups/{id}/rules/{ruleId}/allow` makes: its devices leave the rule's policies and the rule is unchanged for everyone else. A rule paused for everyone or for this group is left as it is. Only rules that name the group are lifted: a rule for whole networks has no allowance per group and is paused for everyone instead. 409 `not_blocked` when nothing is blocking the group and no `until` is given.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                until:
+                  type: [string, "null"]
+                  format: date-time
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, rules, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  rules:
+                    description: Every rule the group has, after the change, so a client can show each rule's lift for it.
+                    type: array
+                    items: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/unblock/end:
+    post:
+      operationId: endGroupUnblock
+      tags: [Groups]
+      summary: End a group's unblock
+      description: |
+        Ends every allowance the group has on its rules, so each applies to it again. A rule paused for this group stays paused; the group's own pause is `/groups/{id}/rules/internet/pause`.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, rules, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  rules:
+                    description: Every rule the group has, after the change, so a client can show each rule's lift for it.
+                    type: array
+                    items: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/unblock/extend:
+    post:
+      operationId: extendGroupUnblock
+      tags: [Groups]
+      summary: Add time to a group's unblock
+      description: |
+        Gives each timed allowance the group has on its rules one new end: the latest of them plus `minutes`, so the group's rules apply again together. 409 `not_unblocked` when it has none, `indefinite` when none has an end time.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [minutes]
+              properties:
+                minutes: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group, rules, change]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+                  rules:
+                    description: Every rule the group has, after the change, so a client can show each rule's lift for it.
+                    type: array
+                    items: { $ref: "#/components/schemas/Rule" }
+                  change: { $ref: "#/components/schemas/ChangeSummary" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/v1/groups/{id}/resolver:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getGroupResolver
+      tags: [Groups, Upstream]
+      summary: Effective category-check resolver for a group
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      responses:
+        "200":
+          description: Effective resolver and discovered networks
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [resolver]
+                properties:
+                  resolver: { $ref: "#/components/schemas/EffectiveResolver" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    put:
+      operationId: setGroupResolver
+      tags: [Groups, Upstream]
+      summary: Point this group's upstream checks at its own endpoint
+      description: |
+        Reporting only, like the rest of Upstream. This changes which resolver FamilyFi
+        asks about this group, so its category verdicts describe its own devices
+        instead of the household's. It does not change what reaches those devices —
+        pointing them at the resolver is a DHCP or client-side job.
+        Changing the URL immediately clears this group's verdicts; saving the same
+        URL preserves them. In-flight results from the replaced endpoint are discarded.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [url]
+              properties:
+                url: { type: string, description: Absolute https URL. }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: clearGroupResolver
+      tags: [Groups, Upstream]
+      summary: Return this group to the household resolver
+      description: |
+        Drops the group's own verdicts with the override. They describe an endpoint it
+        no longer uses, and keeping them would leave a stale answer on its cards until
+        the next sweep.
+      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/CsrfToken" }
+      responses:
+        "200":
+          description: Cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [group]
+                properties:
+                  group: { $ref: "#/components/schemas/Group" }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /api/v1/dpi/categories:
     get:
       operationId: listDpiCategories
@@ -1462,7 +1699,7 @@ paths:
   /api/v1/groups/{id}/rules/{ruleId}/pause:
     post:
       operationId: pauseGroupRule
-      tags: [Rules]
+      tags: [Groups, Rules]
       summary: Pause a rule for one group
       description: |
         Suspends the rule for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it. Same request, states and errors as `/rules/{id}/pause`.
@@ -1530,7 +1767,7 @@ paths:
   /api/v1/groups/{id}/rules/{ruleId}/resume:
     post:
       operationId: resumeGroupRule
-      tags: [Rules]
+      tags: [Groups, Rules]
       summary: Resume a rule for one group
       description: |
         Ends a pause for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it.
@@ -1583,7 +1820,7 @@ paths:
   /api/v1/groups/{id}/rules/{ruleId}/extend:
     post:
       operationId: extendGroupRulePause
-      tags: [Rules]
+      tags: [Groups, Rules]
       summary: Extend a rule pause for one group
       description: |
         Adds `minutes` to a timed pause for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it. Errors as `/rules/{id}/extend`.
@@ -1650,7 +1887,7 @@ paths:
   /api/v1/groups/{id}/rules/{ruleId}/allow:
     post:
       operationId: allowGroupRule
-      tags: [Rules]
+      tags: [Groups, Rules]
       summary: Allow a rule for one group
       description: |
         Overrides the rule for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it. Same request and errors as `/rules/{id}/allow`.
@@ -1718,7 +1955,7 @@ paths:
   /api/v1/groups/{id}/rules/{ruleId}/disallow:
     post:
       operationId: disallowGroupRule
-      tags: [Rules]
+      tags: [Groups, Rules]
       summary: End a rule allowance for one group
       description: |
         Ends an allowance for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it.
@@ -1767,147 +2004,6 @@ paths:
         "403":
           $ref: "#/components/responses/Error"
         "404":
-          $ref: "#/components/responses/Error"
-  /api/v1/groups/{id}/unblock:
-    post:
-      operationId: unblockGroup
-      tags: [Rules]
-      summary: Unblock a group
-      description: |
-        Lifts whatever blocks the group now, for this group alone, whatever kind of rule it is, except an always-on category, app or website rule: that is how the group is set up rather than a block on it, so an unblock never lifts it (pause or allow it for the group from its rule instead), unless it is the group's Block button default (`Group.blockButtonRuleId`). The group's pause ends, and each rule blocking it now is allowed for the group until that rule's active windows end; an always-on rule until the unblock is ended. Given `until`, every other enabled rule the group has is allowed until then, including windows that start meanwhile. Each lift is the rule's allowance for this group, as `/groups/{id}/rules/{ruleId}/allow` makes: its devices leave the rule's policies and the rule is unchanged for everyone else. A rule paused for everyone or for this group is left as it is. Only rules that name the group are lifted: a rule for whole networks has no allowance per group and is paused for everyone instead. 409 `not_blocked` when nothing is blocking the group and no `until` is given.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-        - { $ref: "#/components/parameters/CsrfToken" }
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              properties:
-                until:
-                  type: [string, "null"]
-                  format: date-time
-      responses:
-        "200":
-          description: Done
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group, rules, change]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-                  rules:
-                    description: Every rule the group has, after the change, so a client can show each rule's lift for it.
-                    type: array
-                    items: { $ref: "#/components/schemas/Rule" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-        "409":
-          $ref: "#/components/responses/Error"
-  /api/v1/groups/{id}/unblock/end:
-    post:
-      operationId: endGroupUnblock
-      tags: [Rules]
-      summary: End a group's unblock
-      description: |
-        Ends every allowance the group has on its rules, so each applies to it again. A rule paused for this group stays paused; the group's own pause is `/groups/{id}/rules/internet/pause`.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-        - { $ref: "#/components/parameters/CsrfToken" }
-      responses:
-        "200":
-          description: Done
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group, rules, change]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-                  rules:
-                    description: Every rule the group has, after the change, so a client can show each rule's lift for it.
-                    type: array
-                    items: { $ref: "#/components/schemas/Rule" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-        "409":
-          $ref: "#/components/responses/Error"
-  /api/v1/groups/{id}/unblock/extend:
-    post:
-      operationId: extendGroupUnblock
-      tags: [Rules]
-      summary: Add time to a group's unblock
-      description: |
-        Gives each timed allowance the group has on its rules one new end: the latest of them plus `minutes`, so the group's rules apply again together. 409 `not_unblocked` when it has none, `indefinite` when none has an end time.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-        - { $ref: "#/components/parameters/CsrfToken" }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [minutes]
-              properties:
-                minutes: { type: integer, minimum: 1 }
-      responses:
-        "200":
-          description: Done
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group, rules, change]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-                  rules:
-                    description: Every rule the group has, after the change, so a client can show each rule's lift for it.
-                    type: array
-                    items: { $ref: "#/components/schemas/Rule" }
-                  change: { $ref: "#/components/schemas/ChangeSummary" }
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-        "409":
           $ref: "#/components/responses/Error"
   /api/v1/devices:
     get:
@@ -3028,102 +3124,6 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "403":
-          $ref: "#/components/responses/Error"
-  /api/v1/groups/{id}/resolver:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema: { type: string }
-    get:
-      operationId: getGroupResolver
-      tags: [Upstream]
-      summary: Effective category-check resolver for a group
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      responses:
-        "200":
-          description: Effective resolver and discovered networks
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [resolver]
-                properties:
-                  resolver: { $ref: "#/components/schemas/EffectiveResolver" }
-        "401": { $ref: "#/components/responses/Error" }
-        "403": { $ref: "#/components/responses/Error" }
-        "404": { $ref: "#/components/responses/Error" }
-    put:
-      operationId: setGroupResolver
-      tags: [Upstream]
-      summary: Point this group's upstream checks at its own endpoint
-      description: |
-        Reporting only, like the rest of Upstream. This changes which resolver FamilyFi
-        asks about this group, so its category verdicts describe its own devices
-        instead of the household's. It does not change what reaches those devices —
-        pointing them at the resolver is a DHCP or client-side job.
-        Changing the URL immediately clears this group's verdicts; saving the same
-        URL preserves them. In-flight results from the replaced endpoint are discarded.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - { $ref: "#/components/parameters/CsrfToken" }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [url]
-              properties:
-                url: { type: string, description: Absolute https URL. }
-      responses:
-        "200":
-          description: Saved
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-    delete:
-      operationId: clearGroupResolver
-      tags: [Upstream]
-      summary: Return this group to the household resolver
-      description: |
-        Drops the group's own verdicts with the override. They describe an endpoint it
-        no longer uses, and keeping them would leave a stale answer on its cards until
-        the next sweep.
-      security: [{ cookieAuth: [] }, { bearerAuth: [] }]
-      parameters:
-        - { $ref: "#/components/parameters/CsrfToken" }
-      responses:
-        "200":
-          description: Cleared
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [group]
-                properties:
-                  group: { $ref: "#/components/schemas/Group" }
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
           $ref: "#/components/responses/Error"
 components:
   securitySchemes:
