@@ -251,7 +251,8 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
   const badge: GroupStatusParts["badge"] = blocking.some((rule) => rule.ruleId === button?.id) ? "blocked" : buttonLift ? "unblocked" : "online";
   if (blocking.length) {
     const last = blocking[0]!.until;
-    const detail = `${names(blocking.map((rule) => rule.name))} blocked${last ? ` ${until(last, "")}` : ""}`;
+    // The Block button default goes by its own name, as its sheets and the dropdown say it.
+    const detail = `${names(blocking.map((rule) => (rule.ruleId === button?.id ? button.name : rule.name)))} blocked${last ? ` ${until(last, "")}` : ""}`;
     return online("rule", `Online · ${detail}`, detail, "none", badge);
   }
   // An unblock comes first, as on the button: its Resume is the one way to end it from the card.
