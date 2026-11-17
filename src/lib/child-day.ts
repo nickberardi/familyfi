@@ -349,12 +349,8 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   const onwards = (start: Clock): DayItem[] => {
     const items: DayItem[] = [];
     let at = start;
-    for (let step = 0; step <= 2 * subject.windows.length; step++) {
-      if (at >= 1440)
-        return [
-          ...items,
-          later({ time: clock(at), tone: "on", sign: "morning", title: "Not blocked", detail: "Tomorrow morning" }),
-        ];
+    const morning = () => [...items, later({ time: clock(at), tone: "on", sign: "morning", title: "Not blocked", detail: "Tomorrow morning" })];
+    for (let step = 0; step <= 3 * subject.windows.length; step++) {
       const covering = subject.windows.find((candidate) => inWindow(candidate, at) && !(candidate.allowed && at < candidate.allowed.until));
       if (!covering) {
         // A window a parent lifted part of blocks from when the lift ends; one lifted to its end, not at all.
@@ -362,7 +358,17 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
           .filter((candidate) => inWindow(candidate, at) && candidate.allowed && candidate.allowed.until < endOf(candidate, at))
           .map((candidate) => ({ window: candidate, from: candidate.allowed!.until }))
           .sort((a, b) => a.from - b.from)[0];
-        if (!resumed) break;
+        if (!resumed) {
+          if (at >= 1440) return morning();
+          break;
+        }
+        // Another window that starts before the lift ends is told first.
+        const sooner = nextWindow(at);
+        if (sooner && sooner.from < resumed.from) {
+          items.push(notBlocked(at, sooner));
+          at = sooner.from;
+          continue;
+        }
         // Its own line, even past midnight, then on from its end.
         const end = endOf(resumed.window, at);
         items.push(
@@ -385,6 +391,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       );
       at = end;
     }
+    if (at >= 1440) return morning();
     const next = nextWindow(at);
     return [...items, notBlocked(at, next), ...(next ? [windowItem(next)] : [])];
   };
@@ -724,7 +731,9 @@ export function thingNote({ day, ask, items }: DayStory): string {
       : day.kind === "window"
         ? `${day.window.label} until ${clock(day.end)}`
         : day.kind === "always"
-          ? `${day.label} all day`
+          ? /internet/i.test(day.label)
+            ? `${day.label} all day`
+            : `${day.label}: no internet all day`
           : "";
   if (items.some((item) => item.ask)) return `${blocked}. Ask here and your parents decide.`;
   if (ask?.state === "waiting" && blocked) return `${blocked}. Waiting for an answer.`;
