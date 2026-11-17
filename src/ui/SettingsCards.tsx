@@ -5,15 +5,16 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { initials } from "@/lib/display";
 import type { HouseholdStore } from "@/lib/household-store";
-import { SETTINGS_COPY as COPY, gatewayFacts, householdMemberNote, keyState, keyStatusLine, recoveryNote, removeAdminConfirm, removeLoginConfirm } from "@/lib/settings-copy";
+import { ASKS_CARD_COPY, SETTINGS_COPY as COPY, askWaitChoices, gatewayFacts, householdMemberNote, keyState, keyStatusLine, recoveryNote, removeAdminConfirm, removeLoginConfirm } from "@/lib/settings-copy";
 import { ALERTS_CARD_COPY } from "@/lib/alert-copy";
-import { addFamilyMember, removeLogin, saveTimezone, setAdmin, setAlertsRelay, setFamilyRole } from "@/lib/settings-writes";
+import { addFamilyMember, removeLogin, saveTimezone, setAdmin, setAlertsRelay, setAskWait, setFamilyRole } from "@/lib/settings-writes";
 import { lastSweepAt, relativeSweep } from "@/lib/sync-copy";
 import type { Account, Group, SyncStatus, UnifiSettings } from "@/lib/types";
 
 import { AddMemberField } from "./AddMemberField";
 import { AdminControl } from "./AdminControl";
 import { Disclosure } from "./Disclosure";
+import { FormField } from "./FormField";
 import { FamilyRolePicker } from "./FamilyRolePicker";
 import { TimezoneField } from "./TimezoneField";
 import { PRESS_OPACITY, tokenOf, useUI } from "./UIContext";
@@ -179,6 +180,46 @@ export function AlertsCard({
 }
 
 /**
+ * How long a child's ask waits for an answer before it closes, and how long after Not now before
+ * they can ask again. Each saves when it is chosen. A server before asks leaves both out (`undefined`),
+ * and the card is not shown.
+ */
+export function AsksCard({ timeout, wait, mutate, disabled }: { timeout: number; wait: number; mutate: Mutate; disabled?: boolean }) {
+  const ui = useUI();
+  const text = useText();
+  const COPY = ASKS_CARD_COPY;
+  return (
+    <Card title={COPY.title} sub={COPY.sub} testID="settings-asks">
+      <View style={styles.asksBody}>
+        <FormField label={COPY.timeout}>
+          <ui.Select
+            label={COPY.timeout}
+            value={String(timeout)}
+            options={askWaitChoices("timeout", timeout).map((choice) => ({ value: String(choice.value), label: choice.label }))}
+            onChange={(next) => void setAskWait(mutate, { askTimeoutMinutes: Number(next) })}
+            disabled={disabled}
+            variant="field"
+            testID="settings-ask-timeout"
+          />
+        </FormField>
+        <Text style={[text(14, 20, "muted"), styles.asksNote]}>{COPY.timeoutNote}</Text>
+        <FormField label={COPY.wait}>
+          <ui.Select
+            label={COPY.wait}
+            value={String(wait)}
+            options={askWaitChoices("wait", wait).map((choice) => ({ value: String(choice.value), label: choice.label }))}
+            onChange={(next) => void setAskWait(mutate, { askWaitMinutes: Number(next) })}
+            disabled={disabled}
+            variant="field"
+            testID="settings-ask-wait"
+          />
+        </FormField>
+      </View>
+    </Card>
+  );
+}
+
+/**
  * Who is in the household: the recovery admin, each family member with their role, admin and login,
  * and a row to add one. `onCreateLogin` opens the platform's new-login form for an adult without one.
  */
@@ -279,6 +320,8 @@ export function HouseholdCard({
 
 const styles = StyleSheet.create({
   alertsBody: { paddingHorizontal: 18, paddingVertical: 14 },
+  asksBody: { gap: 4, paddingHorizontal: 18, paddingVertical: 14 },
+  asksNote: { marginBottom: 10 },
   alertsLine: { marginTop: 4 },
   alertsRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },

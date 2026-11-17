@@ -1,7 +1,7 @@
 # Group states
 
 What a group card shows and what its button does. Read this before changing a group's badge,
-status line, Block/Unblock button, More time link or dropdown on any client. It has three parts:
+status line, Block/Unblock button, More time link, ask line or dropdown on any client. It has three parts:
 
 1. **User stories**: what a parent needs from the card.
 2. **Design**: the state a group can be in, what the card shows, and a diagram of how the button
@@ -58,6 +58,7 @@ case 6).
 | **Button** | The one thing a parent most likely wants to do next: Block, Unblock or Resume. |
 | **More time** | Extends whatever is timed. |
 | **Dropdown** | Every other choice: Block internet, Unblock <rule>, and Block <rule> again. |
+| **Ask line** | A child's phone (FamilyFi Me) is waiting for an answer: "Asked to be unpaused", "Asked for 30 minutes off Bedtime". It opens the answer sheet. |
 
 ### How the button decides
 
@@ -180,6 +181,25 @@ The first matching case wins.
 
 The Edit sheet's choices, the button's sheets, the status line and the dropdown name the default by
 the rule's own name ("TV video"), since one rule can block several categories.
+
+### 3.5a Ask line
+
+While the group's latest ask (`Group.ask`) is `waiting` and its `expiresAt` is ahead, the card,
+open or closed, and the group's page show one accent line under the status line
+(`groupAskLine` in `src/lib/group-ask.ts`): "Asked to be unpaused", or "Asked for 30 minutes off
+Bedtime" (time off the rule, as the alert says). It never changes the badge, the status line or the
+button, which still read Block, Unblock or Resume. Tapping it opens the answer sheet
+(`askSheetChoices`), titled "Cassie asked …" with when it was asked and when it closes:
+
+| Asked about | Choices, in order |
+| --- | --- |
+| A pause | **Unpause** (the group's `resume` on `internet` with `askId`), **Not now** |
+| A rule's window that is on | **Allow 30 minutes** (the rule's `allow` for the group with `askId`, as the child asked), **Until Bedtime ends** when that is longer, **For…** and **Until…**, **Not now** |
+| A rule's window no longer on | **Not now** |
+
+A time past the window's end stops at the end, as the server caps it. **Not now** is the ask's
+`decline`, with when the child can ask again (the household's `askWaitMinutes`). An answer takes
+the line away at once; one a second parent already gave is refused with 409 `ask_closed`.
 
 ### 3.6 Examples (checked against `groupHeaderActions` and `groupStatusParts`)
 

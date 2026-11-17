@@ -18,7 +18,8 @@ import { useWide } from "./use-wide";
  * and closes it. Closed, the header shows a caret. Open, the group's one button (`action`: Block,
  * Unblock or Resume) takes the caret's corner, with More time under the status line while a timed
  * block or unblock lasts (`more`), and a dropdown beside it while it has choices for single rules
- * (`menu`); the caller then offers its own way to close. At large text sizes
+ * (`menu`); the caller then offers its own way to close. A child's waiting ask shows under the header,
+ * open or closed, as a line that opens the answer sheet (`ask`). At large text sizes
  * the button would cover the name and badge, so it goes under the header instead. What the card shows
  * below the header, open or closed, is the caller's.
  */
@@ -32,6 +33,7 @@ export function GroupCardFrame({
   onToggle,
   action = null,
   more = null,
+  ask = null,
   menu = [],
   testID,
   children,
@@ -45,6 +47,8 @@ export function GroupCardFrame({
   onToggle: () => void;
   action?: ZoneAction | null;
   more?: ZoneAction | null;
+  /** A child's waiting ask, open or closed: its line opens the answer sheet. */
+  ask?: ZoneAction | null;
   /** Block internet and single-rule choices for the group, in a dropdown beside `action`. */
   menu?: ZoneAction[];
   testID?: string;
@@ -95,8 +99,13 @@ export function GroupCardFrame({
           <HeaderButton action={action} menu={menu} name={group.name} align="left" onMenu={setMenuOpen} />
         </View>
       ) : null}
-      {open && more ? (
+      {ask ? (
         <View style={[styles.more, under ? styles.afterUnder : null, { paddingLeft: inset }]}>
+          <CardTextButton action={ask} />
+        </View>
+      ) : null}
+      {open && more ? (
+        <View style={[styles.more, ask ? styles.afterAsk : under ? styles.afterUnder : null, { paddingLeft: inset }]}>
           <CardTextButton action={more} />
         </View>
       ) : null}
@@ -138,4 +147,5 @@ const styles = StyleSheet.create({
   under: { marginTop: -4, paddingRight: HEADER_PAD, paddingBottom: 12, flexDirection: "row" },
   more: { marginTop: -8, paddingBottom: 10, flexDirection: "row" },
   afterUnder: { marginTop: -6 },
+  afterAsk: { marginTop: -4 },
 });

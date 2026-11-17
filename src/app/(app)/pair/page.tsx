@@ -22,7 +22,7 @@ const SUB = PAIR_COPY.sub;
 
 export default function PairDevicePage() {
   const { tunnel, setTunnel, routes, phones, remote, forbidden, error, load, run, published, canPair, pairedThrough } = usePairDevice(request);
-  const [pairing, setPairing] = useState(false);
+  const [pairing, setPairing] = useState<"app" | "me" | null>(null);
   const [replacing, setReplacing] = useState<PairedPhone | null>(null);
   const [connecting, setConnecting] = useState(false);
 
@@ -48,7 +48,10 @@ export default function PairDevicePage() {
               {PAIR_COPY.connectAgent}
             </button>
             {/* Phones pair through the published route, so there is nothing to pair through while remote access is Off. */}
-            <button type="button" className={PRIMARY_BUTTON} disabled={!canPair} title={canPair ? undefined : PAIR_COPY.remoteFirstPhones} onClick={() => setPairing(true)}>
+            <button type="button" className={SECONDARY_BUTTON} disabled={!canPair} title={canPair ? undefined : PAIR_COPY.remoteFirstPhones} onClick={() => setPairing("me")} data-testid="pair-me">
+              {PAIR_COPY.pairMe}
+            </button>
+            <button type="button" className={PRIMARY_BUTTON} disabled={!canPair} title={canPair ? undefined : PAIR_COPY.remoteFirstPhones} onClick={() => setPairing("app")}>
               {PAIR_COPY.pairPhone}
             </button>
           </div>
@@ -76,7 +79,7 @@ export default function PairDevicePage() {
           }}
           onRepair={(phone) => {
             setReplacing(phone);
-            setPairing(true);
+            setPairing("app");
           }}
           onRemove={async (phone) => {
             if (!(await askConfirm({ ...removeConfirm(phone), destructive: true }))) return;
@@ -95,8 +98,9 @@ export default function PairDevicePage() {
         <PairPhoneSheet
           route={published}
           replacing={replacing}
+          {...(pairing === "me" ? { child: {} } : {})}
           onClose={() => {
-            setPairing(false);
+            setPairing(null);
             setReplacing(null);
             void load();
           }}

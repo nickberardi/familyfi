@@ -3,7 +3,7 @@ import { scopeLabel } from "./agent-prompt";
 import type { ApiRequest } from "./api-client";
 import { relativeSweep } from "./sync-copy";
 import { transportLabel } from "./connection-routes";
-import type { Account, ConnectionRoute, PairedPhone, PairingState, RemoteAccess } from "./types";
+import type { Account, ConnectionRoute, Group, PairedPhone, PairingState, RemoteAccess } from "./types";
 
 /**
  * Pair Device, as every client shows it: which paired devices (phones, Watches and agents) are
@@ -18,6 +18,8 @@ export const PAIR_COPY = {
   title: "Pair Device",
   sub: "Pair the FamilyFi app on a phone, tablet or Mac and choose how it reaches home",
   pairPhone: "Pair a device",
+  /** FamilyFi Me, the app on a child's phone. */
+  pairMe: "Pair FamilyFi Me",
   connectAgent: "Connect an agent",
   adminOnly: "Only a household admin can pair devices or change remote access.",
   loadFailed: "Could not load remote access.",
@@ -151,7 +153,7 @@ function origin(device: Pick<PairedPhone, "clientType">, parentName: string | nu
 export type TagTone = "neutral" | "green" | "yellow" | "red" | "blue";
 
 /** Each access in its colour, as the operator chose: full green, rules only blue, read only red. */
-const SCOPE_TONES: Record<string, TagTone> = { "app:full": "green", "agent:full": "green", "app:rulesOnly": "blue", "agent:readOnly": "red" };
+const SCOPE_TONES: Record<string, TagTone> = { "app:full": "green", "agent:full": "green", "app:rulesOnly": "blue", "agent:readOnly": "red", "me:askOnly": "neutral" };
 
 /**
  * A paired device's tags and lines, the same for phones, Watches and agents. Tags beside its name say
@@ -165,6 +167,8 @@ export function phoneLines(phone: PairedPhone, now = new Date(), parentName: str
     { label: scopeLabel(phone.scope), name: scopeLabel(phone.scope), tone: SCOPE_TONES[phone.scope] ?? "neutral" },
   ];
   if (phone.actsAs) tags.push({ label: phone.actsAs.displayName, name: `Acts as ${phone.actsAs.displayName}`, tone: "neutral" });
+  // A child's phone signs in for its family group, never as an account.
+  if (phone.group) tags.push({ label: phone.group.name, name: `For ${phone.group.name}`, tone: "neutral" });
   if (phone.alerts !== undefined && !phone.revokedAt) {
     const alerts = phone.alerts ? ALERTS_CARD_COPY.accessOn : ALERTS_CARD_COPY.accessOff;
     tags.push({ label: alerts, name: alerts, tone: phone.alerts ? "green" : "yellow" });
@@ -180,25 +184,45 @@ export function phoneLines(phone: PairedPhone, now = new Date(), parentName: str
   };
 }
 
-/** What the pairing sheet says before a code exists, while one is showing, and once a phone used it. */
-export function pairingSheetCopy({ replacing, claimed, claimedName }: { replacing?: Pick<PairedPhone, "displayName"> | null; claimed?: boolean; claimedName?: string | null } = {}) {
+/**
+ * What the pairing sheet says before a code exists, while one is showing, and once a phone used it.
+ * `child`: the sheet pairs FamilyFi Me on a child's phone, for a family group rather than as an adult.
+ */
+export function pairingSheetCopy({
+  replacing,
+  claimed,
+  claimedName,
+  child = false,
+}: { replacing?: Pick<PairedPhone, "displayName"> | null; claimed?: boolean; claimedName?: string | null; child?: boolean } = {}) {
   return {
-    name: {
-      title: replacing ? `Re-pair ${replacing.displayName}` : PAIR_COPY.pairPhone,
-      sub: replacing
-        ? "Makes a new single-use code for this device. Its old pairing keeps working until the code is used, then is signed out and removed, and its Watch moves to the new pairing."
-        : "Makes a single-use code that pairs one device and signs it in as the adult you choose. It expires in five minutes.",
-    },
-    code: claimed
-      ? { title: "Device paired", sub: `${claimedName ?? "The device"} is paired and signed in${replacing ? "; its old entry is gone" : ""}.` }
+    name: child
+      ? {
+          title: PAIR_COPY.pairMe,
+          sub: "Makes a single-use code that pairs FamilyFi Me on a child's phone. It shows them their own rules and lets them ask you for more time. It expires in five minutes.",
+        }
       : {
-          title: "Scan with the FamilyFi app",
-          sub: "Open FamilyFi on the device and scan the QR, or copy the pairing code and paste it in the app. Then confirm the household it shows.",
+          title: replacing ? `Re-pair ${replacing.displayName}` : PAIR_COPY.pairPhone,
+          sub: replacing
+            ? "Makes a new single-use code for this device. Its old pairing keeps working until the code is used, then is signed out and removed, and its Watch moves to the new pairing."
+            : "Makes a single-use code that pairs one device and signs it in as the adult you choose. It expires in five minutes.",
         },
+    code: claimed
+      ? { title: child ? "Phone paired" : "Device paired", sub: `${claimedName ?? (child ? "The phone" : "The device")} is paired and signed in${replacing ? "; its old entry is gone" : ""}.` }
+      : child
+        ? {
+            title: "Scan with FamilyFi Me",
+            sub: "Open FamilyFi Me on the child's phone and scan the QR, or copy the pairing code and paste it in the app.",
+          }
+        : {
+            title: "Scan with the FamilyFi app",
+            sub: "Open FamilyFi on the device and scan the QR, or copy the pairing code and paste it in the app. Then confirm the household it shows.",
+          },
     route: "Route",
-    routeNote: "The device must reach this address while it pairs. Change it under Remote access.",
-    phone: "Device name",
+    routeNote: child ? "The phone must reach this address while it pairs. Change it under Remote access." : "The device must reach this address while it pairs. Change it under Remote access.",
+    phone: child ? "Phone name" : "Device name",
     signsInAs: "Signs in as",
+    /** A child's phone: the family member it is for. */
+    forGroup: "For",
     defaultName: "Device",
     cancel: "Cancel",
     show: "Show pairing code",
@@ -213,6 +237,7 @@ export function pairingSheetCopy({ replacing, claimed, claimedName }: { replacin
     accountsFailed: "Could not load the administrators a device can sign in as.",
     noAccounts: "A device signs in as an adult with administrator access, never as the built-in admin. Give an adult admin access under Settings › Household, then pair this device.",
     noAccountsLink: "Open Settings",
+    noGroups: "FamilyFi Me is for a family member. Add one under Family, then pair their phone.",
     copy: "Copy",
     copied: "Copied",
   };
@@ -265,3 +290,35 @@ export type PhoneInvite = { endpointId: string; displayName: string; accountId?:
 export async function invitePhone<T>(request: ApiRequest, invite: PhoneInvite): Promise<T> {
   return request<T>("/api/v1/paired/invites", { method: "POST", body: { clientType: "app", ...invite } });
 }
+
+/** The family members a child's phone may be paired for. */
+export function pairingChildGroups(groups: readonly Group[]): Group[] {
+  return groups.filter((group) => group.kind === "family");
+}
+
+/** A child's phone's name until someone changes it: "Emma's phone". */
+export function childPhoneName(group: Pick<Group, "name"> | undefined): string {
+  return group ? `${group.name}'s phone` : "Phone";
+}
+
+/** What an administrator's invite for FamilyFi Me on a child's phone carries: its family group, never an account. */
+export type ChildPhoneInvite = { endpointId: string; displayName: string; groupId: string };
+
+/** Invites FamilyFi Me on a child's phone, for its family group. */
+export async function inviteChildPhone<T>(request: ApiRequest, invite: ChildPhoneInvite): Promise<T> {
+  return request<T>("/api/v1/paired/invites", { method: "POST", body: { clientType: "me", ...invite } });
+}
+
+/** A family member's FamilyFi Me phones that are still paired, most recently seen first. */
+export function childPhonesOf(phones: readonly PairedPhone[], groupId: string): PairedPhone[] {
+  return phones.filter((phone) => phone.clientType === "me" && !phone.revokedAt && phone.group?.id === groupId);
+}
+
+/** The FamilyFi Me block on a family member's page. */
+export const CHILD_PHONES_COPY = {
+  title: "FamilyFi Me",
+  pair: PAIR_COPY.pairMe,
+  empty: (name: string) => `Pair FamilyFi Me on ${name}'s phone so they can see their rules and ask you for more time.`,
+  remoteFirst: "Turn on remote access under Pair Device, then pair FamilyFi Me.",
+  revoke: PAIR_COPY.revoke,
+} as const;

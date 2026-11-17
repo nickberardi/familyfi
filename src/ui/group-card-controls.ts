@@ -1,3 +1,4 @@
+import { groupAskLine } from "@/lib/group-ask";
 import { groupHeaderActions } from "@/lib/group-actions";
 import type { GroupCardRun } from "@/lib/group-writes";
 import { groupLift, type Rule } from "@/lib/rules";
@@ -12,7 +13,8 @@ import type { ZoneAction } from "./CardActions";
  * lifted for it, a dropdown (`menu`): Block internet, and unblock or block again one rule for the group. Each
  * tap goes to `onRun` (`runGroupCardAction`); `enabled` is false while the view is stale or a write
  * is in flight. The group's page lists each rule with its own Pause or Resume (`GroupSchedule`), so its
- * dropdown (`pageMenu`) holds only Block internet.
+ * dropdown (`pageMenu`) holds only Block internet. While a child's ask waits, its line (`ask`) opens
+ * the answer sheet.
  */
 export function groupCardControls(
   group: Group,
@@ -21,7 +23,7 @@ export function groupCardControls(
   now: Date,
   onRun: (tap: GroupCardRun) => void,
   enabled = true,
-): { action: ZoneAction; more: ZoneAction | null; menu: ZoneAction[]; pageMenu: ZoneAction[] } {
+): { action: ZoneAction; more: ZoneAction | null; menu: ZoneAction[]; pageMenu: ZoneAction[]; ask: ZoneAction | null } {
   const header = groupHeaderActions(group, rules, timezone, now);
   const liftedUntil = (ruleIds: string[]) => {
     const rule = rules.find((candidate) => candidate.id === ruleIds[0]);
@@ -51,5 +53,7 @@ export function groupCardControls(
     }),
   );
   const pageMenu = menu.filter((_, index) => header.menu[index]!.run === "blockInternet");
-  return { action: asHeader(header.action, true), more: header.more ? asHeader(header.more, false) : null, menu, pageMenu };
+  const askLine = groupAskLine(group, rules, now);
+  const ask: ZoneAction | null = askLine ? { label: askLine, disabled: !enabled, onPress: () => onRun({ kind: "ask" }), testID: `group-ask-${group.id}` } : null;
+  return { action: asHeader(header.action, true), more: header.more ? asHeader(header.more, false) : null, menu, pageMenu, ask };
 }

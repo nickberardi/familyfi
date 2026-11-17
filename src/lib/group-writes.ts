@@ -1,14 +1,15 @@
 import { formatClock } from "./display";
 import { groupAddedNotice, groupEditBody, newGroupBody, type GroupEditDraft, type NewGroupDraft } from "./group-form";
 import { internetRulePath, type GroupRuleRun, type GroupRun } from "./group-actions";
-import type { GroupSheetTarget } from "./group-pause-sheet";
+import type { GroupPauseSheetTarget, GroupSheetTarget } from "./group-pause-sheet";
 import type { ApiRequest } from "./api-client";
 import type { HouseholdStore } from "./household-store";
+import type { AskSheetOption } from "./group-ask";
 import type { PauseSheetRequest } from "./pause-sheet";
 import type { InternetRulePreset, Rule } from "./rules";
 import { assignDeviceLocally } from "./household-state";
 import { ruleToggleNotice } from "./rule-list";
-import type { Device, Group } from "./types";
+import type { Device, Group, GroupAsk } from "./types";
 
 /**
  * The internet writes every client sends from a card or a pause sheet, with their notices. A
@@ -45,7 +46,7 @@ export function applyGroupPause(mutate: Mutate, group: Group, request: PauseShee
  * A group sheet's choice (`groupSheet`): its block, its unblock (what blocks now until it ends,
  * or every rule until a time), or a pause of a rule area's rules for this group alone.
  */
-export function applyGroupSheet(mutate: Mutate, group: Group, target: GroupSheetTarget, request: PauseSheetRequest, timezone: string, now: Date = new Date()) {
+export function applyGroupSheet(mutate: Mutate, group: Group, target: GroupPauseSheetTarget, request: PauseSheetRequest, timezone: string, now: Date = new Date()) {
   if (target.kind === "block") return applyGroupPause(mutate, group, request, timezone, now);
   if (target.kind === "unblock") {
     const path = `/api/v1/groups/${group.id}/unblock`;
@@ -125,6 +126,44 @@ export function applyRulePause(mutate: Mutate, rule: Pick<Rule, "id" | "name">, 
 }
 
 /**
+ * A parent's answer to a child's ask (`askSheetChoices`). Yes to unpause is the group's `resume` on
+ * `internet`; yes to time off a rule is the rule's `allow` for the group, as the child asked or until
+ * a time of the parent's own (`now` is the tap). Each carries the ask's `askId`, so the ask closes as
+ * yes, by this parent; Not now is the ask's `decline`. The ask leaves the card at once.
+ */
+export function answerAsk(mutate: Mutate, group: Group, ask: GroupAsk, option: AskSheetOption, ruleName: string | undefined, now: Date = new Date()) {
+  const answered = (state: GroupAsk["state"]) => (lists: { groups: Group[]; devices: Device[] }) => ({
+    ...lists,
+    groups: lists.groups.map((item) => (item.id === group.id && item.ask?.id === ask.id ? { ...item, ask: { ...ask, state, answeredAt: now.toISOString() } } : item)),
+  });
+  const { request } = option;
+  if (request.kind === "decline") {
+    return mutate((send) => send(`/api/v1/groups/${group.id}/asks/${ask.id}/decline`, { method: "POST" }), {
+      groupId: group.id,
+      optimistic: answered("no"),
+      feedback: { notice: `Said not now to ${group.name}.` },
+    });
+  }
+  if (ask.about === "pause") {
+    return mutate((send) => send(`${internetRulePath(group)}/resume`, { method: "POST", body: { askId: ask.id } }), {
+      groupId: group.id,
+      optimistic: answered("yes"),
+      feedback: { notice: `${group.name} unpaused.` },
+    });
+  }
+  const until =
+    request.kind === "for" ? new Date(now.getTime() + request.minutes * 60_000).toISOString() : request.kind === "until" ? request.until : undefined;
+  return mutate(
+    (send) => send(`/api/v1/groups/${group.id}/rules/${ask.ruleId}/allow`, { method: "POST", body: until === undefined ? { askId: ask.id } : { askId: ask.id, until } }),
+    {
+      groupId: group.id,
+      optimistic: answered("yes"),
+      feedback: { notice: `${ruleName ?? "The rule"} is off for ${group.name} ${option.note}.` },
+    },
+  );
+}
+
+/**
  * Adding, editing and deleting a group, and assigning a device to one. Each resolves to the
  * store's payload, or undefined when there was nothing to send or the write failed (the store
  * reports a failure).
@@ -200,7 +239,7 @@ export function addInternetPreset(mutate: Mutate, group: Pick<Group, "id" | "nam
   );
 }
 
-/** A tap on a group card: its header's button or More time, or a rule area's (`ruleIds`, called `name`). */
+/** A tap on a group card: its header's button or More time, a rule area's (`ruleIds`, called `name`), or its ask line. */
 export type GroupCardRun =
   /**
    * `ruleId` and `name`: the Block button rule a rule run acts on. `liftedUntil`: when its lift for
@@ -215,7 +254,9 @@ export type GroupCardRun =
       /** From the card's dropdown: its sheet and notices say unblock, and a Block again can be undone back to `liftedUntil`. */
       wording?: "unblock";
       liftedUntil?: string | null;
-    };
+    }
+  /** The line for a child's waiting ask: opens its answer sheet. */
+  | { kind: "ask" };
 
 /**
  * What a group card's tap does, the same on every client: Block, Unblock, Pause and every More
@@ -223,6 +264,7 @@ export type GroupCardRun =
  * block holding it, Resume of an unblock, and a rule area's Resume write at once.
  */
 export function runGroupCardAction(mutate: Mutate, group: Group, tap: GroupCardRun, openSheet: (target: GroupSheetTarget) => void) {
+  if (tap.kind === "ask") return openSheet({ kind: "ask" });
   if (tap.kind === "header" && tap.ruleId && tap.name !== undefined) {
     const rule = { ruleIds: [tap.ruleId], name: tap.name, wording: "unblock" as const };
     // The Block button rule's lift for the group is one rule's, as its dropdown item would be.
