@@ -60,10 +60,22 @@ export function askSheetTitle(group: Pick<Group, "name">, ask: GroupAsk, rules: 
   return `${group.name} asked ${askedFor(ask, rules)}`;
 }
 
-/** When it was asked, and until when it waits: "Asked at 9:41 PM. It closes at 10:41 PM if no one answers." */
-export function askSheetBody(ask: GroupAsk, timezone: string): string {
+/**
+ * When it was asked, and until when it waits: "Asked at 9:41 PM. It closes at 10:41 PM if no one
+ * answers.", and why there is nothing to allow when the rule's window is no longer on.
+ */
+export function askSheetBody(ask: GroupAsk, rules: Rule[], timezone: string, now: Date): string {
   const at = `Asked at ${formatClock(new Date(ask.at), timezone)}.`;
-  return ask.expiresAt ? `${at} It closes at ${formatClock(new Date(ask.expiresAt), timezone)} if no one answers.` : at;
+  const closes = ask.expiresAt ? `${at} It closes at ${formatClock(new Date(ask.expiresAt), timezone)} if no one answers.` : at;
+  // Time off a rule whose window is no longer on: nothing to allow, so only Not now is offered.
+  if (ask.about === "rule" && askSheetOptions(ask, rules, timezone, now).length === 0) {
+    const rule = ruleOf(ask, rules);
+    const name = rule?.name ?? "That rule";
+    // An always-on rule has no window to lift time off, as the server refuses it.
+    const always = rule && activeWindowsEnd(ruleInternetWindows(rule), now, timezone) === null;
+    return `${closes} ${name} ${always ? "is always on" : "isn't on now"}, so there's nothing to allow.`;
+  }
+  return closes;
 }
 
 /**
@@ -76,7 +88,8 @@ export function askSheetOptions(ask: GroupAsk, rules: Rule[], timezone: string, 
   if (ask.about === "pause") return [{ label: "Unpause", note: "ends the pause now", request: { kind: "asked" } }];
   const rule = ruleOf(ask, rules);
   const end = rule ? activeWindowsEnd(ruleInternetWindows(rule), now, timezone) : undefined;
-  if (!rule || end === undefined) return [];
+  // Not on now, or always on: no window to lift time off, and the server refuses it.
+  if (!rule || !end) return [];
   const asked = ask.minutes ? new Date(now.getTime() + ask.minutes * 60_000) : null;
   // What the child asked for, unless it runs past the window's end: then it is the rest of the window.
   const fits = asked && (!end || asked.getTime() <= end.getTime());
@@ -97,7 +110,7 @@ export function askSheetOptions(ask: GroupAsk, rules: Rule[], timezone: string, 
 export function askSheetCustom(custom: CustomPause, ask: GroupAsk, rules: Rule[], timezone: string, now: Date): AskSheetOption | null {
   const rule = ruleOf(ask, rules);
   const end = rule ? activeWindowsEnd(ruleInternetWindows(rule), now, timezone) : undefined;
-  const option = end === undefined ? null : askSheetCustomOption(custom, timezone, now);
+  const option = !end ? null : askSheetCustomOption(custom, timezone, now);
   if (!option || option.request.kind === "extend" || option.request.kind === "current") return null;
   const until = option.request.kind === "pauseFor" ? new Date(now.getTime() + option.request.minutes * 60_000) : new Date(option.request.until!);
   if (end && until.getTime() >= end.getTime()) {
@@ -109,7 +122,7 @@ export function askSheetCustom(custom: CustomPause, ask: GroupAsk, rules: Rule[]
 
 /** "Not now": the child can ask again after the household's wait. */
 export function askDeclineOption(timezone: string, now: Date, waitMinutes: number | undefined): AskSheetOption {
-  const note = waitMinutes === undefined ? "they can ask again later" : waitMinutes === 0 ? "can ask again now" : `can ask again at ${formatClock(new Date(now.getTime() + waitMinutes * 60_000), timezone)}`;
+  const note = waitMinutes === undefined ? "they can ask again later" : waitMinutes === 0 ? "they can ask again now" : `they can ask again at ${formatClock(new Date(now.getTime() + waitMinutes * 60_000), timezone)}`;
   return { label: "Not now", note, request: { kind: "decline" } };
 }
 

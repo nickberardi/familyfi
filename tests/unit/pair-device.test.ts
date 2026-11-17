@@ -245,8 +245,8 @@ describe("FamilyFi Me on a child's phone", () => {
   it("is tagged for its family member, never as an account", () => {
     const { tags } = phoneLines(child(), new Date("2026-09-15T12:00:00Z"));
     expect(tags).toEqual([
-      { label: "FamilyFi Me", name: "FamilyFi Me", tone: "neutral" },
-      { label: "Emma", name: "For Emma", tone: "neutral" },
+      { label: "Asks only", name: "Asks only", tone: "neutral" },
+      { label: "For Emma", name: "For Emma", tone: "neutral" },
     ]);
   });
 
@@ -256,8 +256,14 @@ describe("FamilyFi Me on a child's phone", () => {
   });
 
   it("is paired for a family member, named for them until someone renames it", () => {
-    const groups = [{ id: "g1", kind: "family", name: "Emma" }, { id: "t1", kind: "things", name: "TV" }] as Group[];
-    expect(pairingChildGroups(groups).map((group) => group.id)).toEqual(["g1"]);
+    const groups = [
+      { id: "a1", kind: "family", name: "Nick", familyRole: "adult" },
+      { id: "t2", kind: "family", name: "Betsy", familyRole: "teen" },
+      { id: "g1", kind: "family", name: "Emma", familyRole: "child" },
+      { id: "t1", kind: "things", name: "TV" },
+    ] as Group[];
+    // Children, then teens, then adults: the first is who a phone is most likely for.
+    expect(pairingChildGroups(groups).map((group) => group.id)).toEqual(["g1", "t2", "a1"]);
     expect(childPhoneName({ name: "Emma" })).toBe("Emma's phone");
     expect(childPhoneName(undefined)).toBe("Phone");
   });
@@ -269,6 +275,10 @@ describe("FamilyFi Me on a child's phone", () => {
     expect(copy.phone).toBe("Phone name");
     expect(pairingSheetCopy({ child: true, claimed: true, claimedName: "Emma's phone" }).code).toEqual({ title: "Phone paired", sub: "Emma's phone is paired and signed in." });
     expect(CHILD_PHONES_COPY.empty("Emma")).toBe("Pair FamilyFi Me on Emma's phone so they can see their rules and ask you for more time.");
+  });
+
+  it("says what revoking takes from the child", () => {
+    expect(revokeConfirm(child()).message).toBe("FamilyFi Me on it is signed out now. It stops showing their rules and can't ask for more time until it is paired again.");
   });
 
   it("invites with its family group and no account", async () => {

@@ -95,7 +95,7 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   waitingAsk: (i) => groupAsk.waitingAsk(i.group, at(i.now)),
   groupAskLine: (i) => groupAsk.groupAskLine(i.group, i.rules, at(i.now)),
   askSheetTitle: (i) => groupAsk.askSheetTitle(i.group, i.ask, i.rules),
-  askSheetBody: (i) => groupAsk.askSheetBody(i.ask, i.timeZone),
+  askSheetBody: (i) => groupAsk.askSheetBody(i.ask, i.rules ?? [], i.timeZone, at(i.now)),
   askSheetOptions: (i) => groupAsk.askSheetOptions(i.ask, i.rules as Rule[], i.timeZone, at(i.now)),
   askSheetCustom: (i) => groupAsk.askSheetCustom(i.custom, i.ask, i.rules as Rule[], i.timeZone, at(i.now)),
   askDeclineOption: (i) => groupAsk.askDeclineOption(i.timeZone, at(i.now), i.waitMinutes),

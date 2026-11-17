@@ -123,6 +123,13 @@ export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<
   if (kind && isAppControls(kind)) {
     return { title: `Revoke ${phone.displayName}?`, message: "They stop working now, until you next open FamilyFi on that device. The app itself stays paired.", confirmLabel: PAIR_COPY.revoke };
   }
+  if (phone.clientType === "me") {
+    return {
+      title: `Revoke ${phone.displayName}?`,
+      message: "FamilyFi Me on it is signed out now. It stops showing their rules and can't ask for more time until it is paired again.",
+      confirmLabel: PAIR_COPY.revoke,
+    };
+  }
   const paired = kind && isApp(kind) ? " Its shortcuts and system controls, and any Watch, phone or agent it paired, stop working too." : "";
   return { title: `Revoke ${phone.displayName}?`, message: `It is signed out now and must be paired again.${paired}`, confirmLabel: PAIR_COPY.revoke };
 }
@@ -168,7 +175,7 @@ export function phoneLines(phone: PairedPhone, now = new Date(), parentName: str
   ];
   if (phone.actsAs) tags.push({ label: phone.actsAs.displayName, name: `Acts as ${phone.actsAs.displayName}`, tone: "neutral" });
   // A child's phone signs in for its family group, never as an account.
-  if (phone.group) tags.push({ label: phone.group.name, name: `For ${phone.group.name}`, tone: "neutral" });
+  if (phone.group) tags.push({ label: `For ${phone.group.name}`, name: `For ${phone.group.name}`, tone: "neutral" });
   if (phone.alerts !== undefined && !phone.revokedAt) {
     const alerts = phone.alerts ? ALERTS_CARD_COPY.accessOn : ALERTS_CARD_COPY.accessOff;
     tags.push({ label: alerts, name: alerts, tone: phone.alerts ? "green" : "yellow" });
@@ -291,9 +298,11 @@ export async function invitePhone<T>(request: ApiRequest, invite: PhoneInvite): 
   return request<T>("/api/v1/paired/invites", { method: "POST", body: { clientType: "app", ...invite } });
 }
 
-/** The family members a child's phone may be paired for. */
+/** The family members a child's phone may be paired for: children, then teens, then adults. */
 export function pairingChildGroups(groups: readonly Group[]): Group[] {
-  return groups.filter((group) => group.kind === "family");
+  const order = (group: Group) => (group.familyRole === "child" ? 0 : group.familyRole === "teen" ? 1 : 2);
+  // Children and teens first, so the first one is who a phone is most likely for; the sort keeps the household's order within each.
+  return groups.filter((group) => group.kind === "family").sort((a, b) => order(a) - order(b));
 }
 
 /** A child's phone's name until someone changes it: "Emma's phone". */
@@ -320,5 +329,8 @@ export const CHILD_PHONES_COPY = {
   pair: PAIR_COPY.pairMe,
   empty: (name: string) => `Pair FamilyFi Me on ${name}'s phone so they can see their rules and ask you for more time.`,
   remoteFirst: "Turn on remote access under Pair Device, then pair FamilyFi Me.",
+  loading: "Loading…",
+  loadFailed: "Couldn't load FamilyFi Me phones.",
+  tryAgain: "Try again",
   revoke: PAIR_COPY.revoke,
 } as const;
