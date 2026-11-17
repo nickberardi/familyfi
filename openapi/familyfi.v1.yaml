@@ -841,8 +841,7 @@ paths:
       summary: Get a group
       description: |
         A child's phone (`me:askOnly`) reads its own group alone, and any other group is 404 for it.
-        It is told no account: every `by` has a null `accountId`, and is null for the recovery
-        account. Its `dohOverrideUrl` is null.
+        A `by` that names the recovery account is null for it.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ $ref: "#/components/parameters/GroupId" }]
       responses:
@@ -1233,8 +1232,8 @@ paths:
         then Lock DNS (`builtIn: dns`), then Block countries (`builtIn: countries`).
         `groupId` narrows to the rules covering that group, which leaves quarantine out.
         A child's phone (`me:askOnly`) gets only the household's own rules that cover its group, each
-        showing that group alone in `groupIds` and `groupPauses`, and no account (every `by` has a
-        null `accountId`, and is null for the recovery account); a `groupId` other than its group is 404. FamilyFi Me builds the child's
+        showing that group alone in `groupIds` and `groupPauses`, with a `by` that names the recovery
+        account null; a `groupId` other than its group is 404. FamilyFi Me builds the child's
         day from these, its group and the session's time zone.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
