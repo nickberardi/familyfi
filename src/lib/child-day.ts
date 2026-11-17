@@ -211,23 +211,46 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice): DaySt
       title: "Not blocked",
       detail: next ? `Until ${next.label}` : "For the rest of today",
     });
-  const afterWindow = (): DayItem[] => {
-    if (windowEnd >= 1440)
-      return [
+  // What comes from `start` on: a window on then carries on to its end (and any window overlapping
+  // it after that), then nothing blocks until the next window or tomorrow morning.
+  const onwards = (start: Clock): DayItem[] => {
+    const items: DayItem[] = [];
+    let at = start;
+    for (let step = 0; step <= subject.windows.length; step++) {
+      if (at >= 1440)
+        return [
+          ...items,
+          later({ time: clock(at), tone: "on", sign: "morning", title: "Not blocked", detail: "Tomorrow morning" }),
+        ];
+      const covering = subject.windows.find((candidate) => inWindow(candidate, at));
+      if (!covering) break;
+      const end = endOf(covering, at);
+      items.push(
         later({
-          time: clock(windowEnd),
-          tone: "on",
-          sign: "morning",
-          title: "Not blocked",
-          detail: "Tomorrow morning",
+          time: clock(at),
+          tone: "window",
+          sign: "window",
+          window: covering,
+          title: covering.label,
+          detail: `Until ${clock(end)}`,
         }),
-      ];
-    const next = nextWindow(windowEnd);
-    return [notBlocked(windowEnd, next), ...(next ? [windowItem(next)] : [])];
+      );
+      at = end;
+    }
+    const next = nextWindow(at);
+    return [...items, notBlocked(at, next), ...(next ? [windowItem(next)] : [])];
   };
-  // An allowance runs to the window's end at most, and is over once its time has passed.
+  const afterWindow = () => onwards(windowEnd);
+  // An allowance belongs to the window it was answered in: it runs to that window's end at most,
+  // never carries over to a window that follows, and is over once its time has passed.
   const allowedUntil =
-    window && ask?.state === "yes" && ask.minutes ? Math.min(ask.answeredAt + ask.minutes, windowEnd) : undefined;
+    window &&
+    ask?.state === "yes" &&
+    ask.minutes &&
+    inWindow(window, ask.answeredAt) &&
+    endOf(window, ask.answeredAt) === windowEnd
+      ? Math.min(ask.answeredAt + ask.minutes, windowEnd)
+      : undefined;
   // The Now block: askable with no request, else the request's state under it.
   const withAskFor = (request: DayAsk | undefined, item: DayItem, withLength: boolean): DayItem => {
     const ask = request;
@@ -303,7 +326,6 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice): DaySt
       source: `By ${pause.by}`,
     });
     const next = nextWindow(pause.to);
-    const covering = subject.windows.find((candidate) => inWindow(candidate, pause.to));
     // Only a request to unpause (no length) belongs to a pause; a window's request does not.
     const current = ask?.minutes ? undefined : ask;
     story = current;
@@ -321,18 +343,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice): DaySt
         false,
       ),
       // A window already on when the pause ends carries on; otherwise nothing blocks until the next.
-      ...(covering
-        ? [
-            later({
-              time: clock(pause.to),
-              tone: "window",
-              sign: "window",
-              window: covering,
-              title: covering.label,
-              detail: `Until ${clock(endOf(covering, pause.to))}`,
-            }),
-          ]
-        : [notBlocked(pause.to, next), ...(next ? [windowItem(next)] : [])]),
+      ...onwards(pause.to),
     ];
     day = { kind: "paused", pause, next };
   } else if (window && ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil) {

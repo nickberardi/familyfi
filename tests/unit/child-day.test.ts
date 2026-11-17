@@ -237,6 +237,7 @@ describe("a child's day", () => {
     expect(story.items.map((item) => [item.time, item.title])).toEqual([
       ["Now", "Paused by Dad"],
       ["10 PM", "Bedtime"],
+      ["7 AM", "Not blocked"],
     ]);
     expect(story.items[1]?.detail).toBe("Until 7 AM");
   });
@@ -328,5 +329,36 @@ describe("a child's day", () => {
     );
     expect(thingTile(extended)).toEqual({ word: "Allowed", line: "Until 9:35 PM", tone: "on" });
     expect(thingNote(extended)).toBe("Allowed until 9:35 PM.");
+  });
+
+  it("keeps an allowance inside the window it was answered in", () => {
+    const homework = { label: "Homework time", from: 21 * 60, to: 22 * 60 };
+    const subject: DaySubject = {
+      windows: [homework, { label: "Bedtime", from: 22 * 60, to: 31 * 60 }],
+      ask: { state: "yes", at: 21 * 60 + 50, answeredAt: 21 * 60 + 55, by: "Dad", minutes: 30 },
+    };
+    expect(topAnswer(tellDay(subject, 21 * 60 + 56, PHONE_VOICE)).title).toBe("Allowed until 10 PM");
+    const bedtime = tellDay(subject, 22 * 60 + 5, PHONE_VOICE);
+    expect(bedtime.day.kind).toBe("window");
+    expect(topAnswer(bedtime).title).toBe("Bedtime until 7 AM");
+    expect(bedtime.items[0]?.ask).toMatchObject({ withLength: true });
+  });
+
+  it("follows an overlapping window before saying nothing blocks", () => {
+    const story = tellDay(
+      {
+        windows: [
+          { label: "Homework time", from: 16 * 60, to: 18 * 60 },
+          { label: "Evening", from: 17 * 60, to: 19 * 60 },
+        ],
+      },
+      16 * 60 + 30,
+      PHONE_VOICE,
+    );
+    expect(story.items.map((item) => [item.time, item.title, item.detail])).toEqual([
+      ["Now", "Homework time", "4 PM until 6 PM"],
+      ["6 PM", "Evening", "Until 7 PM"],
+      ["7 PM", "Not blocked", "For the rest of today"],
+    ]);
   });
 });
