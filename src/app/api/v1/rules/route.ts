@@ -1,10 +1,16 @@
+import { rulesForChild } from "@/server/child-day";
 import { readBody, withMutation, withSession } from "@/server/guard";
+import { ApiError } from "@/server/http";
 import { createRule, listRules, RuleCreateBody } from "@/server/rules";
 
 export async function GET(request: Request) {
-  return withSession(request, async () => {
+  return withSession(request, async (session) => {
     const groupId = new URL(request.url).searchParams.get("groupId") ?? undefined;
-    return Response.json({ rules: await listRules(groupId) });
+    if (session.device?.clientType !== "me") return Response.json({ rules: await listRules(groupId) });
+    // A child's phone (FamilyFi Me) reads only the rules that cover its own group.
+    const own = session.device.groupId;
+    if (!own || (groupId !== undefined && groupId !== own)) throw new ApiError(404, "not_found", "Group not found.");
+    return Response.json({ rules: await rulesForChild(await listRules(own), own) });
   });
 }
 

@@ -191,7 +191,7 @@ const ACCESS: Record<string, Entry> = {
   "PUT /api/v1/groups/{id}/resolver": { access: "session" },
   "DELETE /api/v1/groups/{id}/resolver": { access: "session" },
   "GET /api/v1/health": { access: "public" },
-  "GET /api/v1/rules": { access: "session", devices: READERS_AND_WATCH },
+  "GET /api/v1/rules": { access: "session", devices: [...READERS_AND_WATCH, "me"] },
   "POST /api/v1/rules": { access: "session", devices: CONTROLLERS },
   "GET /api/v1/rules/{id}": { access: "session", devices: READERS },
   "PATCH /api/v1/rules/{id}": { access: "session", devices: CONTROLLERS },
