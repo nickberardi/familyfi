@@ -72,8 +72,8 @@ export type DaySubject = {
   pause?: DayPause;
   windows: DayWindow[];
   ask?: DayAsk;
-  /** The names of rules that block all internet all the time (an always-on internet rule). */
-  always?: string[];
+  /** Rules that block all internet all the time (an always-on internet rule); `allowed` while a parent lifted one until a time. */
+  always?: { label: string; allowed?: { by?: string; until: Clock } }[];
 };
 
 /** The words that differ between this phone (your apps) and a Thing (it). */
@@ -277,7 +277,7 @@ export type MeDay = {
   allowance: { by: string | null; until: string | null } | null;
   /** `allowed`: the window's rule is lifted for this group until a time (an allowance, or a rule paused or allowed). */
   windows: { ruleId: string; ruleName: string; name: string; days: number[]; start: string; end: string; allowed: { by: string | null; until: string } | null }[];
-  alwaysOn: { ruleId: string; name: string; kind: "internet" | "category" | "app" | "domain" }[];
+  alwaysOn: { ruleId: string; name: string; kind: "internet" | "category" | "app" | "domain"; allowed: { by: string | null; until: string } | null }[];
 };
 
 function minutesOfHhmm(value: string): Clock {
@@ -312,7 +312,14 @@ export function meDaySubject(me: MeDay, now: Date): { subject: DaySubject; now: 
         ...(me.pause.until ? { to: minutesOf(me.pause.until) } : { to: 1440, open: true }),
       }
     : undefined;
-  const always = me.alwaysOn.filter((rule) => rule.kind === "internet").map((rule) => rule.name);
+  const always = me.alwaysOn
+    .filter((rule) => rule.kind === "internet")
+    .map((rule) => ({
+      label: rule.name,
+      ...(rule.allowed ? { allowed: { ...(rule.allowed.by ? { by: rule.allowed.by } : {}), until: minutesOf(rule.allowed.until) } } : {}),
+    }))
+    // Lifted for the rest of today: nothing to tell today.
+    .filter((rule) => !rule.allowed || rule.allowed.until < 1440);
   return { subject: { windows, ...(pause ? { pause } : {}), ...(always.length ? { always } : {}) }, now: minutes, clock };
 }
 
@@ -326,6 +333,8 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   const blocking = subject.windows.filter((candidate) => inWindow(candidate, now));
   // When every one is lifted, the one whose lift ends first is the one to tell.
   const liftEnd = (candidate: DayWindow) => Math.min(candidate.allowed?.until ?? now, endOf(candidate, now));
+  const blockingAlways = subject.always?.find((rule) => !rule.allowed || now >= rule.allowed.until);
+  const liftedAlways = subject.always?.filter((rule) => rule.allowed && now < rule.allowed.until).sort((a, b) => a.allowed!.until - b.allowed!.until)[0];
   const window =
     blocking.find((candidate) => !(candidate.allowed && now < candidate.allowed.until)) ??
     [...blocking].sort((a, b) => liftEnd(a) - liftEnd(b))[0];
@@ -515,14 +524,25 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       ...(pause.open ? [] : onwards(pause.to)),
     ];
     day = { kind: "paused", pause, next };
-  } else if (subject.always?.length) {
+  } else if (blockingAlways) {
     // An always-on internet rule blocks all day, whatever the windows. A child can't ask about it yet:
     // asking (familyfi PR 2) covers a pause and a window.
-    const label = subject.always[0];
+    const label = blockingAlways.label;
     bands.splice(0, bands.length, { kind: "window", from: 0, to: 1440, label, source: "No internet", times: "All day" });
     items = [{ time: "Now", now: true, tone: "window", sign: "window", title: label, detail: "All day" }];
     day = { kind: "always", label };
     story = undefined;
+  } else if (liftedAlways && !(window && !(window.allowed && now < window.allowed.until))) {
+    // Lifted for now: allowed until then, and no internet from then on.
+    const { label, allowed } = liftedAlways;
+    const until = allowed!.until;
+    const by = allowed!.by;
+    bands.splice(0, bands.length, { kind: "window", from: until, to: 1440, label, source: "No internet", times: `from ${clock(until)}` });
+    items = [
+      { time: "Now", now: true, tone: "on", sign: "allowed", title: `Allowed until ${clock(until)}`, detail: by ? `${by} said yes` : `${label} is off for now` },
+      later({ time: clock(until), tone: "window", sign: "window", title: `${label} again`, detail: "For the rest of today" }),
+    ];
+    day = { kind: "extended", window: { label, from: 0, to: 1440 }, until, end: 1440, ...(by ? { by } : {}) };
   } else if (window && ((ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil) || lift)) {
     const asked = ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil ? { ...ask, minutes: ask.minutes } : undefined;
     const allowedTo = asked ? allowedUntil! : Math.min(lift!.until, windowEnd);

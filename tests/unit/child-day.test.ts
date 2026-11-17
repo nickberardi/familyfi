@@ -468,9 +468,9 @@ describe("a child's day on the household's clock", () => {
   });
 
   it("tells a rule that blocks all internet all the time, never \"Nothing is blocked\"", () => {
-    const blocked = me({ windows: [bedtime([1])], alwaysOn: [{ ruleId: "r2", name: "No internet", kind: "internet" }, { ruleId: "r3", name: "Games", kind: "category" }] });
+    const blocked = me({ windows: [bedtime([1])], alwaysOn: [{ ruleId: "r2", name: "No internet", kind: "internet", allowed: null }, { ruleId: "r3", name: "Games", kind: "category", allowed: null }] });
     const { subject, now, clock: day } = meDaySubject(blocked, MONDAY_NIGHT);
-    expect(subject.always).toEqual(["No internet"]);
+    expect(subject.always).toEqual([{ label: "No internet" }]);
     const story = tellDay(subject, now, PHONE_VOICE, day);
     expect(story.day).toEqual({ kind: "always", label: "No internet" });
     expect(topAnswer(story)).toMatchObject({ title: "No internet", sentence: "No internet all day." });
@@ -480,10 +480,22 @@ describe("a child's day on the household's clock", () => {
     const thing = tellDay(subject, now, THING_VOICE, day);
     expect(thingTile(thing)).toEqual({ word: "No internet", line: "All day", tone: "window" });
     expect(thingNote(thing)).toBe("No internet all day.");
-    const homework = meDaySubject(me({ alwaysOn: [{ ruleId: "r4", name: "Homework", kind: "internet" }] }), MONDAY_NIGHT);
+    const homework = meDaySubject(me({ alwaysOn: [{ ruleId: "r4", name: "Homework", kind: "internet", allowed: null }] }), MONDAY_NIGHT);
     expect(thingNote(tellDay(homework.subject, homework.now, THING_VOICE, homework.clock))).toBe("Homework: no internet all day.");
+    // Lifted until 5 PM, read at 3 PM: allowed until then, and no internet from then on.
+    const lifted = me({ alwaysOn: [{ ruleId: "r2", name: "No internet", kind: "internet", allowed: { by: "Dad", until: "2026-11-16T22:00:00Z" } }] });
+    const afternoon = meDaySubject(lifted, new Date("2026-11-16T20:00:00Z"));
+    const allowed = tellDay(afternoon.subject, afternoon.now, PHONE_VOICE, afternoon.clock);
+    expect(topAnswer(allowed)).toMatchObject({ title: "Allowed until 5 PM", sentence: "Dad said yes. No internet starts again at 5 PM." });
+    expect(allowed.items.map((item) => [item.time, item.title, item.detail])).toEqual([
+      ["Now", "Allowed until 5 PM", "Dad said yes"],
+      ["5 PM", "No internet again", "For the rest of today"],
+    ]);
+    // Read after 5 PM it blocks again.
+    const evening = meDaySubject(lifted, new Date("2026-11-16T23:00:00Z"));
+    expect(tellDay(evening.subject, evening.now, PHONE_VOICE, evening.clock).day.kind).toBe("always");
     // A category rule alone leaves the internet on.
-    const games = meDaySubject(me({ alwaysOn: [{ ruleId: "r3", name: "Games", kind: "category" }] }), MONDAY_NIGHT);
+    const games = meDaySubject(me({ alwaysOn: [{ ruleId: "r3", name: "Games", kind: "category", allowed: null }] }), MONDAY_NIGHT);
     expect(games.subject.always).toBeUndefined();
   });
 

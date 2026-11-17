@@ -24,8 +24,8 @@ async function childFacingName(by: { accountId: string | null; name: string } | 
  * nothing else in the household. Its pause, its allowance, the windows of its internet rules that
  * are on, and the rules that block something all the time. A rule paused or allowed, for everyone or
  * for this group, blocks nothing while it is lifted: a scheduled internet rule lifted until a time
- * keeps its windows, marked `allowed` until then, so the child is told when they come back; one
- * lifted with no end, and an always-on rule while lifted, are left out.
+ * keeps its windows, marked `allowed` until then, so the child is told when they come back, and an
+ * always-on rule lifted until a time is marked the same way; one lifted with no end is left out.
  */
 export async function childDay(groupId: string | null, now = new Date()): Promise<MeDay> {
   const group = groupId ? await prisma().group.findUnique({ where: { id: groupId }, include: groupInclude }) : null;
@@ -67,8 +67,16 @@ export async function childDay(groupId: string | null, now = new Date()): Promis
       : null,
     allowance: shown.allowance.active ? { by: await childFacingName(shown.allowance.by), until: shown.allowance.until } : null,
     windows: windows.flat(),
-    alwaysOn: links
-      .filter((link) => link.rule.mode === RuleMode.always && liftOf(link) === undefined)
-      .map(({ rule }) => ({ ruleId: rule.id, name: rule.name, kind: rule.kind })),
+    alwaysOn: await Promise.all(
+      links
+        .filter((link) => link.rule.mode === RuleMode.always && liftOf(link) !== null)
+        .map(async (link) => {
+          const lift = liftOf(link);
+          const allowed = lift
+            ? { by: await childFacingName(lift.pausedByName ? { accountId: lift.pausedByAccountId, name: lift.pausedByName } : null), until: lift.pauseUntil!.toISOString() }
+            : null;
+          return { ruleId: link.rule.id, name: link.rule.name, kind: link.rule.kind, allowed };
+        }),
+    ),
   };
 }

@@ -3463,15 +3463,23 @@ components:
                   until: { type: string, format: date-time }
         alwaysOn:
           type: array
-          description: The group's rules that block all the time, leaving out one lifted now.
+          description: The group's rules that block all the time, leaving out one lifted with no end.
           items:
             type: object
             additionalProperties: false
-            required: [ruleId, name, kind]
+            required: [ruleId, name, kind, allowed]
             properties:
               ruleId: { type: string }
               name: { type: string }
               kind: { type: string, enum: [internet, category, app, domain] }
+              allowed:
+                type: [object, "null"]
+                description: "The rule is lifted for this group until `until`. Null when it is not."
+                additionalProperties: false
+                required: [by, until]
+                properties:
+                  by: { type: [string, "null"], description: "Who lifted it, as they were named then; null when FamilyFi recorded no person or the recovery account did." }
+                  until: { type: string, format: date-time }
     LoginResponse:
       type: object
       additionalProperties: false
