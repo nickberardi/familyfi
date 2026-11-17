@@ -1,9 +1,9 @@
 import type { Prisma } from "@prisma/client";
-import { CLIENT_TYPES, legacyClient, scopeFor, scopeWord } from "@/lib/client-type";
+import { CLIENT_TYPES, legacyClient, scopeWord } from "@/lib/client-type";
 import { z } from "zod";
 import { isAdministrator, removeDevice, revokeDevice } from "./connection";
 import { prisma } from "./db";
-import { isFullApp } from "./device-scope";
+import { isFullApp, isValidScope } from "./device-scope";
 import { ApiError } from "./http";
 
 type Viewer = Parameters<typeof isAdministrator>[0];
@@ -113,9 +113,9 @@ export async function getPairedDevice(session: Viewer, id: string) {
 export async function updatePairedDevice(id: string, input: { displayName?: string; scope?: string }) {
   const device = await prisma().pairedDevice.findUnique({ where: { id } });
   if (!device) throw deviceNotFound();
-  // An agent's scope may come as its word (`full`) or whole (`agent:full`).
-  const word = input.scope === undefined ? undefined : scopeWord(input.scope);
-  const scope = word && word !== scopeWord(device.scope) ? (device.clientType === "agent" && !input.scope!.startsWith("app:") && !input.scope!.startsWith("me:") ? scopeFor("agent", word) : null) : undefined;
+  // An agent's scope may come as its word (`full`), read in the device's own group, or whole (`agent:full`).
+  const whole = input.scope === undefined ? undefined : input.scope.includes(":") ? input.scope : `${device.scope.split(":")[0]}:${input.scope}`;
+  const scope = whole && whole !== device.scope ? (device.clientType === "agent" && isValidScope("agent", whole) ? whole : null) : undefined;
   if (scope === null) throw new ApiError(400, "invalid_scope", `A ${legacyClient(device.clientType)} cannot hold the ${input.scope} scope.`);
   await prisma().pairedDevice.update({ where: { id }, data: { displayName: input.displayName, ...(scope ? { scope } : {}) } });
   const updated = await prisma().pairedDevice.findUniqueOrThrow({ where: { id }, include: deviceInclude() });

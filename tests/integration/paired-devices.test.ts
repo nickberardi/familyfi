@@ -102,6 +102,7 @@ describe("/paired/devices", () => {
     const whole = await patch(agent.device.id, { scope: "agent:readOnly" });
     expect(((await whole.json()) as { device: { scope: string } }).device.scope).toBe("readOnly");
     expect((await patch(agent.device.id, { scope: "app:full" })).status).toBe(400);
+    expect((await patch(phone.device.id, { scope: "agent:full" })).status).toBe(400);
     await patch(agent.device.id, { scope: "full" });
     const invalid = await patch(agent.device.id, { scope: "rulesOnly" });
     expect(invalid.status).toBe(400);
