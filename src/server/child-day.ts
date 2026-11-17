@@ -1,10 +1,23 @@
-import { RuleMode } from "@prisma/client";
+import { AccountKind, RuleMode } from "@prisma/client";
 import type { MeDay } from "@/lib/child-day";
 import { prisma } from "./db";
 import { blockRuleOf, groupInclude, lifted, publicGroup } from "./groups";
 import { currentTimezone } from "./household";
 import { ApiError } from "./http";
 import { builtInRule } from "./rules";
+
+/**
+ * Who a child is told paused them: the person as they were named then. The recovery account is no
+ * person, so it goes unnamed, and FamilyFi Me says the pause without a name.
+ */
+async function childFacingName(by: { accountId: string | null; name: string } | null): Promise<string | null> {
+  if (!by) return null;
+  if (by.accountId) {
+    const account = await prisma().account.findUnique({ where: { id: by.accountId }, select: { kind: true } });
+    if (account?.kind === AccountKind.recovery) return null;
+  }
+  return by.name;
+}
 
 /**
  * A child's own day, for FamilyFi Me (`GET /api/v1/me/day`): the group its phone signs in for, and
@@ -32,7 +45,7 @@ export async function childDay(groupId: string | null, now = new Date()): Promis
     pause: shown.suspension.active && block
       // Only starting, extending and ending a pause write the block rule's row (group-internet.ts,
       // group-unblock.ts), so its last update is when the pause was last set.
-      ? { by: shown.suspension.by?.name ?? null, since: block.updatedAt.toISOString(), until: shown.suspension.until }
+      ? { by: await childFacingName(shown.suspension.by), since: block.updatedAt.toISOString(), until: shown.suspension.until }
       : null,
     allowance: shown.allowance.active ? { by: shown.allowance.by?.name ?? null, until: shown.allowance.until } : null,
     windows: covering

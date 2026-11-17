@@ -407,7 +407,7 @@ describe("a child's day on the household's clock", () => {
     expect(story.bands).toEqual([]);
     const tuesday = meDaySubject(me({ windows: [bedtime([2])] }), TUESDAY_MORNING);
     const bands = tellDay(tuesday.subject, tuesday.now, PHONE_VOICE, tuesday.clock).bands;
-    expect(bands.map((band) => band.source)).toEqual(["Some days"]);
+    expect(bands.map((band) => band.source)).toEqual(["Tue"]);
   });
 
   it("draws a pause from yesterday from where it began, and one with no end to the end of today", () => {
@@ -417,10 +417,14 @@ describe("a child's day on the household's clock", () => {
     expect(tellDay(subject, now, PHONE_VOICE, day).day.kind).toBe("paused");
   });
 
-  it("names a window by its own name, or else its rule's, and a pause by someone when FamilyFi did not record who", () => {
+  it("names a window by its own name, or else its rule's, and says a pause without a name when FamilyFi did not record who", () => {
     const named = { ...bedtime([1]), name: "School night" };
     const { subject } = meDaySubject(me({ windows: [named], pause: { by: null, since: "2026-11-17T03:00:00Z", until: "2026-11-17T04:00:00Z" } }), MONDAY_NIGHT);
     expect(subject.windows[0].label).toBe("School night");
-    expect(subject.pause).toEqual({ by: "A parent", from: 22 * 60, to: 23 * 60 });
+    expect(subject.pause).toEqual({ from: 22 * 60, to: 23 * 60 });
+    const story = tellDay(subject, 22 * 60 + 30, PHONE_VOICE, householdDay(MONDAY_NIGHT, ZONE).clock);
+    expect(story.items[0].title).toBe("Paused");
+    expect(story.bands.find((band) => band.kind === "pause")?.source).toBe("Paused");
+    expect(topAnswer(story).sentence).toBe("Your apps are paused.");
   });
 });

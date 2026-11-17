@@ -1,5 +1,5 @@
 import type { TimelineBand } from "@/lib/day-timeline";
-import { formatHhmm } from "@/lib/display";
+import { daysLabel, formatHhmm } from "@/lib/display";
 import {
   isWindowActive,
   localWeekday,
@@ -29,7 +29,8 @@ export type DayWindow = { label: string; from: Clock; to: Clock; days?: number[]
  * window the line names (its `window`), which an app may draw by its name.
  */
 export type DaySign = "pause" | "window" | "allowed" | "morning" | "waiting" | "declined";
-export type DayPause = { by: string; from: Clock; to: Clock };
+/** `by` is who paused, as they were named then; absent when FamilyFi did not record a person. */
+export type DayPause = { by?: string; from: Clock; to: Clock };
 export type AskLength = 15 | 30 | 60;
 /**
  * A request and its answer: `at` is when it was sent, `answeredAt` when a parent answered, `by`
@@ -61,6 +62,8 @@ export type DayVoice = {
   endAsk: string;
   endWaiting: (at: string) => string;
   endDone: (by: string, at: string) => string;
+  /** The sentence for a pause FamilyFi has no person's name for: "Your apps are paused." */
+  pausedByNoOne: string;
 };
 
 /** A state's colour: a pause in the paused ink, a window in plain ink (accent is for actions), allowed in green. */
@@ -199,7 +202,7 @@ function onDay(day: DayClock) {
         from,
         to,
         label: window.label,
-        source: window.days && window.days.length < 7 ? "Some days" : "Every day",
+        source: daysLabel(window.days ?? EVERY_DAY),
       })),
     );
   };
@@ -232,9 +235,6 @@ export type MeDay = {
   alwaysOn: { ruleId: string; name: string; kind: "internet" | "category" | "app" | "domain" }[];
 };
 
-/** What a parent is called when FamilyFi did not record who it was. */
-export const SOMEONE = "A parent";
-
 function minutesOfHhmm(value: string): Clock {
   const [hours, minutes] = value.split(":").map(Number);
   return hours * 60 + minutes;
@@ -253,7 +253,7 @@ export function meDaySubject(me: MeDay, now: Date): { subject: DaySubject; now: 
     return { label: window.name || window.ruleName, from, to: end <= from ? end + 1440 : end, days: window.days };
   });
   const pause = me.pause
-    ? { by: me.pause.by ?? SOMEONE, from: Math.min(minutesOf(me.pause.since), minutes), to: me.pause.until ? minutesOf(me.pause.until) : 1440 }
+    ? { ...(me.pause.by ? { by: me.pause.by } : {}), from: Math.min(minutesOf(me.pause.since), minutes), to: me.pause.until ? minutesOf(me.pause.until) : 1440 }
     : undefined;
   return { subject: { windows, ...(pause ? { pause } : {}) }, now: minutes, clock };
 }
@@ -374,7 +374,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       from: pause.from,
       to: ended.answeredAt,
       label: voice.pauseWord,
-      source: `By ${pause.by}`,
+      source: pause.by ? `By ${pause.by}` : voice.pauseWord,
     });
   if (pause && ended && !window) {
     const next = nextWindow(now);
@@ -388,19 +388,19 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
         detail: next ? `Until ${next.label}` : "For the rest of today",
         status: {
           sign: "allowed",
-          text: voice.endDone(pause.by, clock(ended.answeredAt)),
+          text: voice.endDone(ended.by, clock(ended.answeredAt)),
         },
       },
       ...(next ? [windowItem(next)] : []),
     ];
-    day = { kind: "unpaused", by: pause.by, next };
+    day = { kind: "unpaused", by: ended.by, next };
   } else if (pause && !ended) {
     bands.push({
       kind: "pause",
       from: pause.from,
       to: pause.to,
       label: voice.pauseWord,
-      source: `By ${pause.by}`,
+      source: pause.by ? `By ${pause.by}` : voice.pauseWord,
     });
     const next = nextWindow(pause.to);
     // Only a request to unpause (no length) belongs to a pause; a window's request does not.
@@ -414,7 +414,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
           now: true,
           tone: "paused",
           sign: "pause",
-          title: `${voice.pauseWord} by ${pause.by}`,
+          title: pause.by ? `${voice.pauseWord} by ${pause.by}` : voice.pauseWord,
           detail: `${clock(pause.from)} until ${clock(pause.to)}`,
         },
         false,
@@ -514,6 +514,7 @@ export const PHONE_VOICE: DayVoice = {
   endAsk: "Ask to unpause",
   endWaiting: (at) => `You asked to be unpaused at ${at}. Waiting for an answer.`,
   endDone: (by, at) => `${by} unpaused your apps at ${at}.`,
+  pausedByNoOne: "Your apps are paused.",
 };
 
 /** An Android phone's voice: FamilyFi blocks its internet at home, not its apps (no Screen Time there). */
@@ -521,6 +522,7 @@ export const INTERNET_VOICE: DayVoice = {
   ...PHONE_VOICE,
   whose: "your internet",
   endDone: (by, at) => `${by} unpaused your internet at ${at}.`,
+  pausedByNoOne: "Your internet is paused.",
 };
 
 /** A Thing's voice: it. */
@@ -530,6 +532,7 @@ export const THING_VOICE: DayVoice = {
   endAsk: "Ask to unblock",
   endWaiting: (at) => `You asked to unblock it at ${at}. Waiting for an answer.`,
   endDone: (by, at) => `${by} unblocked it at ${at}.`,
+  pausedByNoOne: "It is blocked.",
 };
 
 /**
@@ -554,7 +557,7 @@ export function topAnswer({ day, voice }: DayStory): TopAnswer {
         sign: "pause",
         tone: "paused",
         title: `Paused until ${clock(day.pause.to)}`,
-        sentence: `${day.pause.by} paused ${voice.whose}.`,
+        sentence: day.pause.by ? `${day.pause.by} paused ${voice.whose}.` : voice.pausedByNoOne,
       };
     case "window":
       return {
