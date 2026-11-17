@@ -258,12 +258,12 @@ like a phone, over a route for five minutes, but names the family group it is fo
 (`{ clientType: "me", displayName, endpointId, groupId }`; 400 `family_group_required` for a group
 of things) instead of an account. Its code carries what a phone's does: the route, its pin, and a
 Cloudflare Access token where the route has one, so it reaches the household away from home. It
-signs in for that group and never as an account: its session's `kind` is `me`, its `displayName`
+signs in for that group and never as an account: its session's `kind` is `group`, its `displayName`
 the group's name and its `username` names the device, and a paired-device listing shows its
 `group` with `actsAs` null. It has no parent device, since it belongs to its group: re-pairing or
 revoking the phone that invited it leaves it alone.
 
-It reads its own group with `GET /groups/{id}` (any other group is 404 for it), whose `day` tells the group's own pause and allowance, the windows of its
+It reads its own group with `GET /groups/{id}` (any other group is 404 for it), whose `day`, sent only to a child's phone, tells the group's own pause and allowance, the windows of its
 internet rules (each with the days it starts on, its household-time start and end, and `allowed`
 while its rule is lifted for the group until a time), and the rules that block something all the
 time (with `allowed` too); nothing else in the household. A rule lifted with no end is left out. A `by` is `null` where FamilyFi recorded no person, or the recovery account acted.
