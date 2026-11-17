@@ -363,8 +363,13 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
           .map((candidate) => ({ window: candidate, from: candidate.allowed!.until }))
           .sort((a, b) => a.from - b.from)[0];
         if (!resumed) break;
-        items.push(notBlocked(at, resumed.window));
-        at = resumed.from;
+        // Its own line, even past midnight, then on from its end.
+        const end = endOf(resumed.window, at);
+        items.push(
+          notBlocked(at, resumed.window),
+          later({ time: clock(resumed.from), tone: "window", sign: "window", window: resumed.window, title: resumed.window.label, detail: `Until ${clock(end)}` }),
+        );
+        at = end;
         continue;
       }
       const end = endOf(covering, at);
@@ -500,7 +505,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     // asking (familyfi PR 2) covers a pause and a window.
     const label = subject.always[0];
     bands.splice(0, bands.length, { kind: "window", from: 0, to: 1440, label, source: "No internet", times: "All day" });
-    items = [{ time: "Now", now: true, tone: "window", sign: "window", title: label, detail: "No internet all day" }];
+    items = [{ time: "Now", now: true, tone: "window", sign: "window", title: label, detail: "All day" }];
     day = { kind: "always", label };
     story = undefined;
   } else if (window && ((ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil) || lift)) {
@@ -579,7 +584,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
         tone: "on",
         sign: "allowed",
         title: "Not blocked",
-        detail: next ? `Until ${clock(next.from)}` : "All day",
+        detail: next ? `Until ${clock(next.from)}` : "For the rest of today",
       },
       ...(next ? [windowItem(next)] : []),
     ];
@@ -686,7 +691,7 @@ export function thingTile({ day, ask }: DayStory): {
   line: string;
   tone: DayTone | "muted";
 } {
-  if (day.kind === "always") return { word: day.label, line: "No internet all day", tone: "window" };
+  if (day.kind === "always") return { word: day.label, line: "All day", tone: "window" };
   if (day.kind === "paused" || day.kind === "window") {
     if (ask?.state === "waiting")
       return {
@@ -704,7 +709,7 @@ export function thingTile({ day, ask }: DayStory): {
   // Unpaused or open: nothing blocks it now.
   return {
     word: "Not blocked",
-    line: day.next ? `Until ${clock(day.next.from)}` : "All day",
+    line: day.next ? `Until ${clock(day.next.from)}` : "For the rest of today",
     tone: "on",
   };
 }
@@ -719,7 +724,7 @@ export function thingNote({ day, ask, items }: DayStory): string {
       : day.kind === "window"
         ? `${day.window.label} until ${clock(day.end)}`
         : day.kind === "always"
-          ? `${day.label}: no internet all day`
+          ? `${day.label} all day`
           : "";
   if (items.some((item) => item.ask)) return `${blocked}. Ask here and your parents decide.`;
   if (ask?.state === "waiting" && blocked) return `${blocked}. Waiting for an answer.`;
