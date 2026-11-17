@@ -106,6 +106,9 @@ const clientFiles = sourceFiles.filter((file) => /^\s*["']use client["']/.test(r
 const libFiles = sourceFiles.filter((file) => file.startsWith(path.join(srcRoot, "lib") + path.sep));
 // Shared components run in the browser and in the native app, which imports them directly.
 const uiFiles = sourceFiles.filter((file) => file.startsWith(path.join(srcRoot, "ui") + path.sep));
+// Expo native modules both apps link from `native/`: they run on the phone, and the web never loads them.
+const nativeRoot = path.join(repoRoot, "native");
+const nativeFiles = walk(nativeRoot).filter(isCode);
 
 describe("client boundary", () => {
   it("finds the files it guards", () => {
@@ -114,7 +117,14 @@ describe("client boundary", () => {
     expect(uiFiles.length).toBeGreaterThan(0);
   });
 
-  it("never lets a Client Component, src/lib or src/ui reach server code, even through other modules", () => {
-    expect(boundaryViolations([...clientFiles, ...libFiles, ...uiFiles])).toEqual([]);
+  it("never lets a Client Component, src/lib, src/ui or a native module reach server code, even through other modules", () => {
+    expect(nativeFiles.length).toBeGreaterThan(0);
+    expect(boundaryViolations([...clientFiles, ...libFiles, ...uiFiles, ...nativeFiles])).toEqual([]);
+  });
+
+  it("keeps the apps' native modules out of the web and the server", () => {
+    // familyfi has no Expo, so nothing under src may import a native module.
+    const reaching = sourceFiles.filter((file) => importSpecifiers(readFileSync(file, "utf8")).some((specifier) => /(^|\/)native\/|^familyfi-(transport|scanner)$/.test(specifier)));
+    expect(reaching.map(rel)).toEqual([]);
   });
 });

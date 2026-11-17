@@ -18,6 +18,8 @@ const eslintConfig = defineConfig([
     "reports/**",
     ".stryker-tmp/**",
     "prisma/migrations/**",
+    // Expo native modules for the apps, which lint and typecheck them (familyfi has no Expo).
+    "native/**",
   ]),
 ]);
 

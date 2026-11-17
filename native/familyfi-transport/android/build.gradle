@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.getfamilyfi'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.familyfitransport"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  // The version React Native itself ships (node_modules/react-native/gradle/libs.versions.toml).
+  implementation "com.squareup.okhttp3:okhttp:4.9.2"
+}
