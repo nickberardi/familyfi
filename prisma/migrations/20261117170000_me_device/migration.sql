@@ -6,3 +6,6 @@ ALTER TABLE "Pairing" ADD COLUMN "groupId" TEXT;
 
 ALTER TABLE "PairedDevice" ADD CONSTRAINT "PairedDevice_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "Group"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "Pairing" ADD CONSTRAINT "Pairing_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "Group"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- The phone that made a child's phone's invite: revoking it cancels the invite while it waits.
+ALTER TABLE "Pairing" ADD COLUMN "madeByDeviceId" TEXT;

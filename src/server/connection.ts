@@ -131,7 +131,11 @@ async function revokeCompanions(id: string, db: Db, now: Date) {
   let parents = [id];
   const seen = new Set(parents);
   while (parents.length) {
-    await db.pairing.updateMany({ where: { parentDeviceId: { in: parents }, claimedAt: null, expiresAt: { gt: now } }, data: { expiresAt: now } });
+    // A child's phone's invite has no parent, but the phone that made it still cancels it.
+    await db.pairing.updateMany({
+      where: { OR: [{ parentDeviceId: { in: parents } }, { madeByDeviceId: { in: parents } }], claimedAt: null, expiresAt: { gt: now } },
+      data: { expiresAt: now },
+    });
     // Revoked records are walked too: a phone re-paired under one still descends from its ancestors.
     const companions = await db.pairedDevice.findMany({ where: { parentDeviceId: { in: parents } }, select: { id: true } });
     const ids = companions.map((companion) => companion.id).filter((companion) => !seen.has(companion));
@@ -192,7 +196,8 @@ export async function removeDevice(id: string, db: Db = prisma() as unknown as D
 export async function removeAccountDevices(accountId: string, db: Db = prisma() as unknown as Db, now = new Date()): Promise<number> {
   const devices = await db.pairedDevice.findMany({ where: { accountId }, select: { id: true } });
   for (const device of devices) await removeDevice(device.id, db, now);
-  await db.pairing.updateMany({ where: { accountId, claimedAt: null, expiresAt: { gt: now } }, data: { expiresAt: now } });
+  // Invites for them, and invites they made (a child's phone's names no account).
+  await db.pairing.updateMany({ where: { OR: [{ accountId }, { createdByAccountId: accountId }], claimedAt: null, expiresAt: { gt: now } }, data: { expiresAt: now } });
   return devices.length;
 }
 

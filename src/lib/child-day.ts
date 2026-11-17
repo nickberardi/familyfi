@@ -72,6 +72,8 @@ export type DaySubject = {
   pause?: DayPause;
   windows: DayWindow[];
   ask?: DayAsk;
+  /** The names of rules that block all internet all the time (an always-on internet rule). */
+  always?: string[];
 };
 
 /** The words that differ between this phone (your apps) and a Thing (it). */
@@ -121,7 +123,9 @@ export type Day =
       /** Who said yes, when FamilyFi has a person's name. */
       by?: string;
     }
-  | { kind: "open"; next?: DayWindow };
+  | { kind: "open"; next?: DayWindow }
+  /** A rule blocks all internet all the time: `label` is its name. */
+  | { kind: "always"; label: string };
 
 export type DayStory = {
   day: Day;
@@ -304,7 +308,8 @@ export function meDaySubject(me: MeDay, now: Date): { subject: DaySubject; now: 
         ...(me.pause.until ? { to: minutesOf(me.pause.until) } : { to: 1440, open: true }),
       }
     : undefined;
-  return { subject: { windows, ...(pause ? { pause } : {}) }, now: minutes, clock };
+  const always = me.alwaysOn.filter((rule) => rule.kind === "internet").map((rule) => rule.name);
+  return { subject: { windows, ...(pause ? { pause } : {}), ...(always.length ? { always } : {}) }, now: minutes, clock };
 }
 
 /** Tells a day from what blocks it, the time now, and the child's request, on the household's day (the sample's by default). */
@@ -313,7 +318,9 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   // A no stands until the child can ask again; after that the Now block is askable again.
   const ask = subject.ask?.state === "no" && now >= subject.ask.answeredAt + ASK_AGAIN_AFTER ? undefined : subject.ask;
   const pause = subject.pause && now >= subject.pause.from && now < subject.pause.to ? subject.pause : undefined;
-  const window = subject.windows.find((candidate) => inWindow(candidate, now));
+  // A window a parent lifted gives way to another that still blocks now.
+  const blocking = subject.windows.filter((candidate) => inWindow(candidate, now));
+  const window = blocking.find((candidate) => !(candidate.allowed && now < candidate.allowed.until)) ?? blocking[0];
   const windowEnd = window ? endOf(window, now) : 0;
   const nextWindow = (after: Clock) => firstWindowFrom(subject.windows, after);
   const later = (item: Omit<DayItem, "now">): DayItem => ({
@@ -478,6 +485,13 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       ...(pause.open ? [] : onwards(pause.to)),
     ];
     day = { kind: "paused", pause, next };
+  } else if (subject.always?.length) {
+    // An always-on internet rule blocks all day, whatever the windows; asking about it comes with asking.
+    const label = subject.always[0];
+    bands.splice(0, bands.length, { kind: "window", from: 0, to: 1440, label, source: "All the time" });
+    items = [{ time: "Now", now: true, tone: "window", sign: "window", title: label, detail: "All the time" }];
+    day = { kind: "always", label };
+    story = undefined;
   } else if (window && ((ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil) || lift)) {
     const asked = ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil ? { ...ask, minutes: ask.minutes } : undefined;
     const until = asked ? allowedUntil! : Math.min(lift!.until, windowEnd);
@@ -637,6 +651,8 @@ export function topAnswer({ day, voice }: DayStory): TopAnswer {
         title: `Allowed until ${clock(day.until)}`,
         sentence: `${extendedSentence(day)}${day.until < day.end ? ` ${day.window.label} starts again at ${clock(day.until)}.` : ""}`,
       };
+    case "always":
+      return { sign: "window", tone: "window", title: day.label, sentence: `${day.label} is on all the time.` };
     case "open":
       return {
         sign: "allowed",
@@ -659,6 +675,7 @@ export function thingTile({ day, ask }: DayStory): {
   line: string;
   tone: DayTone | "muted";
 } {
+  if (day.kind === "always") return { word: day.label, line: "All the time", tone: "window" };
   if (day.kind === "paused" || day.kind === "window") {
     if (ask?.state === "waiting")
       return {
@@ -690,7 +707,9 @@ export function thingNote({ day, ask, items }: DayStory): string {
         : `Blocked until ${clock(day.pause.to)}`
       : day.kind === "window"
         ? `${day.window.label} until ${clock(day.end)}`
-        : "";
+        : day.kind === "always"
+          ? `${day.label} all the time`
+          : "";
   if (items.some((item) => item.ask)) return `${blocked}. Ask here and your parents decide.`;
   if (ask?.state === "waiting" && blocked) return `${blocked}. Waiting for an answer.`;
   if (blocked) return `${blocked}.`;

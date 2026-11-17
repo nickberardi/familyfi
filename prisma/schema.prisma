@@ -333,6 +333,9 @@ model Pairing {
   /// The paired device that made this invite for its companion (`claim=true`).
   parentDeviceId     String?
   parentDevice       PairedDevice?       @relation("pairingParentDevice", fields: [parentDeviceId], references: [id], onDelete: SetNull)
+  /// The paired phone that made a child's phone's invite (`me`), which is not its parent: revoking the
+  /// phone cancels the invite while it waits, and leaves the child's phone it paired alone.
+  madeByDeviceId     String?
   /// A phone this pairing re-pairs: when the pairing is claimed, that old record is revoked and removed.
   replacesDeviceId   String?
   /// The client type this pairing admits (src/lib/client-type.ts). An agent pairing has no route: its code carries the address it was made from.
