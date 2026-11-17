@@ -14,11 +14,12 @@ import { POST as invite } from "@/app/api/v1/paired/invites/route";
 import { DELETE as unpair, GET as pairedDevice } from "@/app/api/v1/paired/devices/[id]/route";
 import { meDaySubject, tellDay, PHONE_VOICE, type MeDay } from "@/lib/child-day";
 import { prisma } from "@/server/db";
+import { removeAccountDevices, revokeDevice } from "@/server/connection";
 import { deleteGroup } from "@/server/groups";
 import { exportHousehold, importHousehold } from "@/server/household-export";
 import { resetDatabase } from "../helpers/db";
 import { request, type SessionAuth } from "../helpers/http";
-import { bearer, claimInvite, homeRoute, issuedInvite, pairingAdmin, pairingAdminAuth, type Claim } from "../helpers/pairing";
+import { bearer, claimInvite, homeRoute, issuedInvite, pairingAdmin, pairingAdminAuth, pairPhone, type Claim } from "../helpers/pairing";
 
 const json = { "content-type": "application/json" };
 
@@ -215,6 +216,26 @@ describe("FamilyFi Me on a child's phone", () => {
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(claim.token) }))).status).toBe(401);
     const renewed = await refresh(request("/api/v1/auth/refresh", { method: "POST", headers: json, body: JSON.stringify({ refreshToken: claim.refreshToken }) }));
     expect(renewed.status).toBe(403);
+  });
+
+  it("is never claimed once the phone that invited it is revoked, or its administrator is demoted", async () => {
+    const group = await childGroup();
+    const phone = await pairPhone(admin);
+    const fromPhone = await issuedInvite(await inviteMe(bearer(phone.token), { endpointId: (await homeRoute()).id, groupId: group.id }));
+    const fromBrowser = await issuedInvite(await inviteMe(admin, { endpointId: (await homeRoute()).id, groupId: group.id }));
+    await revokeDevice(phone.device.id);
+    expect((await claimInvite(fromPhone, "iPhone")).status).toBe(403);
+    await removeAccountDevices((await pairingAdmin()).id);
+    expect((await claimInvite(fromBrowser, "iPhone")).status).toBe(403);
+  });
+
+  it("stays paired when the phone that invited it is revoked: it belongs to its group", async () => {
+    const group = await childGroup();
+    const phone = await pairPhone(admin);
+    const issued = await issuedInvite(await inviteMe(bearer(phone.token), { endpointId: (await homeRoute()).id, groupId: group.id }));
+    const claimed = (await (await claimInvite(issued, "iPhone")).json()) as Claim;
+    await revokeDevice(phone.device.id);
+    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(claimed.token) }))).status).toBe(200);
   });
 
   it("is never claimed once its group is gone", async () => {

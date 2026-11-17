@@ -47,7 +47,7 @@ function inviteStatus(invite: { claimedAt: Date | null; expiresAt: Date }, now =
  * A phone invite, over the published route the phone pairs through: the app's, acting as an account,
  * or a child's (`me`), signing in for a family group.
  */
-async function invitePhone(input: { endpointId: string; displayName: string; createdByAccountId: string; parentDeviceId?: string | null; replacesDeviceId?: string | null } & ({ clientType: "app"; accountId: string } | { clientType: "me"; groupId: string })) {
+async function invitePhone(input: { endpointId: string; displayName: string; createdByAccountId: string; parentDeviceId?: string | null; madeByDeviceId?: string | null; replacesDeviceId?: string | null } & ({ clientType: "app"; accountId: string } | { clientType: "me"; groupId: string })) {
   const token = randomToken();
   const clientType = input.clientType;
   const invite = await prisma().pairing.create({
@@ -60,6 +60,7 @@ async function invitePhone(input: { endpointId: string; displayName: string; cre
       groupId: input.clientType === "me" ? input.groupId : null,
       createdByAccountId: input.createdByAccountId,
       parentDeviceId: input.parentDeviceId ?? null,
+      madeByDeviceId: input.madeByDeviceId ?? null,
       replacesDeviceId: input.replacesDeviceId ?? null,
       tokenHash: sha256(token),
       expiresAt: new Date(Date.now() + PHONE_INVITE_TTL_MS),
@@ -322,7 +323,7 @@ export async function inviteDevice(session: SignedInSession, input: InviteInput,
     const group = await prisma().group.findUnique({ where: { id: input.groupId }, select: { id: true, kind: true } });
     if (!group) throw new ApiError(404, "not_found", "Group not found.");
     if (group.kind !== GroupKind.family) throw new ApiError(400, "family_group_required", "FamilyFi Me signs in for a person's group, not a group of things.");
-    const { invite, code } = await invitePhone({ clientType: "me", endpointId: endpoint.id, displayName: input.displayName, groupId: group.id, createdByAccountId: session.accountId });
+    const { invite, code } = await invitePhone({ clientType: "me", endpointId: endpoint.id, displayName: input.displayName, groupId: group.id, createdByAccountId: session.accountId, madeByDeviceId: parentDeviceId });
     return inviteBody(invite, code);
   }
   const accountId = input.accountId ?? session.accountId;

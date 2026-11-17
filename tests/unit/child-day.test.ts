@@ -467,6 +467,23 @@ describe("a child's day on the household's clock", () => {
     expect(early.bands.filter((band) => band.kind === "window").map((band) => [band.from, band.to])).toEqual([[23 * 60, 1440]]);
   });
 
+  it("tells a rule that blocks all internet all the time, never \"Nothing is blocked\"", () => {
+    const blocked = me({ windows: [bedtime([1])], alwaysOn: [{ ruleId: "r2", name: "No internet", kind: "internet" }, { ruleId: "r3", name: "Games", kind: "category" }] });
+    const { subject, now, clock: day } = meDaySubject(blocked, MONDAY_NIGHT);
+    expect(subject.always).toEqual(["No internet"]);
+    const story = tellDay(subject, now, PHONE_VOICE, day);
+    expect(story.day).toEqual({ kind: "always", label: "No internet" });
+    expect(topAnswer(story)).toMatchObject({ title: "No internet", sentence: "No internet is on all the time." });
+    expect(story.items.map((item) => [item.title, item.detail])).toEqual([["No internet", "All the time"]]);
+    expect(story.bands).toEqual([{ kind: "window", from: 0, to: 1440, label: "No internet", source: "All the time" }]);
+    const thing = tellDay(subject, now, THING_VOICE, day);
+    expect(thingTile(thing)).toEqual({ word: "No internet", line: "All the time", tone: "window" });
+    expect(thingNote(thing)).toBe("No internet all the time.");
+    // A category rule alone leaves the internet on.
+    const games = meDaySubject(me({ alwaysOn: [{ ruleId: "r3", name: "Games", kind: "category" }] }), MONDAY_NIGHT);
+    expect(games.subject.always).toBeUndefined();
+  });
+
   it("tells nothing of a window a parent lifted for the whole of it", () => {
     // Bedtime lifted until 9 AM tomorrow; it is 7 PM.
     const lifted = { ...bedtime([1]), allowed: { by: "Dad", until: "2026-11-17T14:00:00Z" } };
