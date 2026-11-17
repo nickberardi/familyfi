@@ -233,7 +233,9 @@ export async function deleteGroup(id: string) {
   await prisma().rule.deleteMany({ where: { id: { in: rules.map((r) => r.id) } } });
   await prisma().$transaction(async (db) => {
     // A child's phone signs in for this group alone, so it is signed out with it. Revoked, not
-    // deleted, so its record and history stay; the group link then clears.
+    // deleted, so its record and history stay; the group link then clears. The row is locked first: a
+    // claim in flight holds it FOR SHARE, so the revoke waits for its device; a later claim finds no group.
+    await db.$queryRaw`SELECT "id" FROM "Group" WHERE "id" = ${id} FOR UPDATE`;
     await revokeGroupDevices(id, db as never);
     await db.group.delete({ where: { id } });
   });

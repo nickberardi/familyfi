@@ -3428,7 +3428,7 @@ components:
           additionalProperties: false
           required: [by, since, until]
           properties:
-            by: { type: [string, "null"], description: "Who paused it, as they were named then." }
+            by: { type: [string, "null"], description: "Who paused it, as they were named then; null when FamilyFi recorded no person or the recovery account did." }
             since: { type: string, format: date-time, description: "When the pause was last set: started, or extended." }
             until: { type: [string, "null"], format: date-time, description: Null until a parent ends it. }
         allowance:
@@ -3437,7 +3437,7 @@ components:
           additionalProperties: false
           required: [by, until]
           properties:
-            by: { type: [string, "null"] }
+            by: { type: [string, "null"], description: "Who allowed it, as they were named then; null when FamilyFi recorded no person or the recovery account did." }
             until: { type: [string, "null"], format: date-time }
         windows:
           type: array

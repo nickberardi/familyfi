@@ -220,7 +220,8 @@ export async function claimInvite(input: { id: string; token: string; displayNam
     const claimed = await db.pairing.updateMany({ where: { id: invite.id, claimedAt: null, expiresAt: { gt: now } }, data: { claimedAt: now } });
     if (claimed.count !== 1) return null;
     // A child's phone's group may have gone since the invite was read. Holding its row until the device is
-    // made keeps a deletion from slipping in between; one that already happened voids the invite.
+    // made makes deleteGroup, which locks it FOR UPDATE before revoking, wait and then revoke this device;
+    // a deletion that already happened voids the invite.
     if (signer.group) {
       const held = await db.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Group" WHERE "id" = ${signer.group.id} FOR SHARE`;
       if (!held.length) throw new VoidInvite();
