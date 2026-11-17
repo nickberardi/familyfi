@@ -33,7 +33,7 @@ const ARGON2 = {
 export type PublicSession = {
   username: string;
   displayName: string;
-  /** `me`: a child's phone (FamilyFi Me), signed in for its family group rather than as an account. */
+  /** `group`: a child's phone (FamilyFi Me), signed in for its family group rather than as an account. */
   kind: "recovery" | "personal" | "group";
   expiresAt: string;
 };

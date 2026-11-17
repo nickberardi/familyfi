@@ -841,7 +841,8 @@ paths:
       summary: Get a group
       description: |
         A child's phone (`me:askOnly`) reads its own group alone, and any other group is 404 for it.
-        Only a child's phone gets `day`: what its group's people see of it, as FamilyFi Me tells it.
+        It is told no account: every `by` has a null `accountId`, and is null for the recovery
+        account. Its `dohOverrideUrl` is null.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ $ref: "#/components/parameters/GroupId" }]
       responses:
@@ -855,9 +856,6 @@ paths:
                 required: [group]
                 properties:
                   group: { $ref: "#/components/schemas/Group" }
-                  day:
-                    description: Sent only to a child's phone (`me:askOnly`).
-                    allOf: [{ $ref: "#/components/schemas/GroupDay" }]
         "401":
           $ref: "#/components/responses/Error"
         "403": { $ref: "#/components/responses/Error" }
@@ -997,6 +995,10 @@ paths:
         Every rule, household-wide, led by the built-in rules: quarantine (`builtIn: quarantine`),
         then Lock DNS (`builtIn: dns`), then Block countries (`builtIn: countries`).
         `groupId` narrows to the rules covering that group, which leaves quarantine out.
+        A child's phone (`me:askOnly`) gets only the household's own rules that cover its group, each
+        showing that group alone in `groupIds` and `groupPauses`, and no account (every `by` has a
+        null `accountId`, and is null for the recovery account); a `groupId` other than its group is 404. FamilyFi Me builds the child's
+        day from these, its group and the session's time zone.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: groupId
@@ -1019,6 +1021,7 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
     post:
       operationId: createRule
       tags: [Rules]
@@ -3396,82 +3399,6 @@ components:
         expiresAt:
           type: string
           format: date-time
-    GroupDay:
-      description: |
-        A group's day as its people see it: its pause and allowance now, the windows of its
-        internet rules, and the rules that block something all the time. A rule paused or allowed,
-        for everyone or for this group, with no end, blocks nothing and is left out. Scheduled
-        category, app and website rules are not listed yet. People are named, never accounts.
-      type: object
-      additionalProperties: false
-      required: [group, timezone, pause, allowance, windows, alwaysOn]
-      properties:
-        group:
-          type: object
-          additionalProperties: false
-          required: [id, name]
-          properties:
-            id: { type: string }
-            name: { type: string }
-        timezone: { type: string, description: The household's IANA time zone; window times are its wall clock. }
-        pause:
-          type: [object, "null"]
-          description: The group's pause, while it is on.
-          additionalProperties: false
-          required: [by, since, until]
-          properties:
-            by: { type: [string, "null"], description: "Who paused it, as they were named then; null when FamilyFi recorded no person or the recovery account did." }
-            since: { type: string, format: date-time, description: "When the pause was last set: started, or extended. Not when it began; FamilyFi Me draws from it but tells no start." }
-            until: { type: [string, "null"], format: date-time, description: Null until a parent ends it. }
-        allowance:
-          type: [object, "null"]
-          description: The group's allowance, while it lifts its internet windows.
-          additionalProperties: false
-          required: [by, until]
-          properties:
-            by: { type: [string, "null"], description: "Who allowed it, as they were named then; null when FamilyFi recorded no person or the recovery account did." }
-            until: { type: [string, "null"], format: date-time }
-        windows:
-          type: array
-          description: "The windows of the group's scheduled internet rules that are on, in rule then window order, including a rule lifted until a time (see `allowed`)."
-          items:
-            type: object
-            additionalProperties: false
-            required: [ruleId, ruleName, name, days, start, end, allowed]
-            properties:
-              ruleId: { type: string }
-              ruleName: { type: string }
-              name: { type: string, description: The window's own name; empty when it has none. }
-              days: { type: array, items: { type: integer, minimum: 0, maximum: 6 }, description: "The days it starts on, 0 = Sunday." }
-              start: { type: string, description: "HH:mm, household time." }
-              end: { type: string, description: "HH:mm, household time; at or before `start`, the next morning." }
-              allowed:
-                type: [object, "null"]
-                description: "Its rule is lifted for this group until `until`: an allowance, or the rule paused or allowed. Null when it is not; a rule lifted with no end is left out."
-                additionalProperties: false
-                required: [by, until]
-                properties:
-                  by: { type: [string, "null"], description: "Who lifted it, as they were named then; null when FamilyFi recorded no person or the recovery account did." }
-                  until: { type: string, format: date-time }
-        alwaysOn:
-          type: array
-          description: The group's rules that block all the time, leaving out one lifted with no end.
-          items:
-            type: object
-            additionalProperties: false
-            required: [ruleId, name, kind, allowed]
-            properties:
-              ruleId: { type: string }
-              name: { type: string }
-              kind: { type: string, enum: [internet, category, app, domain] }
-              allowed:
-                type: [object, "null"]
-                description: "The rule is lifted for this group until `until`. Null when it is not."
-                additionalProperties: false
-                required: [by, until]
-                properties:
-                  by: { type: [string, "null"], description: "Who lifted it, as they were named then; null when FamilyFi recorded no person or the recovery account did." }
-                  until: { type: string, format: date-time }
     LoginResponse:
       type: object
       additionalProperties: false
@@ -3697,7 +3624,7 @@ components:
         Shortcuts and system controls, reads its session, connection manifest, groups, rules and changes, and pauses, resumes,
         extends, allows, disallows and turns rules on and off (403 `watch_scope` for a Watch beyond
         that, 403 `app_scope` for the app's controls). `me:askOnly`, held by FamilyFi Me on a child's
-        phone, reads its session, connection manifest and its own group and its day (`GET /groups/{id}`), and
+        phone, reads its session, connection manifest, its own group and the rules that cover it, and
         un-pairs itself; beyond that 403 `me_scope`. New scopes may be added.
         `agent:readOnly` reads household state: groups, rules, devices, sync, changes, DNS categories
         and household settings (its timezone). `agent:full` also changes groups, rules and their

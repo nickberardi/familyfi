@@ -263,7 +263,7 @@ the group's name and its `username` names the device, and a paired-device listin
 `group` with `actsAs` null. It has no parent device, since it belongs to its group: re-pairing or
 revoking the phone that invited it leaves it alone.
 
-It reads its own group with `GET /groups/{id}` (any other group is 404 for it), whose `day`, sent only to a child's phone, tells the group's own pause and allowance, the windows of its
+It reads its own group with `GET /groups/{id}` (any other group is 404 for it), the rules that cover it with `GET /rules`, and the time zone with `GET /auth/session`. `groupDayOf` (`src/lib/child-day.ts`) builds its day from them, which tells the group's own pause and allowance, the windows of its
 internet rules (each with the days it starts on, its household-time start and end, and `allowed`
 while its rule is lifted for the group until a time), and the rules that block something all the
 time (with `allowed` too); nothing else in the household. A rule lifted with no end is left out. A `by` is `null` where FamilyFi recorded no person, or the recovery account acted.
@@ -339,7 +339,7 @@ allowlist in [`src/server/device-scope.ts`](../src/server/device-scope.ts), not 
 | `app:rulesOnly` | Its session, connection manifest, groups, rules and changes; the rule and group-rule verbs; revoking itself (403 `watch_scope` for a Watch, `app_scope` for the app's controls, beyond that) |
 | `agent:full` | Household reads and controls; never accounts, UniFi settings, resolvers, household-settings changes or connection management |
 | `agent:readOnly` | Household reads |
-| `me:askOnly` | Its session, connection manifest and its own group and its day (`GET /groups/{id}`); revoking itself (403 `me_scope` beyond that) |
+| `me:askOnly` | Its session, connection manifest and its own group and the rules that cover it (`GET /groups/{id}`, `GET /rules`); revoking itself (403 `me_scope` beyond that) |
 
 A client type holds only the scopes in its row, and a device holding any other allows nothing. A
 phone, tablet or Mac always pairs as `app`, and a Watch and an app's Siri and shortcuts enroll with

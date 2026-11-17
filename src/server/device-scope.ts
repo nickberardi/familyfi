@@ -18,7 +18,7 @@ import { mayHoldScope, type ClientScope } from "@/lib/client-type";
  * - `agent:readOnly`: household reads.
  * - `me:askOnly`: FamilyFi Me on a child's phone (`me`), which signs in for its family group and
  *   never as an account: its session, `GET /connection` for the manifest it needs away from home, its
- *   own group and its day (`GET /groups/{id}`), and un-pairing itself. It reads nothing else in the household.
+ *   own group (`GET /groups/{id}`) and the rules that cover it (`GET /rules`), and un-pairing itself. It reads nothing else in the household.
  *
  * The built-in quarantine rule's switch is the household's quarantine setting, so an `app:rulesOnly` device or an
  * agent may pause, extend and resume it, never switch, edit or delete it.
@@ -28,9 +28,9 @@ import { mayHoldScope, type ClientScope } from "@/lib/client-type";
 const RULE_VERBS = /^\/api\/v1\/rules\/[^/]+\/(pause|resume|extend|allow|disallow|on|off)$/;
 /** The same verbs for one group alone, including its built-in `internet` rule. */
 const GROUP_RULE_VERBS = /^\/api\/v1\/groups\/[^/]+\/rules\/[^/]+\/(pause|resume|extend|allow|disallow)$/;
-/** A group's unblock, which lifts whatever blocks it now, and its end and extend. */
 /** One group (the route answers a child's phone for its own group only). */
 const ONE_GROUP = /^\/api\/v1\/groups\/[^/]+$/;
+/** A group's unblock, which lifts whatever blocks it now, and its end and extend. */
 const GROUP_UNBLOCK = /^\/api\/v1\/groups\/[^/]+\/unblock(\/(end|extend))?$/;
 
 /** The built-in quarantine rule's switch: PATCH, DELETE, on and off. Its other verbs are rule verbs. */
@@ -103,7 +103,7 @@ function agentFull(request: ScopedCall): boolean {
 
 /** `me:askOnly`: the child's own day, and the calls every paired device needs to stay signed in. */
 function meAskOnly({ method, path, deviceId }: ScopedCall): boolean {
-  if (method === "GET") return path === "/api/v1/auth/session" || path === "/api/v1/connection" || ONE_GROUP.test(path);
+  if (method === "GET") return path === "/api/v1/auth/session" || path === "/api/v1/connection" || ONE_GROUP.test(path) || path === "/api/v1/rules";
   return method === "DELETE" && path === `/api/v1/paired/devices/${encodeURIComponent(deviceId)}`;
 }
 

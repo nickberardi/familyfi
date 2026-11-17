@@ -10,9 +10,12 @@ import { GET as currentSession } from "@/app/api/v1/auth/session/route";
 import { GET as connection } from "@/app/api/v1/connection/route";
 import { GET as groups } from "@/app/api/v1/groups/route";
 import { GET as oneGroup } from "@/app/api/v1/groups/[id]/route";
+import { GET as listRules } from "@/app/api/v1/rules/route";
 import { POST as invite } from "@/app/api/v1/paired/invites/route";
 import { DELETE as unpair, GET as pairedDevice } from "@/app/api/v1/paired/devices/[id]/route";
-import { meDaySubject, tellDay, PHONE_VOICE, type GroupDay } from "@/lib/child-day";
+import { groupDayOf, meDaySubject, tellDay, PHONE_VOICE, type GroupDay } from "@/lib/child-day";
+import type { Rule } from "@/lib/rules";
+import type { Group } from "@/lib/types";
 import { prisma } from "@/server/db";
 import { deleteAccount } from "@/server/accounts";
 import { removeAccountDevices, revokeDevice } from "@/server/connection";
@@ -49,9 +52,21 @@ async function pairMe(admin: SessionAuth, groupId: string): Promise<Claim & { se
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
-/** A group and its day, as the phone reads them. */
+/** A group, as the phone reads it. */
 function meDay(auth: SessionAuth, groupId: string) {
   return oneGroup(request(`/api/v1/groups/${groupId}`, { auth }), params(groupId));
+}
+
+/** The rules a child's phone reads. */
+async function childRules(token: string): Promise<Rule[]> {
+  return ((await (await listRules(request("/api/v1/rules", { auth: bearer(token) }))).json()) as { rules: Rule[] }).rules;
+}
+
+/** The day FamilyFi Me builds from its group, its rules and the household's time zone. */
+async function childDay(token: string, groupId: string): Promise<GroupDay> {
+  const group = ((await (await meDay(bearer(token), groupId)).json()) as { group: Group }).group;
+  const { timezone } = (await (await currentSession(request("/api/v1/auth/session", { auth: bearer(token) }))).json()) as { timezone: string };
+  return groupDayOf(group, await childRules(token), timezone, new Date());
 }
 
 describe("FamilyFi Me on a child's phone", () => {
@@ -109,16 +124,16 @@ describe("FamilyFi Me on a child's phone", () => {
     // Another group is not there for it.
     const other = await meDay(bearer(claim.token), sam.id);
     expect(other.status).toBe(404);
+    expect(await errorCode(other)).toBe("not_found");
     const refused = await groups(request("/api/v1/groups", { auth: bearer(claim.token) }));
     expect(refused.status).toBe(403);
     expect(await errorCode(refused)).toBe("me_scope");
     const read = await meDay(bearer(claim.token), group.id);
     expect(read.status).toBe(200);
-    expect(((await read.json()) as { day: GroupDay }).day.group).toEqual({ id: group.id, name: "Emma" });
-    // A parent reads the group without the day.
-    const parent = (await (await meDay(admin, group.id)).json()) as { group: unknown; day?: unknown };
-    expect(parent.group).toBeTruthy();
-    expect(parent.day).toBeUndefined();
+    expect(((await read.json()) as { group: Group }).group).toMatchObject({ id: group.id, name: "Emma" });
+    // Its rules: only its own group's, and no other group's id.
+    const otherRules = await listRules(request(`/api/v1/rules?groupId=${sam.id}`, { auth: bearer(claim.token) }));
+    expect(otherRules.status).toBe(404);
   });
 
   it("tells the group's pause, windows and always-on rules, and leaves out a paused rule", async () => {
@@ -141,8 +156,12 @@ describe("FamilyFi Me on a child's phone", () => {
       data: { name: "Emma paused", kind: RuleKind.internet, mode: RuleMode.always, systemGroupId: group.id, enabled: true, expiresAt: until, blockedByName: "Dad", groups: { create: { groupId: group.id } } },
     });
     const claim = await pairMe(admin, group.id);
-    const day = ((await (await meDay(bearer(claim.token), group.id)).json()) as { day: GroupDay }).day;
+    const rules = await childRules(claim.token);
+    expect(rules.map((rule) => rule.name).sort()).toEqual(["Bedtime", "Games", "Paused rule"]);
+    expect(rules.find((rule) => rule.name === "Bedtime")?.groupIds).toEqual([group.id]);
+    const day = await childDay(claim.token, group.id);
     expect(day.pause).toMatchObject({ by: "Dad", until: until.toISOString() });
+    expect(JSON.stringify(rules)).not.toContain("accountId\":\"");
     expect(day.allowance).toBeNull();
     expect(day.windows).toEqual([expect.objectContaining({ ruleName: "Bedtime", name: "", days: [0, 1, 5], start: "21:00", end: "07:00" })]);
     expect(day.alwaysOn).toEqual([expect.objectContaining({ name: "Games", kind: "category" })]);
@@ -169,7 +188,7 @@ describe("FamilyFi Me on a child's phone", () => {
     const latest = new Date(Date.now() + 2 * 60 * 60_000);
     await prisma().ruleGroup.updateMany({ where: { groupId: group.id, rule: { name: "Bedtime" } }, data: { pauseActive: true, pauseUntil: latest, pauseKind: "allow", pausedByName: "Mom" } });
     const claim = await pairMe(admin, group.id);
-    const day = ((await (await meDay(bearer(claim.token), group.id)).json()) as { day: GroupDay }).day;
+    const day = await childDay(claim.token, group.id);
     expect(day.windows.map((entry) => [entry.ruleName, entry.allowed])).toEqual([
       ["Bedtime", { by: "Mom", until: latest.toISOString() }],
       ["Homework", null],
@@ -184,8 +203,12 @@ describe("FamilyFi Me on a child's phone", () => {
       data: { name: "Emma paused", kind: RuleKind.internet, mode: RuleMode.always, systemGroupId: group.id, enabled: true, blockedByAccountId: recovery.id, blockedByName: "Recovery admin", groups: { create: { groupId: group.id } } },
     });
     const claim = await pairMe(admin, group.id);
-    const day = ((await (await meDay(bearer(claim.token), group.id)).json()) as { day: GroupDay }).day;
+    const day = await childDay(claim.token, group.id);
     expect(day.pause).toMatchObject({ by: null, until: null });
+    // Nor does the group it reads name an account.
+    const read = ((await (await meDay(bearer(claim.token), group.id)).json()) as { group: Group }).group;
+    expect(read.suspension.by).toBeNull();
+    expect(JSON.stringify(read)).not.toContain(recovery.id);
   });
 
   it("names no one for an allowance the recovery account gave", async () => {
@@ -200,7 +223,7 @@ describe("FamilyFi Me on a child's phone", () => {
       },
     });
     const claim = await pairMe(admin, group.id);
-    const day = ((await (await meDay(bearer(claim.token), group.id)).json()) as { day: GroupDay }).day;
+    const day = await childDay(claim.token, group.id);
     expect(day.allowance).toMatchObject({ by: null });
   });
 

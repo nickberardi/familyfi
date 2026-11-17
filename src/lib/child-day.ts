@@ -1,5 +1,7 @@
 import type { TimelineBand } from "@/lib/day-timeline";
 import { daysLabel, formatHhmm } from "@/lib/display";
+import { groupLift, rulePaused, type Rule, type RulePause } from "@/lib/rules";
+import type { Actor, Group } from "@/lib/types";
 import {
   isWindowActive,
   localWeekday,
@@ -263,7 +265,7 @@ function onDay(day: DayClock) {
 }
 
 /**
- * A child's own day as FamilyFi reads it (`day` in `GET /api/v1/groups/{id}`): the group the phone signs in for,
+ * A child's own day as FamilyFi reads it (`groupDayOf`, from `GET /groups/{id}` and `GET /rules`): the group the phone signs in for,
  * the household's time zone, the group's pause and allowance now, the windows of its internet rules
  * (`days` are the days a window starts on, 0 = Sunday; `start` and `end` are the household's
  * HH:mm, and an end at or before the start is the next morning), and the rules that block
@@ -272,13 +274,51 @@ function onDay(day: DayClock) {
 export type GroupDay = {
   group: { id: string; name: string };
   timezone: string;
-  /** `since` is when the pause was last set (started, or extended), not when it began: it places the band, and no start is told. `until` null: until a parent ends it. */
-  pause: { by: string | null; since: string; until: string | null } | null;
+  /** `since`, when known, is when the pause was last set (started, or extended), not when it began: it places the band, and no start is told; without it the band starts now. `until` null: until a parent ends it. */
+  pause: { by: string | null; since?: string; until: string | null } | null;
   allowance: { by: string | null; until: string | null } | null;
   /** `allowed`: the window's rule is lifted for this group until a time (an allowance, or a rule paused or allowed). */
   windows: { ruleId: string; ruleName: string; name: string; days: number[]; start: string; end: string; allowed: { by: string | null; until: string } | null }[];
   alwaysOn: { ruleId: string; name: string; kind: "internet" | "category" | "app" | "domain"; allowed: { by: string | null; until: string } | null }[];
 };
+
+/**
+ * A child's own day from what FamilyFi Me reads: its group (`GET /groups/{id}`), the rules that cover
+ * it (`GET /rules`, which a child's phone gets for its own group alone) and the household's time zone
+ * (`GET /auth/session`). The group's pause and allowance, the windows of its internet rules that are
+ * on, and the rules that block something all the time. A rule paused or allowed, for everyone or for
+ * this group, blocks nothing while it is lifted: a scheduled internet rule lifted until a time keeps
+ * its windows, marked `allowed` until then, so the child is told when they come back, and an
+ * always-on rule lifted until a time is marked the same way; one lifted with no end is left out.
+ * FamilyFi names no person for the recovery account to a child's phone, so a `by` it sends as null
+ * stays unnamed.
+ */
+export function groupDayOf(group: Pick<Group, "id" | "name" | "suspension" | "allowance">, rules: Rule[], timezone: string, now: Date): GroupDay {
+  const name = (by: Actor) => by?.name ?? null;
+  // How long a rule is lifted for this group, for everyone or for it alone: the later end, null when
+  // it has none; undefined when it is not lifted.
+  const liftOf = (rule: Rule): RulePause | null | undefined => {
+    const lifts = [rulePaused(rule, now) ? rule.pause : null, groupLift(rule, group.id, now)].filter((lift): lift is RulePause => lift !== null);
+    if (!lifts.length) return undefined;
+    if (lifts.some((lift) => lift.until === null)) return null;
+    return lifts.reduce((a, b) => (new Date(a.until!).getTime() >= new Date(b.until!).getTime() ? a : b));
+  };
+  const allowedOf = (lift: RulePause | undefined) => (lift ? { by: name(lift.by), until: lift.until! } : null);
+  const own = rules.filter((rule) => rule.enabled && rule.builtIn === null && (rule.groupIds ?? []).includes(group.id) && liftOf(rule) !== null);
+  return {
+    group: { id: group.id, name: group.name },
+    timezone,
+    pause: group.suspension.active ? { by: name(group.suspension.by), until: group.suspension.until } : null,
+    allowance: group.allowance.active ? { by: name(group.allowance.by), until: group.allowance.until } : null,
+    windows: own
+      .filter((rule) => rule.kind === "internet" && rule.mode === "scheduled")
+      .flatMap((rule) => {
+        const allowed = allowedOf(liftOf(rule) ?? undefined);
+        return (rule.windows ?? []).map((window) => ({ ruleId: rule.id, ruleName: rule.name, name: window.name, days: [...window.days].sort((a, b) => a - b), start: window.start, end: window.end, allowed }));
+      }),
+    alwaysOn: own.filter((rule) => rule.mode === "always").map((rule) => ({ ruleId: rule.id, name: rule.name, kind: rule.kind, allowed: allowedOf(liftOf(rule) ?? undefined) })),
+  };
+}
 
 function minutesOfHhmm(value: string): Clock {
   const [hours, minutes] = value.split(":").map(Number);
@@ -303,7 +343,7 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
       ...(window.allowed ? { allowed: { ...(window.allowed.by ? { by: window.allowed.by } : {}), until: minutesOf(window.allowed.until) } } : {}),
     };
   });
-  const since = me.pause ? Math.min(minutesOf(me.pause.since), minutes) : 0;
+  const since = me.pause ? Math.min(me.pause.since ? minutesOf(me.pause.since) : minutes, minutes) : 0;
   const pause = me.pause
     ? {
         ...(me.pause.by ? { by: me.pause.by } : {}),
