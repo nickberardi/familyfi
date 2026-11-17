@@ -178,10 +178,19 @@ test("a child's ask for time off a rule offers what they asked, the window's end
     await sheet.getByRole("button", { name: /^For…/ }).click();
     await expect(sheet.getByRole("button", { name: "Allow", exact: true })).toBeVisible();
     await shot(page, "rule-ask-sheet-for");
-    await page.emulateMedia({ colorScheme: "dark" });
-    await shot(page, "rule-ask-sheet-dark");
-    await page.emulateMedia({ colorScheme: "light" });
     await sheet.getByRole("button", { name: "Cancel" }).click();
+
+    // Allow as asked is the rule's own allow with the ask's id. The ask here is the test's, so the
+    // server gets the same allow for 30 minutes without it.
+    const allowed: unknown[] = [];
+    await page.route(`**/api/v1/groups/${group.id}/rules/${ruleId}/allow`, async (route) => {
+      allowed.push(route.request().postDataJSON());
+      await route.continue({ postData: JSON.stringify({ until: new Date(Date.now() + 30 * 60_000).toISOString() }) });
+    });
+    await page.getByTestId(`group-ask-${group.id}`).click();
+    await page.getByRole("dialog", { name: "Cassie asked for 30 minutes off Browser bedtime" }).getByRole("button", { name: /^Allow 30 minutes/ }).click();
+    await expect.poll(() => allowed).toEqual([{ askId: "ask-browser" }]);
+    await expect(page.getByText(/^Browser bedtime is off for Cassie until/).filter({ visible: true })).toBeVisible();
   } finally {
     await page.request.delete(`/api/v1/rules/${ruleId}`, { headers });
   }
@@ -213,7 +222,13 @@ test("a family member's FamilyFi Me phone is listed on their page and can be rev
     const body = (await response.json()) as { devices: unknown[] };
     await route.fulfill({ response, json: { devices: revoked.length ? body.devices : [phone, ...body.devices] } });
   });
+  let refuse = true;
   await page.route(`**/api/v1/paired/devices/${phone.id}`, async (route) => {
+    // The first revoke fails, and its message stays after the list reloads.
+    if (refuse) {
+      refuse = false;
+      return route.fulfill({ status: 409, json: { error: { code: "conflict", message: "That phone couldn't be revoked." } } });
+    }
     revoked.push(route.request().method());
     await route.fulfill({ json: {} });
   });
@@ -222,13 +237,21 @@ test("a family member's FamilyFi Me phone is listed on their page and can be rev
   await expect(card).toContainText("Cassie's phone");
   await expect(card).toContainText("Asks only");
   await expect(card).toContainText("For Cassie");
+  // With remote access off, the card says why Pair FamilyFi Me is off, phones listed or not.
+  await expect(card.getByRole("button", { name: "Pair FamilyFi Me" })).toBeDisabled();
+  await expect(card).toContainText("Turn on remote access");
   await card.scrollIntoViewIfNeeded();
   await shot(page, "child-phones-listed");
   await expectAccessible(page, "a family member's FamilyFi Me phones");
   await card.getByRole("button", { name: "Revoke" }).click();
+  const reloaded = page.waitForResponse((response) => /\/api\/v1\/paired\/devices(\?.*)?$/.test(response.url()) && response.request().method() === "GET");
+  await answerConfirm(page);
+  await reloaded;
+  await expect(page.getByRole("alert").filter({ hasText: "That phone couldn't be revoked." })).toBeVisible();
+  await card.getByRole("button", { name: "Revoke" }).click();
   await expect(page.getByTestId("confirm-dialog")).toBeVisible();
   await shot(page, "child-phone-revoke");
-  expect(await answerConfirm(page)).toBe("Revoke Cassie's phone? FamilyFi Me on it is signed out now. It stops showing their rules and can't ask for more time until it is paired again.");
+  expect(await answerConfirm(page)).toBe("Revoke Cassie's phone? FamilyFi Me on it signs out now and stops showing Cassie's rules or asking for more time until it is paired again.");
   expect(revoked).toEqual(["DELETE"]);
   await expect(card).not.toContainText("Cassie's phone");
 });

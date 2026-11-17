@@ -25,7 +25,7 @@ export const PAIR_COPY = {
   loadFailed: "Could not load remote access.",
   actionFailed: "That didn't work.",
   paired: "Paired devices",
-  pairedSub: "Apps, Watches, agents and what they set up; revoke any one of them",
+  pairedSub: "Apps, Watches, agents, FamilyFi Me and what they set up; revoke any one of them",
   noPhones: "No paired devices yet. Pair a device or connect an agent to add one.",
   remoteFirst: "Turn on remote access, then pair a device. Agents connect over the home network.",
   remoteFirstPhones: "Turn on remote access, then pair a device.",
@@ -117,7 +117,7 @@ export function publishedRoute(tunnel: Pick<RemoteAccess, "endpointId"> | null, 
 }
 
 /** Revoking a phone also revokes the Watches, phones and agents it paired. */
-export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "clientType">>) {
+export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "clientType" | "group">>) {
   const kind = phone.clientType ? { clientType: phone.clientType } : null;
   // Nothing pairs an app's Siri and shortcuts again: the app sets them up itself when it next opens.
   if (kind && isAppControls(kind)) {
@@ -126,7 +126,7 @@ export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<
   if (phone.clientType === "me") {
     return {
       title: `Revoke ${phone.displayName}?`,
-      message: "FamilyFi Me on it is signed out now. It stops showing their rules and can't ask for more time until it is paired again.",
+      message: `FamilyFi Me on it signs out now and stops showing ${phone.group ? `${phone.group.name}'s` : "their"} rules or asking for more time until it is paired again.`,
       confirmLabel: PAIR_COPY.revoke,
     };
   }

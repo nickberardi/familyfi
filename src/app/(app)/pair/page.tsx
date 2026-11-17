@@ -48,9 +48,6 @@ export default function PairDevicePage() {
               {PAIR_COPY.connectAgent}
             </button>
             {/* Phones pair through the published route, so there is nothing to pair through while remote access is Off. */}
-            <button type="button" className={SECONDARY_BUTTON} disabled={!canPair} title={canPair ? undefined : PAIR_COPY.remoteFirstPhones} onClick={() => setPairing("me")} data-testid="pair-me">
-              {PAIR_COPY.pairMe}
-            </button>
             <button type="button" className={PRIMARY_BUTTON} disabled={!canPair} title={canPair ? undefined : PAIR_COPY.remoteFirstPhones} onClick={() => setPairing("app")}>
               {PAIR_COPY.pairPhone}
             </button>
@@ -89,6 +86,7 @@ export default function PairDevicePage() {
             if (!(await askConfirm({ ...removeAllConfirm(count), destructive: true }))) return;
             void run(() => removeRevokedPhones(request));
           }}
+          onPairMe={() => setPairing("me")}
         />
       </div>
 

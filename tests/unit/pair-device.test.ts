@@ -278,7 +278,7 @@ describe("FamilyFi Me on a child's phone", () => {
   });
 
   it("says what revoking takes from the child", () => {
-    expect(revokeConfirm(child()).message).toBe("FamilyFi Me on it is signed out now. It stops showing their rules and can't ask for more time until it is paired again.");
+    expect(revokeConfirm(child()).message).toBe("FamilyFi Me on it signs out now and stops showing Emma's rules or asking for more time until it is paired again.");
   });
 
   it("invites with its family group and no account", async () => {
