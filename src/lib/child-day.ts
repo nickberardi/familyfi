@@ -36,10 +36,10 @@ export type DaySign = "pause" | "window" | "allowed" | "morning" | "waiting" | "
 /**
  * `by` is who paused, as they were named then; absent when FamilyFi did not record a person.
  * `open`: the pause has no end time (it lasts until a parent ends it); `to` is then only where its
- * band stops drawing, and no time is told. `earlier`: it was set before today, so `from` (0) is no
- * time it started.
+ * band stops drawing, and no time is told. `from` only places its band: FamilyFi knows when a pause
+ * was last set, not when it began, so no start is told.
  */
-export type DayPause = { by?: string; from: Clock; to: Clock; open?: boolean; earlier?: boolean };
+export type DayPause = { by?: string; from: Clock; to: Clock; open?: boolean };
 
 /** What a pause with no end time says where a time would go. */
 export const NO_END_TIME = "No end time";
@@ -49,10 +49,9 @@ function pauseUntil(pause: DayPause): string {
   return pause.open ? NO_END_TIME : `Until ${clock(pause.to)}`;
 }
 
-/** A pause's times, where a band's would go: "5 PM until 6 PM", "From 5 PM", or only its end when it began before today. */
+/** A pause band's times, mid-sentence: only its end ("until 6 PM", "no end time"), never a start. */
 function pauseTimes(pause: DayPause, to = pause.to): string {
-  if (pause.earlier) return to === pause.to ? pauseUntil(pause) : `Until ${clock(to)}`;
-  return pause.open && to === pause.to ? `From ${clock(pause.from)}` : `${clock(pause.from)} until ${clock(to)}`;
+  return pause.open && to === pause.to ? "no end time" : `until ${clock(to)}`;
 }
 export type AskLength = 15 | 30 | 60;
 /**
@@ -219,27 +218,39 @@ function onDay(day: DayClock) {
     const end = windowEndsAt(spec(window), at(now), day.timeZone);
     return end ? minutesOf(end) : window.to;
   };
-  const windowBands = (windows: DayWindow[]): TimelineBand[] => {
+  // A window a parent lifted until a time blocks only after then: a band still to come starts there,
+  // and is gone when the lift covers it. A band already over stays as it was.
+  const windowBands = (windows: DayWindow[], now: Clock): TimelineBand[] => {
     const weekday = localWeekday(at(12 * 60), day.timeZone);
     return windows.flatMap((window) =>
-      windowDayBands(spec(window), weekday).map(({ from, to }): TimelineBand => ({
-        kind: "window",
-        from,
-        to,
-        label: window.label,
-        source: daysLabel(window.days ?? EVERY_DAY),
-      })),
+      windowDayBands(spec(window), weekday).flatMap(({ from, to }): TimelineBand[] => {
+        const start = window.allowed && to > now ? Math.max(from, Math.min(window.allowed.until, to)) : from;
+        return start < to ? [{ kind: "window", from: start, to, label: window.label, source: daysLabel(window.days ?? EVERY_DAY) }] : [];
+      }),
     );
   };
-  /** The first window that starts at or after `after` and before midnight. */
+  /**
+   * The first window that blocks at or after `after` and before midnight, as that occurrence runs today:
+   * one a parent lifted past its start starts when the lift ends, and one the lift covers is skipped.
+   */
   const firstWindowFrom = (windows: DayWindow[], after: Clock): DayWindow | undefined =>
     windows
-      .map((window) => {
-        const start = nextWindowStart(spec(window), at(after - 1 / 60_000), day.timeZone);
-        return start ? { window, from: minutesOf(start) } : undefined;
+      .flatMap((window) => {
+        let from = after;
+        // A window's next start, then the one after it while a lift covers the whole occurrence.
+        for (let step = 0; step < 8; step++) {
+          const found = nextWindowStart(spec(window), at(from - 1 / 60_000), day.timeZone);
+          if (!found) return [];
+          const start = minutesOf(found);
+          const end = start + (window.to - window.from);
+          const lifted = window.allowed && window.allowed.until > start ? Math.min(window.allowed.until, end) : start;
+          if (lifted < end) return [{ ...window, from: lifted, to: end }];
+          from = end;
+        }
+        return [];
       })
-      .filter((found): found is { window: DayWindow; from: Clock } => !!found && found.from < 1440)
-      .sort((a, b) => a.from - b.from)[0]?.window;
+      .filter((found) => found.from < 1440)
+      .sort((a, b) => a.from - b.from)[0];
   return { inWindow, endOf, windowBands, firstWindowFrom };
 }
 
@@ -253,7 +264,7 @@ function onDay(day: DayClock) {
 export type MeDay = {
   group: { id: string; name: string };
   timezone: string;
-  /** `since` is when the pause was last set: started, or extended. `until` null: until a parent ends it. */
+  /** `since` is when the pause was last set (started, or extended), not when it began: it places the band, and no start is told. `until` null: until a parent ends it. */
   pause: { by: string | null; since: string; until: string | null } | null;
   allowance: { by: string | null; until: string | null } | null;
   /** `allowed`: the window's rule is lifted for this group until a time (an allowance, or a rule paused or allowed). */
@@ -288,8 +299,8 @@ export function meDaySubject(me: MeDay, now: Date): { subject: DaySubject; now: 
   const pause = me.pause
     ? {
         ...(me.pause.by ? { by: me.pause.by } : {}),
-        // A pause set before today is drawn from midnight and tells no start.
-        ...(since < 0 ? { from: 0, earlier: true } : { from: since }),
+        // A pause set before today is drawn from midnight.
+        from: Math.max(0, since),
         ...(me.pause.until ? { to: minutesOf(me.pause.until) } : { to: 1440, open: true }),
       }
     : undefined;
@@ -311,7 +322,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   });
   const windowItem = (next: DayWindow) =>
     later({
-      time: clock(startsAt(next)),
+      time: clock(next.from),
       tone: "window",
       sign: "window",
       window: next,
@@ -402,7 +413,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     return item;
   };
 
-  const bands = windowBands(subject.windows);
+  const bands = windowBands(subject.windows, now);
   let day: Day;
   let items: DayItem[];
   let story = ask;
@@ -458,7 +469,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
           tone: "paused",
           sign: "pause",
           title: pause.by ? `${voice.pauseWord} by ${pause.by}` : voice.pauseWord,
-          detail: pause.open ? (pause.earlier ? NO_END_TIME : `Since ${clock(pause.from)}, with no end time`) : pauseTimes(pause),
+          detail: pauseUntil(pause),
         },
         false,
       ),
@@ -543,7 +554,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
         tone: "on",
         sign: "allowed",
         title: "Not blocked",
-        detail: next ? `Until ${clock(startsAt(next))}` : "All day",
+        detail: next ? `Until ${clock(next.from)}` : "All day",
       },
       ...(next ? [windowItem(next)] : []),
     ];
@@ -616,8 +627,8 @@ export function topAnswer({ day, voice }: DayStory): TopAnswer {
       return {
         sign: "allowed",
         tone: "on",
-        title: day.next ? `Not blocked until ${clock(startsAt(day.next))}` : "Not blocked",
-        sentence: `${day.by} unpaused ${voice.whose}.${day.next ? ` ${day.next.label} starts at ${clock(startsAt(day.next))}.` : ""}`,
+        title: day.next ? `Not blocked until ${clock(day.next.from)}` : "Not blocked",
+        sentence: `${day.by} unpaused ${voice.whose}.${day.next ? ` ${day.next.label} starts at ${clock(day.next.from)}.` : ""}`,
       };
     case "extended":
       return {
@@ -631,14 +642,9 @@ export function topAnswer({ day, voice }: DayStory): TopAnswer {
         sign: "allowed",
         tone: "on",
         title: "Nothing is blocked",
-        sentence: day.next ? `${day.next.label} starts at ${clock(startsAt(day.next))}.` : "Nothing is planned for today.",
+        sentence: day.next ? `${day.next.label} starts at ${clock(day.next.from)}.` : "Nothing is planned for today.",
       };
   }
-}
-
-/** When a window next starts: later than its own start when a parent lifted it past then. */
-function startsAt(window: DayWindow): Clock {
-  return window.allowed && window.allowed.until > window.from && window.allowed.until < window.to ? window.allowed.until : window.from;
 }
 
 /** "Dad said yes to 30 more minutes.", "Dad said yes.", or with no name "Bedtime is off for now." */
@@ -670,7 +676,7 @@ export function thingTile({ day, ask }: DayStory): {
   // Unpaused or open: nothing blocks it now.
   return {
     word: "Not blocked",
-    line: day.next ? `Until ${clock(startsAt(day.next))}` : "All day",
+    line: day.next ? `Until ${clock(day.next.from)}` : "All day",
     tone: "on",
   };
 }
@@ -689,7 +695,7 @@ export function thingNote({ day, ask, items }: DayStory): string {
   if (ask?.state === "waiting" && blocked) return `${blocked}. Waiting for an answer.`;
   if (blocked) return `${blocked}.`;
   if (day.kind === "extended") return `Allowed until ${clock(day.until)}.`;
-  return "next" in day && day.next ? `Not blocked until ${clock(startsAt(day.next))}.` : "Not blocked today.";
+  return "next" in day && day.next ? `Not blocked until ${clock(day.next.from)}.` : "Not blocked today.";
 }
 
 /** The short line beside "See my day" while a request waits, or after a no until the child can ask again. */
