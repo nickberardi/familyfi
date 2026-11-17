@@ -40,7 +40,7 @@ export function SetupScreen({
   step: SetupProgressStep;
   title?: string;
   body?: string;
-  /** The smaller body text of the paste step. */
+  /** The paste step's muted body text: the floor keeps it at 14, the same size as body. */
   dense?: boolean;
   onBack?: () => void;
   /** Welcome: the content centred on the screen, `footer` at the bottom. */

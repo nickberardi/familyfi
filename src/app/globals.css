@@ -225,7 +225,8 @@
    * A phone's setup steps (`src/ui/SetupScreen.tsx`) draw on `deep` whatever the
    * appearance, as the apps' first screens always have: the progress track, iOS's
    * disabled prominent button and its ink, the cyan wash behind a tinted button, a
-   * faint well and the white entry field.
+   * faint well, the white entry field, the primary button (the accent) and error
+   * text (the dark appearance's danger).
    */
   --ff-brand-setup-button: var(--ff-accent);
   --ff-brand-setup-danger: rgb(255, 128, 120);
