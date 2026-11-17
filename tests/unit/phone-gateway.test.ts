@@ -20,6 +20,13 @@ describe("phone-only gateway rules", () => {
     expect(allowedThroughTunnel("/api/v1/x%2F..%2Fy")).toBe(false);
   });
 
+  it("refuses a backslash anywhere in the path, which Next.js reads as a slash", () => {
+    for (const path of ["/api/v1\\..\\..\\login", "/api/v1/x\\..\\..\\..\\login", "/api/v1/..\\..\\login", "/api/v1\\groups", "/api/v1/groups\\", "/api/v1/x%5C..%5Clogin"]) {
+      expect(allowedThroughTunnel(path)).toBe(false);
+    }
+    expect(allowedThroughTunnel("/api/v1/groups?q=a\\b")).toBe(true);
+  });
+
   it("drops cookies and client-claimed forwarding, keeps Cloudflare's client address, and marks the call", () => {
     const headers = tunnelHeaders({
       cookie: "familyfi_session=abc",
@@ -109,6 +116,12 @@ describe("phone-only gateway", () => {
   it("never reaches the app for a page", async () => {
     const before = seen.length;
     expect((await get("/login")).status).toBe(404);
+    expect(seen.length).toBe(before);
+  });
+
+  it("never reaches the app for a path with a backslash", async () => {
+    const before = seen.length;
+    expect((await get("/api/v1/x\\..\\..\\..\\login")).status).toBe(404);
     expect(seen.length).toBe(before);
   });
 });
