@@ -32,6 +32,7 @@ export type IconName =
   | "copy"
   | "arrow-square-out"
   | "plus"
+  | "caret-left"
   | "caret-up"
   | "caret-down"
   | "caret-right"

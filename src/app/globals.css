@@ -222,6 +222,22 @@
   --ff-brand-on-deep-2: #7e849a;
 
   /*
+   * A phone's setup steps (`src/ui/SetupScreen.tsx`) draw on `deep` whatever the
+   * appearance, as the apps' first screens always have: the progress track, iOS's
+   * disabled prominent button and its ink, the cyan wash behind a tinted button, a
+   * faint well, the white entry field, the primary button (the accent) and error
+   * text (the dark appearance's danger).
+   */
+  --ff-brand-setup-button: var(--ff-accent);
+  --ff-brand-setup-danger: rgb(255, 128, 120);
+  --ff-brand-setup-track: rgba(255, 255, 255, 0.18);
+  --ff-brand-setup-disabled: rgba(118, 118, 128, 0.24);
+  --ff-brand-setup-disabled-ink: rgba(235, 235, 245, 0.3);
+  --ff-brand-setup-tint: rgba(3, 160, 239, 0.16);
+  --ff-brand-setup-well: rgba(255, 255, 255, 0.06);
+  --ff-brand-setup-field: #ffffff;
+
+  /*
    * Motion. State flips are instant and everything else is near-instant: the gateway
    * is the slow part, never the interface. Nothing bounces and nothing slides in
    * decoratively.
