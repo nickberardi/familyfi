@@ -10,7 +10,10 @@ import {
   thingTile,
   topAnswer,
   askNote,
+  householdDay,
+  meDaySubject,
   type DaySubject,
+  type MeDay,
 } from "@/lib/child-day";
 
 const BEDTIME = { label: "Bedtime", from: 21 * 60, to: 31 * 60 };
@@ -360,5 +363,64 @@ describe("a child's day", () => {
       ["6 PM", "Evening", "Until 7 PM"],
       ["7 PM", "Not blocked", "For the rest of today"],
     ]);
+  });
+});
+
+describe("a child's day on the household's clock", () => {
+  const ZONE = "America/New_York";
+  // Monday 16 November 2026, 10:30 PM in New York (UTC-5).
+  const MONDAY_NIGHT = new Date("2026-11-17T03:30:00Z");
+  // Tuesday 17 November 2026, 6 AM in New York.
+  const TUESDAY_MORNING = new Date("2026-11-17T11:00:00Z");
+  const me = (patch: Partial<MeDay> = {}): MeDay => ({
+    group: { id: "g1", name: "Emma" },
+    timezone: ZONE,
+    pause: null,
+    allowance: null,
+    windows: [],
+    alwaysOn: [],
+    ...patch,
+  });
+  const bedtime = (days: number[]) => ({ ruleId: "r1", ruleName: "Bedtime", name: "", days, start: "21:00", end: "07:00" });
+
+  it("counts minutes from the household's midnight, whatever the machine's zone", () => {
+    const { clock: day, now } = householdDay(MONDAY_NIGHT, ZONE);
+    expect(now).toBe(22 * 60 + 30);
+    expect(day.midnight.toISOString()).toBe("2026-11-16T05:00:00.000Z");
+    expect(day.timeZone).toBe(ZONE);
+  });
+
+  it("reads a window on the days it starts, including its morning tail", () => {
+    const monday = meDaySubject(me({ windows: [bedtime([1])] }), MONDAY_NIGHT);
+    expect(monday.subject.windows).toEqual([{ label: "Bedtime", from: 21 * 60, to: 31 * 60, days: [1] }]);
+    expect(tellDay(monday.subject, monday.now, PHONE_VOICE, monday.clock).day.kind).toBe("window");
+    const tuesday = meDaySubject(me({ windows: [bedtime([1])] }), TUESDAY_MORNING);
+    expect(tuesday.now).toBe(6 * 60);
+    expect(tellDay(tuesday.subject, tuesday.now, PHONE_VOICE, tuesday.clock).day.kind).toBe("window");
+  });
+
+  it("leaves a window alone on a day it does not start, and says it runs some days", () => {
+    const { subject, now, clock: day } = meDaySubject(me({ windows: [bedtime([2])] }), MONDAY_NIGHT);
+    const story = tellDay(subject, now, PHONE_VOICE, day);
+    expect(story.day).toEqual({ kind: "open", next: undefined });
+    // Its Tuesday occurrence starts on Tuesday, so Monday's bar has none of it.
+    expect(story.bands).toEqual([]);
+    const tuesday = meDaySubject(me({ windows: [bedtime([2])] }), TUESDAY_MORNING);
+    const bands = tellDay(tuesday.subject, tuesday.now, PHONE_VOICE, tuesday.clock).bands;
+    expect(bands.map((band) => band.source)).toEqual(["Some days"]);
+  });
+
+  it("draws a pause from yesterday from where it began, and one with no end to the end of today", () => {
+    const pause = { by: "Dad", since: "2026-11-16T22:00:00Z", until: null };
+    const { subject, now, clock: day } = meDaySubject(me({ pause }), TUESDAY_MORNING);
+    expect(subject.pause).toEqual({ by: "Dad", from: -7 * 60, to: 1440 });
+    expect(tellDay(subject, now, PHONE_VOICE, day).day.kind).toBe("paused");
+  });
+
+  it("names a window by its own name, or else its rule's, and a pause by someone when FamilyFi did not record who", () => {
+    const named = { ...bedtime([1]), name: "School night" };
+    const { subject } = meDaySubject(me({ windows: [named], pause: { by: null, since: "2026-11-17T03:00:00Z", until: "2026-11-17T04:00:00Z" } }), MONDAY_NIGHT);
+    expect(subject.windows[0].label).toBe("School night");
+    expect(subject.pause).toEqual({ by: "A parent", from: 22 * 60, to: 23 * 60 });
   });
 });

@@ -56,7 +56,8 @@ export async function connectionOverview(session: SignedInSession) {
   return {
     endpoints: manifest.endpoints,
     endpointManifest: manifest,
-    unifi: { status: household.connectionStatus, error: household.connectionError, lastSyncAt: lastRun?.finishedAt?.toISOString() ?? lastRun?.startedAt?.toISOString() ?? null },
+    // A child's phone needs the manifest, not the gateway's error text.
+    unifi: { status: household.connectionStatus, error: session.device?.clientType === "me" ? null : household.connectionError, lastSyncAt: lastRun?.finishedAt?.toISOString() ?? lastRun?.startedAt?.toISOString() ?? null },
     lastChange: lastChange ? { id: lastChange.id, scope: lastChange.scope, status: lastChange.status, error: lastChange.error, updatedAt: lastChange.updatedAt.toISOString() } : null,
   };
 }

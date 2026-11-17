@@ -1,4 +1,4 @@
-import { RuleLiftKind, RuleMode } from "@prisma/client";
+import { RuleMode } from "@prisma/client";
 import type { MeDay } from "@/lib/child-day";
 import { prisma } from "./db";
 import { blockRuleOf, groupInclude, lifted, publicGroup } from "./groups";
@@ -6,15 +6,12 @@ import { currentTimezone } from "./household";
 import { ApiError } from "./http";
 import { builtInRule } from "./rules";
 
-function pausedNow(state: { pauseActive: boolean; pauseUntil: Date | null; pauseKind: RuleLiftKind }, now: Date) {
-  return state.pauseKind === RuleLiftKind.pause && lifted(state, now);
-}
-
 /**
  * A child's own day, for FamilyFi Me (`GET /api/v1/me/day`): the group its phone signs in for, and
  * nothing else in the household. Its pause, its allowance, the windows of its internet rules that
- * are on, and the rules that block something all the time. A rule paused for everyone or for this
- * group is left out while it is paused; an allowance is reported as itself, and its windows stay.
+ * are on, and the rules that block something all the time. A rule paused or allowed, for everyone or
+ * for this group, is left out while it is lifted, as the group's own internet windows are
+ * (`internetWindows`); the group's allowance is reported as well.
  */
 export async function childDay(groupId: string | null, now = new Date()): Promise<MeDay> {
   const group = groupId ? await prisma().group.findUnique({ where: { id: groupId }, include: groupInclude }) : null;
@@ -25,8 +22,8 @@ export async function childDay(groupId: string | null, now = new Date()): Promis
   const block = blockRuleOf(group);
   const covering = group.rules
     .filter(({ rule }) => rule.enabled && rule.systemGroupId === null && builtInRule(rule) === null)
-    // A pause lifts a rule; an allowance is the group's own, told by `allowance`.
-    .filter((link) => !pausedNow(link.rule, now) && !pausedNow(link, now))
+    // A rule paused or allowed, for everyone or for this group, blocks nothing while it is lifted.
+    .filter((link) => !lifted(link.rule, now) && !lifted(link, now))
     .map((link) => link.rule)
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   return {

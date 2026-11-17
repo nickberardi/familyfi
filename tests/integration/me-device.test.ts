@@ -66,7 +66,11 @@ describe("FamilyFi Me on a child's phone", () => {
     const session = await currentSession(request("/api/v1/auth/session", { auth: bearer(claim.token) }));
     expect(session.status).toBe(200);
     expect(((await session.json()) as { session: { kind: string } }).session.kind).toBe("me");
-    expect((await connection(request("/api/v1/connection", { auth: bearer(claim.token) }))).status).toBe(200);
+    await prisma().household.update({ where: { id: "default" }, data: { connectionError: "Gateway refused the key" } });
+    const overview = await connection(request("/api/v1/connection", { auth: bearer(claim.token) }));
+    expect(overview.status).toBe(200);
+    // The manifest, never the household's last change or the gateway's error text.
+    expect(await overview.json()).toMatchObject({ lastChange: null, unifi: { error: null } });
     const listed = await pairedDevice(request(`/api/v1/paired/devices/${claim.device.id}`, { auth: admin }), params(claim.device.id));
     expect(((await listed.json()) as { device: { group: unknown; actsAs: unknown } }).device).toMatchObject({ group: { id: group.id, name: "Emma" }, actsAs: null });
   });
@@ -136,6 +140,23 @@ describe("FamilyFi Me on a child's phone", () => {
     expect(tellDay(subject, now, PHONE_VOICE, clock).day.kind).toBe("paused");
   });
 
+  it("leaves out a rule allowed for everyone, or for this group, while it is lifted", async () => {
+    const group = await childGroup();
+    const later = new Date(Date.now() + 60 * 60_000);
+    const window = { create: [{ position: 0, name: "", days: [0, 1, 2, 3, 4, 5, 6], start: "21:00", end: "07:00" }] };
+    await prisma().rule.create({
+      data: { name: "Bedtime", kind: RuleKind.internet, mode: RuleMode.scheduled, pauseActive: true, pauseUntil: later, pauseKind: "allow", groups: { create: { groupId: group.id } }, windows: window },
+    });
+    await prisma().rule.create({
+      data: { name: "Games", kind: RuleKind.category, mode: RuleMode.always, targetIds: [8], groups: { create: { groupId: group.id, pauseActive: true, pauseUntil: later, pauseKind: "allow" } } },
+    });
+    await prisma().rule.create({ data: { name: "Homework", kind: RuleKind.internet, mode: RuleMode.scheduled, groups: { create: { groupId: group.id } }, windows: window } });
+    const claim = await pairMe(admin, group.id);
+    const day = (await (await meDay(request("/api/v1/me/day", { auth: bearer(claim.token) }))).json()) as MeDay;
+    expect(day.windows.map((entry) => entry.ruleName)).toEqual(["Homework"]);
+    expect(day.alwaysOn).toEqual([]);
+  });
+
   it("un-pairs itself, and only itself", async () => {
     const group = await childGroup();
     const first = await pairMe(admin, group.id);
@@ -171,6 +192,7 @@ describe("FamilyFi Me on a child's phone", () => {
     const kept = await childGroup();
     const archive = (await exportHousehold()).archive;
     const keptPhone = await pairMe(admin, kept.id);
+    const waiting = await issuedInvite(await inviteMe(admin, { endpointId: (await homeRoute()).id, groupId: kept.id }));
     const gone = await childGroup("Sam");
     const gonePhone = await pairMe(admin, gone.id);
     await importHousehold("apply", archive, { accountId: (await pairingAdmin()).id });
@@ -179,5 +201,7 @@ describe("FamilyFi Me on a child's phone", () => {
     expect((await meDay(request("/api/v1/me/day", { auth: bearer(keptPhone.token) }))).status).toBe(200);
     const goneDevice = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: gonePhone.device.id } });
     expect(goneDevice.revokedAt).not.toBeNull();
+    // An invite still waiting for a group that came back can still be claimed.
+    expect((await claimInvite(waiting, "iPhone")).status).toBe(200);
   });
 });
