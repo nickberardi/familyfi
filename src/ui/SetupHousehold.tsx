@@ -14,6 +14,7 @@ import {
 } from "@/lib/companion-setup";
 
 import { SETUP } from "./SetupScreen";
+import { PRESS_OPACITY } from "./UIContext";
 
 /**
  * "Is this your household?": what the pairing code said and what the household proved, then what
@@ -72,9 +73,10 @@ function Row({
     <View style={styles.secret}>
       {value}
       <Pressable
-        accessibilityRole="button"
+        role="button"
+        aria-expanded={revealed}
         onPress={onToggle}
-        style={styles.reveal}
+        style={({ pressed }) => [styles.reveal, pressed && { opacity: PRESS_OPACITY }]}
         testID="setup-reveal-key"
       >
         <Text style={styles.revealText}>

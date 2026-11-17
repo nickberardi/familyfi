@@ -18,6 +18,8 @@ export const LIGHT = {
   "brand-deep": "#000a1e",
   "brand-on-deep": "#ffffff",
   "brand-on-deep-2": "#7e849a",
+  "brand-setup-button": "#0066cc",
+  "brand-setup-danger": "rgb(255, 128, 120)",
   "brand-setup-disabled": "rgba(118, 118, 128, 0.24)",
   "brand-setup-disabled-ink": "rgba(235, 235, 245, 0.3)",
   "brand-setup-field": "#ffffff",

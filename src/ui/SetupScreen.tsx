@@ -53,7 +53,8 @@ export function SetupScreen({
   const heading = title ? (
     <View style={[styles.heading, centered && styles.centeredHeading]}>
       <Text
-        accessibilityRole="header"
+        role="heading"
+        aria-level={1}
         style={[
           centered ? styles.welcomeTitle : styles.title,
           centered && styles.center,
@@ -106,7 +107,7 @@ export function SetupScreen({
   );
 }
 
-/** Back (while there is somewhere to go back to) and the four capsules of the setup's progress. */
+/** Back (while there is somewhere to go back to) and one capsule per step of `SETUP_PROGRESS`. */
 function SetupHeader({
   step,
   onBack,
@@ -122,8 +123,8 @@ function SetupHeader({
     <View style={[styles.header, { paddingTop: top + 20 }]}>
       {onBack ? (
         <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={SETUP_ACTIONS.back}
+          role="button"
+          aria-label={SETUP_ACTIONS.back}
           onPress={onBack}
           testID="setup-back"
           style={({ pressed }) => [styles.back, pressed && { opacity: PRESS_OPACITY }]}
@@ -136,14 +137,12 @@ function SetupHeader({
       ) : null}
       <View style={styles.spacer} />
       <View
-        accessibilityRole="progressbar"
-        accessibilityLabel="Setup progress"
-        accessibilityValue={{
-          min: 1,
-          max: SETUP_PROGRESS.length,
-          now: index + 1,
-          text: `Step ${index + 1} of ${SETUP_PROGRESS.length}`,
-        }}
+        role="progressbar"
+        aria-label="Setup progress"
+        aria-valuemin={1}
+        aria-valuemax={SETUP_PROGRESS.length}
+        aria-valuenow={index + 1}
+        aria-valuetext={`Step ${index + 1} of ${SETUP_PROGRESS.length}`}
         style={styles.progress}
       >
         {SETUP_PROGRESS.map((name, at) => (
@@ -169,7 +168,11 @@ function SetupHeader({
 export function SetupButton({
   tone = "cyan",
   ...props
-}: ComponentProps<typeof Button> & { tone?: "cyan" | "white" }) {
+}: Omit<ComponentProps<typeof Button>, "kind"> & {
+  /** The setup ground has inks for these kinds only. */
+  kind?: "primary" | "secondary" | "tinted" | "plain";
+  tone?: "cyan" | "white";
+}) {
   const ui = useUI();
   const kind = props.kind ?? "primary";
   const grey = kind === "primary" && (props.disabled || props.busy);
@@ -234,14 +237,17 @@ export function SetupField({
   );
 }
 
-/** familyfi's brand tokens for setup, which do not change with the appearance. */
+/**
+ * familyfi's brand tokens for setup, read once through `paletteColor`: setup draws on the brand's
+ * deep ground whatever the appearance, so its colours never follow `useUI().color`.
+ */
 export const SETUP = {
   page: paletteColor("light", "brand-deep"),
   ink: paletteColor("light", "brand-on-deep"),
   ink2: paletteColor("light", "brand-on-deep-2"),
   accent: paletteColor("light", "brand-cyan"),
-  button: paletteColor("light", "accent"),
-  danger: paletteColor("dark", "danger"),
+  button: paletteColor("light", "brand-setup-button"),
+  danger: paletteColor("light", "brand-setup-danger"),
   track: paletteColor("light", "brand-setup-track"),
   disabled: paletteColor("light", "brand-setup-disabled"),
   disabledInk: paletteColor("light", "brand-setup-disabled-ink"),
