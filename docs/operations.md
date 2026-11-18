@@ -285,7 +285,7 @@ Release notes say whether anyone checked a block on a real gateway since the las
 
 ### Local release
 
-`scripts/release.sh` publishes a release from your machine, without the runners: it checks that `HEAD` is on `origin/main`, runs the checks and tests of `ci.yml`'s verify job and `container.yml` through `scripts/test.py`, builds and pushes both architectures to GHCR with the same tags, and creates the GitHub Release as a Pre-release naming the image by digest. It never promotes.
+`scripts/release.sh` publishes a release from your machine, without the runners: it checks that `HEAD` is on `origin/main`, runs `ci.yml`'s checks and host tests and `container.yml` through `scripts/test.py`, builds and pushes both architectures to GHCR with the same tags, and creates the GitHub Release as a Pre-release naming the image by digest. It never promotes.
 
 ```bash
 scripts/release.sh --tag vX.Y.Z  # replace with the matching package/spec version
