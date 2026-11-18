@@ -48,7 +48,7 @@ export function asTransport(send: (request: TransportRequest) => Promise<Transpo
  * answered, then the rest in manifest order. A read (or a sign-in,
  * sign-out or session refresh, which change nothing in the household) that finds a route unreachable,
  * or behind a Cloudflare Access wall, moves to the next route; a household write never does, since it
- * may have landed. A refresh that landed unanswered may be sent again: the server honours the token it
+ * may have landed, except on a connection made for a device revoking itself (`failover`). A refresh that landed unanswered may be sent again: the server honours the token it
  * just replaced until the device uses the pair that replaced it. Older servers honoured it only
  * once, within `REFRESH_REUSE_GRACE_MS`, so a refresh still gives up on a route well within that
  * grace, leaving the next route time to use it.
