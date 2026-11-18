@@ -37,6 +37,8 @@ export type PublicSession = {
   /** `group`: a child's phone (FamilyFi Me), signed in for its family group rather than as an account. */
   kind: "recovery" | "personal" | "group";
   expiresAt: string;
+  /** A child's phone (`group`) only: the family group it signs in for, which it reads its day from. */
+  groupId?: string;
 };
 
 export async function hashPassword(password: string): Promise<string> {
@@ -407,13 +409,20 @@ export type SessionView = {
   username: string;
   expiresAt: Date;
   account: { displayName: string; kind: AccountKind } | null;
-  device?: { clientType: string; group?: { name: string } | null } | null;
+  device?: { clientType: string; groupId?: string | null; group?: { id?: string; name: string } | null } | null;
 };
 
 export function toPublicSession(session: SessionView): PublicSession {
   // A child's phone has no account: it is named for the group it signs in for.
   if (session.device?.clientType === "me" && !session.account) {
-    return { username: session.username, displayName: session.device.group?.name ?? "", kind: "group", expiresAt: session.expiresAt.toISOString() };
+    const groupId = session.device.groupId ?? session.device.group?.id;
+    return {
+      username: session.username,
+      displayName: session.device.group?.name ?? "",
+      kind: "group",
+      expiresAt: session.expiresAt.toISOString(),
+      ...(groupId ? { groupId } : {}),
+    };
   }
   return {
     username: session.username,
