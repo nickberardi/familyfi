@@ -636,10 +636,16 @@ describe("a companion session", () => {
 
   it("revokes first over the route that last answered on the device's network", async () => {
     const home = household();
-    const session = await paired(home, home.transport);
-    session.setNetwork({ kind: "cellular" });
+    let lanUp = true;
+    const transport: Transport = async (request) =>
+      !lanUp && request.url.startsWith(LAN.url) ? Promise.reject(new TransportError(new Error("unreachable"))) : home.transport(request);
+    const session = await paired(home, transport);
+    // On Wi-Fi the home route comes first, but the Cloudflare route is the one that last answered.
+    session.setNetwork({ kind: "wifi", key: "10.0.0.0/24" });
+    lanUp = false;
     await session.request("/api/v1/connection");
     expect(session.getState().activeRouteId).toBe(EDGE.id);
+    lanUp = true;
     const before = home.calls.length;
     await session.unpair();
     await settle(() => home.calls.slice(before).some((call) => call.method === "DELETE"));
