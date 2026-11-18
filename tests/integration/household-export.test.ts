@@ -159,7 +159,7 @@ describe("household export", () => {
     const video = await prisma().rule.create({
       data: { name: "TV video", kind: RuleKind.category, mode: RuleMode.always, targetIds: [4], groups: { create: { groupId: built.things.id } } },
     });
-    await prisma().group.update({ where: { id: built.things.id }, data: { blockButtonRuleId: video.id } });
+    await prisma().group.update({ where: { id: built.things.id }, data: { blockButtonRuleId: video.id, kidsCanAsk: true } });
     // Phone alerts belong to this install and its phones: never exported, never imported.
     await prisma().household.update({ where: { id: "default" }, data: { alertsRelayEnabled: true, alertsInstallId: "relay-install-1" } });
     const auth = await recoveryAuth();
