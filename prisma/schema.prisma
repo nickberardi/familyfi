@@ -378,11 +378,16 @@ model Group {
   /// block rule already points the other way; deleting the rule clears it, and a rule that no
   /// longer covers the group reads as all internet.
   blockButtonRuleId String?
+  /// A Things group only: children with FamilyFi Me see it and ask for more time on it. One switch,
+  /// the same for every child.
+  kidsCanAsk       Boolean         @default(false)
   upstreamChecks   UpstreamCheck[]
   /// FamilyFi Me on the child's phones (`me` paired devices), and their invites.
   pairedDevices    PairedDevice[]  @relation("pairedDeviceGroup")
   pairings         Pairing[]       @relation("pairingGroup")
   asks             Ask[]
+  /// The asks this family group's child filed, on itself or on a shared Thing.
+  asksMade         Ask[]           @relation("askFrom")
 }
 
 model Account {
@@ -766,8 +771,12 @@ enum AskState {
 /// ask left waiting closes at `expiresAt`: `ended` when that is the block's end, else `timedOut`.
 model Ask {
   id                  String        @id @default(cuid())
+  /// What the ask is about: the child's own group, or a Things group shared with children.
   groupId             String
   group               Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  /// The child's family group that asked. The same as `groupId` for an ask on the child's own group.
+  fromGroupId         String
+  fromGroup           Group         @relation("askFrom", fields: [fromGroupId], references: [id], onDelete: Cascade)
   deviceId            String?
   device              PairedDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   about               String
@@ -786,5 +795,6 @@ model Ask {
   askAgainAt          DateTime?     @db.Timestamptz(3)
 
   @@index([groupId, createdAt])
+  @@index([fromGroupId, createdAt])
   @@index([state, expiresAt])
 }

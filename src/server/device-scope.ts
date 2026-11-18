@@ -18,8 +18,10 @@ import { mayHoldScope, type ClientScope } from "@/lib/client-type";
  * - `agent:readOnly`: household reads.
  * - `me:askOnly`: FamilyFi Me on a child's phone (`me`), which signs in for its family group and
  *   never as an account: its session, `GET /connection` for the manifest it needs away from home, its
- *   own group (`GET /groups/{id}`) and the rules that cover it (`GET /rules`), un-pairing itself, and telling
- *   its own Screen Time permission (`PATCH /paired/devices/{its id}`). It reads nothing else in the household.
+ *   own group and the Things groups shared with children (`GET /groups`, `GET /groups/{id}`) and the
+ *   rules that cover them (`GET /rules`), asking for more time on those (`POST /groups/{id}/asks`),
+ *   un-pairing itself, and telling its own Screen Time permission (`PATCH /paired/devices/{its id}`).
+ *   It reads nothing else in the household.
  *
  * The built-in quarantine rule's switch is the household's quarantine setting, so an `app:rulesOnly` device or an
  * agent may pause, extend and resume it, never switch, edit or delete it.
@@ -29,7 +31,7 @@ import { mayHoldScope, type ClientScope } from "@/lib/client-type";
 const RULE_VERBS = /^\/api\/v1\/rules\/[^/]+\/(pause|resume|extend|allow|disallow|on|off)$/;
 /** The same verbs for one group alone, including its built-in `internet` rule. */
 const GROUP_RULE_VERBS = /^\/api\/v1\/groups\/[^/]+\/rules\/[^/]+\/(pause|resume|extend|allow|disallow)$/;
-/** One group (the route answers a child's phone for its own group only). */
+/** One group (the route answers a child's phone for its own group and shared Things only). */
 const ONE_GROUP = /^\/api\/v1\/groups\/[^/]+$/;
 /** A child's ask for more time, on a group (`POST /groups/{id}/asks`). */
 const GROUP_ASKS = /^\/api\/v1\/groups\/[^/]+\/asks$/;
@@ -104,10 +106,12 @@ function agentFull(request: ScopedCall): boolean {
   return agentReadOnly(request) || (AGENT_WRITES[request.method] ?? []).some((pattern) => pattern.test(request.path));
 }
 
-/** `me:askOnly`: the child's own day, and the calls every paired device needs to stay signed in. */
+/** `me:askOnly`: the child's own day and shared Things, and the calls every paired device needs to stay signed in. */
 function meAskOnly({ method, path, deviceId }: ScopedCall): boolean {
-  if (method === "GET") return path === "/api/v1/auth/session" || path === "/api/v1/connection" || ONE_GROUP.test(path) || path === "/api/v1/rules";
-  // Asking for more time; the route answers only for the device's own group.
+  if (method === "GET") {
+    return path === "/api/v1/auth/session" || path === "/api/v1/connection" || path === "/api/v1/groups" || ONE_GROUP.test(path) || path === "/api/v1/rules";
+  }
+  // Asking for more time; the route answers only for the device's own group and shared Things.
   if (method === "POST") return GROUP_ASKS.test(path);
   // Un-pairing itself, and telling its Screen Time permission (the route takes only that from it).
   return (method === "DELETE" || method === "PATCH") && path === `/api/v1/paired/devices/${encodeURIComponent(deviceId)}`;

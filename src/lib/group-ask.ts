@@ -5,7 +5,8 @@ import { activeWindowsEnd, ruleInternetWindows, type Rule } from "./rules";
 import type { Group, GroupAsk } from "./types";
 
 /*
- * A child's ask for more time, as a parent sees and answers it on every client. The group's card
+ * A child's ask for more time, as a parent sees and answers it on every client, on the child's own
+ * group or on a Thing shared with children, which names the child who asked. The group's card
  * and page show a waiting ask as one line, which opens the answer sheet: yes as the child asked,
  * yes for another time, or Not now. A yes to unpause is the group's `resume` on `internet`, a yes
  * to time off a rule is the rule's `allow` for the group, each with the ask's `askId`; Not now is
@@ -36,9 +37,12 @@ function ruleOf<R extends Pick<Rule, "id">>(ask: GroupAsk, rules: R[]): R | unde
   return ask.about === "rule" ? rules.find((rule) => rule.id === ask.ruleId) : undefined;
 }
 
-/** What the child asked for: "to be unpaused", "for 30 minutes off Bedtime". */
-function askedFor(ask: GroupAsk, rules: Pick<Rule, "id" | "name">[]): string {
-  if (ask.about === "pause") return "to be unpaused";
+/**
+ * What the child asked for: "to be unpaused", "for 30 minutes off Bedtime". On a shared Thing (`thing`
+ * its name, or "it" on its own card): "to unpause TV".
+ */
+function askedFor(ask: GroupAsk, rules: Pick<Rule, "id" | "name">[], thing?: string): string {
+  if (ask.about === "pause") return thing ? `to unpause ${thing}` : "to be unpaused";
   const name = ruleOf(ask, rules)?.name;
   const length = ask.minutes ? minutesText(ask.minutes) : null;
   // Time off the rule's block, never "of" it, as the alert says.
@@ -49,15 +53,18 @@ function askedFor(ask: GroupAsk, rules: Pick<Rule, "id" | "name">[]): string {
 
 /**
  * The line on the group's card and page while an ask waits, which opens the answer sheet: "Asked
- * to be unpaused", "Asked for 30 minutes off Bedtime". Null with nothing waiting.
+ * to be unpaused", "Asked for 30 minutes off Bedtime". On a shared Thing it names the child who
+ * asked: "Cassie asked to unpause it". Null with nothing waiting.
  */
 export function groupAskLine(group: Pick<Group, "ask">, rules: Pick<Rule, "id" | "name">[], now: Date): string | null {
   const ask = waitingAsk(group, now);
-  return ask ? `Asked ${askedFor(ask, rules)}` : null;
+  if (!ask) return null;
+  return ask.from ? `${ask.from.name} asked ${askedFor(ask, rules, "it")}` : `Asked ${askedFor(ask, rules)}`;
 }
 
+/** The answer sheet's title: "Sam asked to be unpaused"; on a shared Thing "Cassie asked to unpause TV". */
 export function askSheetTitle(group: Pick<Group, "name">, ask: GroupAsk, rules: Pick<Rule, "id" | "name">[]): string {
-  return `${group.name} asked ${askedFor(ask, rules)}`;
+  return ask.from ? `${ask.from.name} asked ${askedFor(ask, rules, group.name)}` : `${group.name} asked ${askedFor(ask, rules)}`;
 }
 
 /**

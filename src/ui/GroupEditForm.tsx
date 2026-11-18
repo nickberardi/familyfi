@@ -12,7 +12,8 @@ import type { GroupEdit } from "./use-group-edit";
 
 /**
  * A group's Edit sheet inside each client's own frame, as the design's "Edit <name>" modal has it:
- * its name, a person's role or a Things group's monogram, what its card's Block button stands for
+ * its name, a person's role or a Things group's monogram, whether kids can ask about a Things
+ * group in FamilyFi Me, what its card's Block button stands for
  * (shown when it has a category, app or website rule), where its category checks reach DNS, and
  * why the last save was refused. Save, Cancel and Delete belong to the frame: the web's dialog
  * footer, the app's navigation bar.
@@ -63,6 +64,15 @@ export function GroupEditForm({
           />
         </EditField>
       )}
+      {group.kind === "things" ? (
+        <View style={styles.toggleRow}>
+          <View style={styles.grow}>
+            <Text style={[styles.label, { fontFamily: ui.font, color: ui.color("ink") }]}>{COPY.kidsCanAsk}</Text>
+            <Text style={note}>{COPY.kidsCanAskHelp(name)}</Text>
+          </View>
+          <ui.Toggle label={COPY.kidsCanAsk} on={draft.kidsCanAsk ?? false} onToggle={() => set({ kidsCanAsk: !draft.kidsCanAsk })} disabled={!enabled} testID="group-kids-can-ask" />
+        </View>
+      ) : null}
       {edit.blockButtonChoices.length > 1 ? (
         <BlockButtonField
           label={COPY.blockButton}
@@ -109,6 +119,9 @@ export function GroupEditForm({
 
 const styles = StyleSheet.create({
   form: { gap: 14 },
+  toggleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  grow: { flex: 1, minWidth: 0, gap: 2 },
+  label: { fontSize: 14, lineHeight: 20, fontWeight: "600" },
   help: { gap: 4 },
   note: { fontSize: 14, lineHeight: 20 },
 });

@@ -65,10 +65,17 @@ export function monogramPlaceholder(name: string): string {
 }
 
 /** `blockButtonRuleId`: the rule the card's Block button blocks, or "" for all internet; absent leaves it as it is. */
-export type GroupEditDraft = { name: string; familyRole: FamilyRole; monogram: string; blockButtonRuleId?: string };
+/** `kidsCanAsk` is a Things group's alone: whether children with FamilyFi Me see it and ask about it. */
+export type GroupEditDraft = { name: string; familyRole: FamilyRole; monogram: string; blockButtonRuleId?: string; kidsCanAsk?: boolean };
 
 export function groupEditDraft(group: Group): GroupEditDraft {
-  return { name: group.name, familyRole: group.familyRole ?? "child", monogram: group.monogram ?? "", blockButtonRuleId: group.blockButtonRuleId ?? "" };
+  return {
+    name: group.name,
+    familyRole: group.familyRole ?? "child",
+    monogram: group.monogram ?? "",
+    blockButtonRuleId: group.blockButtonRuleId ?? "",
+    ...(group.kind === "things" ? { kidsCanAsk: group.kidsCanAsk ?? false } : {}),
+  };
 }
 
 /**
@@ -103,8 +110,10 @@ export function groupEditBody(group: Group, draft: GroupEditDraft) {
     return { name, familyRole: draft.familyRole, ...button };
   }
   const monogram = draft.monogram.trim() || null;
-  if (name === group.name && monogram === (group.monogram ?? null) && !("blockButtonRuleId" in button)) return null;
-  return { name, monogram, ...button };
+  // Like the Block button, sent only when it changes.
+  const sharing = draft.kidsCanAsk === undefined || draft.kidsCanAsk === (group.kidsCanAsk ?? false) ? {} : { kidsCanAsk: draft.kidsCanAsk };
+  if (name === group.name && monogram === (group.monogram ?? null) && !("blockButtonRuleId" in button) && !("kidsCanAsk" in sharing)) return null;
+  return { name, monogram, ...button, ...sharing };
 }
 
 /** Whether a group with no devices is told its rules cannot apply until it has one. */
@@ -158,6 +167,8 @@ export const GROUP_EDIT_COPY = {
   title: (name: string) => `Edit ${name}`,
   blockButton: "Block button default",
   blockButtonAll: "All internet",
+  kidsCanAsk: "Kids can ask",
+  kidsCanAskHelp: (name: string) => `Children with FamilyFi Me on their phone see ${name}, whether it's blocked, and can ask you for more time on it.`,
   blockButtonHelp: (name: string) => `Choose the rule that Unblock on the card lifts for ${name}, with the same timers, and Block puts back. When that rule isn't blocking, Block still blocks all internet.`,
   doh: "DNS-over-HTTPS",
   dohModes: [

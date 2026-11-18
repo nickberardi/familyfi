@@ -809,6 +809,12 @@
         "groups"
       ]
     },
+    "tests/integration/shared-things.test.ts": {
+      "categories": [
+        "pairing",
+        "groups"
+      ]
+    },
     "tests/integration/me-device.test.ts": {
       "categories": [
         "pairing",

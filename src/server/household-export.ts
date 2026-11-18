@@ -115,6 +115,8 @@ const Config = z
         dohOverrideUrl: z.string().nullable(),
         /** Older exports have no Block button default: all internet. */
         blockButtonRuleId: Id.nullable().default(null),
+        /** Older exports share no Things with children. */
+        kidsCanAsk: z.boolean().default(false),
       }),
     ),
     accounts: z.array(
@@ -286,6 +288,7 @@ export async function householdConfig(): Promise<HouseholdConfig> {
       familyRole: group.familyRole,
       dohOverrideUrl: group.dohOverrideUrl,
       blockButtonRuleId: group.blockButtonRuleId,
+      kidsCanAsk: group.kidsCanAsk,
     })),
     accounts: accounts.map((account) => ({
       username: account.username,

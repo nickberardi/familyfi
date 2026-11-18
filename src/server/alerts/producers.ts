@@ -172,7 +172,7 @@ export async function recordSyncBackFor(deviceId: string, now = new Date()): Pro
  * producer it reads and writes nothing on the gateway.
  */
 export async function recordAsk(
-  ask: { groupId: string; groupName: string; about: "pause" | "rule"; ruleName?: string; minutes?: number },
+  ask: { groupId: string; groupName: string; thingName?: string; about: "pause" | "rule"; ruleName?: string; minutes?: number },
   now = new Date(),
 ): Promise<void> {
   try {
@@ -180,6 +180,7 @@ export async function recordAsk(
     const detail: AskData = {
       g: ask.groupId,
       n: ask.groupName,
+      ...(ask.thingName ? { t: ask.thingName } : {}),
       a: ask.about,
       ...(ask.ruleName ? { r: ask.ruleName } : {}),
       ...(ask.minutes ? { m: ask.minutes } : {}),

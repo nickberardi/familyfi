@@ -125,9 +125,10 @@ describe("FamilyFi Me on a child's phone", () => {
     const other = await meDay(bearer(claim.token), sam.id);
     expect(other.status).toBe(404);
     expect(await errorCode(other)).toBe("not_found");
-    const refused = await groups(request("/api/v1/groups", { auth: bearer(claim.token) }));
-    expect(refused.status).toBe(403);
-    expect(await errorCode(refused)).toBe("me_scope");
+    // The group list holds its own group alone while no Thing is shared with children.
+    const listed = await groups(request("/api/v1/groups", { auth: bearer(claim.token) }));
+    expect(listed.status).toBe(200);
+    expect(((await listed.json()) as { groups: Group[] }).groups.map((item) => item.id)).toEqual([group.id]);
     const read = await meDay(bearer(claim.token), group.id);
     expect(read.status).toBe(200);
     expect(((await read.json()) as { group: Group }).group).toMatchObject({ id: group.id, name: "Emma" });

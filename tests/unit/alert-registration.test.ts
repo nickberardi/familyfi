@@ -53,6 +53,8 @@ describe("alert registration", () => {
     // A child's ask opens that child's group, where the parent answers it.
     expect(alertDestination("ask.new", { g: "sam" })).toBe("/family/sam");
     expect(alertDestination("ask.new")).toBe("/family");
+    // An ask on a shared Thing opens the Thing, where the parent answers it.
+    expect(alertDestination("ask.new", { g: "tv", n: "Cassie", t: "TV" })).toBe("/things/tv");
     // News of a child's phone opens their family member, where the phone is listed.
     expect(alertDestination("me.quiet", { g: "cassie", p: "Cassie's iPad" })).toBe("/family/cassie");
     expect(alertDestination("me.protection", {})).toBe("/family");

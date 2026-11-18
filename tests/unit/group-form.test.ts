@@ -72,6 +72,17 @@ describe("editing a group", () => {
     expect(groupEditBody(group(), { ...groupEditDraft(group()), blockButtonRuleId: "r-social" })).toEqual({ name: "Sam", familyRole: "child", blockButtonRuleId: "r-social" });
   });
 
+  it("shares a Things group with kids only when the switch changes, and never a family group", () => {
+    const tv = group({ kind: "things", familyRole: null, monogram: "TV", name: "TV", kidsCanAsk: false });
+    expect(groupEditDraft(tv).kidsCanAsk).toBe(false);
+    expect(groupEditBody(tv, groupEditDraft(tv))).toBeNull();
+    expect(groupEditBody(tv, { ...groupEditDraft(tv), kidsCanAsk: true })).toEqual({ name: "TV", monogram: "TV", kidsCanAsk: true });
+    // A client that does not show the switch leaves it as it is.
+    const { kidsCanAsk: _left, ...without } = groupEditDraft(tv);
+    expect(groupEditBody(tv, { ...without, name: "Den TV" })).toEqual({ name: "Den TV", monogram: "TV" });
+    expect(groupEditDraft(group()).kidsCanAsk).toBeUndefined();
+  });
+
   it("offers all internet, then each of the group's own category, app or website rules by its own name", () => {
     const rule = (id: string, name: string, kind: string, extra: object = {}) =>
       ({ id, name, kind, scope: "group", groupIds: ["g1"], targetIds: [], domains: [], builtIn: null, ...extra }) as never;
