@@ -447,6 +447,36 @@ describe("a companion session", () => {
     expect(storage.keys()).toEqual([]);
   });
 
+  it("never credits an answer to a network the device moved to while it was on its way", async () => {
+    const home = household();
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let hold = false;
+    const transport: Transport = async (request) => {
+      if (hold && new URL(request.url).pathname === "/api/v1/connection") await held;
+      return home.transport(request);
+    };
+    const storage = memory();
+    const session = createCompanionSession({ transport, storage, deviceName: () => "A phone" });
+    await session.load();
+    await session.verify(home.code);
+    await session.trust();
+    session.setNetwork({ kind: "wifi", key: "192.168.1.0/24" });
+
+    hold = true;
+    const leaving = session.request("/api/v1/connection");
+    // Out of the house: the home route answers only after the phone is on cellular.
+    session.setNetwork({ kind: "cellular" });
+    release();
+    await leaving;
+    expect(session.getState().activeRouteId).toBeNull();
+
+    const relaunch = createCompanionSession({ transport, storage, deviceName: () => "A phone" });
+    relaunch.setNetwork({ kind: "cellular" });
+    await relaunch.load();
+    expect(relaunch.getState().activeRouteId).toBeNull();
+  });
+
   it("keeps a refreshed route list, and neither saves nor announces an unchanged one", async () => {
     const home = household();
     const storage = memory();

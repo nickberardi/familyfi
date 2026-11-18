@@ -107,8 +107,11 @@ export type CompanionConnection = {
   token?: () => string | null;
   /** The route that last answered, where each request starts. */
   activeRouteId?: () => string | null;
-  /** Told which route answered, so the Connection screen can show it and the next request starts there. */
-  onRoute?: (route: ConnectionRoute) => void;
+  /**
+   * Told which route answered, and the network the request was ordered for, so the Connection screen
+   * can show it and the next request on that network starts there.
+   */
+  onRoute?: (route: ConnectionRoute, network: DeviceNetwork | null) => void;
   /** The network the device is on now, which orders the routes (`orderRoutes`); unknown when absent. */
   network?: () => DeviceNetwork | null;
 };
@@ -122,7 +125,9 @@ export function createCompanionRequest(transport: Transport, connection: Compani
     const token = connection.token?.() ?? null;
     let lastFailure: unknown = new Error("FamilyFi has no route to try.");
 
-    const ordered = orderRoutes(connection.routes(), connection.activeRouteId?.() ?? null, connection.network?.() ?? null);
+    // Read once: a request that outlasts a change of network still reports the network it was ordered for.
+    const network = connection.network?.() ?? null;
+    const ordered = orderRoutes(connection.routes(), connection.activeRouteId?.() ?? null, network);
     for (const [index, route] of ordered.entries()) {
       const headers: Record<string, string> = {
         Accept: "application/json",
@@ -160,7 +165,7 @@ export function createCompanionRequest(transport: Transport, connection: Compani
         if (retryable) continue;
         throw new TransportError(lastFailure);
       }
-      connection.onRoute?.(route);
+      connection.onRoute?.(route, network);
       if (response.status < 200 || response.status >= 300) {
         throw apiErrorOf(body, response.status);
       }
