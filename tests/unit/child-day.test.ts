@@ -66,6 +66,15 @@ describe("a child's day", () => {
     expect(topAnswer(story).title).toBe("Not blocked until 9 PM");
   });
 
+  it("lets a window or an always-on rule tell the day after a yes ended a pause", () => {
+    const yes = { state: "yes" as const, at: 20 * 60, answeredAt: 20 * 60 + 5, by: "Mom" };
+    expect(tellDay({ windows: [BEDTIME], ask: yes }, 21 * 60 + 30, PHONE_VOICE).day.kind).toBe("window");
+    expect(tellDay({ windows: [], always: [{ label: "Grounded" }], ask: yes }, 21 * 60, PHONE_VOICE).day.kind).toBe("always");
+    const lifted = tellDay({ windows: [], always: [{ label: "Grounded", allowed: { by: "Dad", until: 22 * 60 } }], ask: yes }, 21 * 60, PHONE_VOICE);
+    expect(lifted.day.kind).not.toBe("unpaused");
+    expect(tellDay({ windows: [], ask: yes }, 21 * 60, PHONE_VOICE).day.kind).toBe("unpaused");
+  });
+
   it("names the parent who answered, not the one who paused", () => {
     const story = tellDay({ ...paused, ask: { state: "yes", at: NOW - 5, answeredAt: NOW - 2, by: "Mom" } }, NOW, PHONE_VOICE);
     expect(topAnswer(story).sentence).toMatch(/^Mom unpaused your apps\./);
