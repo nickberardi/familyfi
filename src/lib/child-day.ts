@@ -587,7 +587,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   let story = ask;
   // A yes ends the pause, and its band stops when it was answered. If a window is on by then,
   // the window case below tells the rest. FamilyFi reports no pause once a parent ends it, so a
-  // yes to unpause is told without one too, unless an always-on rule blocks now.
+  // yes to unpause is told without one too, unless an always-on rule blocks, or is lifted, now.
   const ended =
     ask?.state === "yes" && !ask.minutes && (pause || (!blockingAlways && !liftedAlways)) ? ask : undefined;
   if (pause && ended)
