@@ -6,9 +6,15 @@
  */
 import { requireNativeModule } from "expo";
 
-import type { TransportRequest, TransportResponse } from "@/lib/companion-request";
+import type { DeviceNetwork, TransportRequest, TransportResponse } from "@/lib/companion-request";
+
+type Subscription = { remove(): void };
 
 type NativeTransport = {
+  /** The network the device is on now: Wi-Fi (with its subnet as `key`), cellular, or other (a VPN, none). */
+  network(): DeviceNetwork;
+  /** Each change of network. */
+  addListener(event: "onNetwork", listener: (network: DeviceNetwork) => void): Subscription;
   request(request: TransportRequest): Promise<TransportResponse>;
   /** base64url SHA-256 of a DER certificate's SubjectPublicKeyInfo: its pin. For the pin vectors. */
   spkiPin(certificateBase64: string): string;
