@@ -74,6 +74,7 @@ function household({
   manifestEndpoints = [LAN, EDGE],
   otherSigner = false,
   health = CURRENT_HEALTH as HealthVersions | null,
+  claimSession = { username: "admin", displayName: "An adult", kind: "recovery", expiresAt: "2030-01-01T00:00:00Z" } as Record<string, string>,
 } = {}) {
   const keys = generateKeyPairSync("ed25519");
   const signer = otherSigner ? generateKeyPairSync("ed25519") : keys;
@@ -100,7 +101,7 @@ function household({
     "POST /api/v1/paired/invites/cm1/claim": () =>
       json(200, {
         device: { id: "dev-1", displayName: "A phone", clientType: "app", scope: "app:full" },
-        session: { username: "admin", displayName: "An adult", kind: "recovery", expiresAt: "2030-01-01T00:00:00Z" },
+        session: claimSession,
         token: "bearer-1",
         tokenType: "Bearer",
         refreshToken: "refresh-1",
@@ -412,6 +413,18 @@ describe("a companion session", () => {
     const meCode = encodePairingCode({ version: 1, url: LAN.url, code: "cm1.token-1", fingerprint: home.fingerprint, pin: LAN.spkiSha256!, clientType: "me" });
     await child.verify(meCode);
     expect(child.getState().pending?.code.clientType).toBe("me");
+    // The code's client type is unsigned: an app code edited to say "me" claims, but the phone keeps
+    // nothing from a sign-in that isn't a child's, and revokes it.
+    await expect(child.trust()).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.me);
+    expect(child.getState()).toMatchObject({ status: "unpaired", pending: null, session: null });
+    expect(storage.keys()).toEqual([]);
+    await settle(() => home.calls.some((call) => call.method === "DELETE"));
+    // A child's sign-in for its group is kept.
+    const family = household({ claimSession: { username: "device:dev-1", displayName: "Emma", kind: "group", groupId: "g1", expiresAt: "2030-01-01T00:00:00Z" } });
+    const phone = createCompanionSession({ transport: family.transport, storage: memory(), deviceName: () => "A phone", client: "me" });
+    await phone.verify(encodePairingCode({ version: 1, url: LAN.url, code: "cm1.token-1", fingerprint: family.fingerprint, pin: LAN.spkiSha256!, clientType: "me" }));
+    await phone.trust();
+    expect(phone.getState()).toMatchObject({ status: "signedIn", session: { session: { kind: "group", groupId: "g1" } } });
     // The app's session, without a client, refuses the child's code.
     const app = createCompanionSession({ transport: home.transport, storage: memory(), deviceName: () => "A phone" });
     await expect(app.verify(meCode)).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.app);

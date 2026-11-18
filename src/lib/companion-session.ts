@@ -5,11 +5,13 @@ import {
   refreshRoutes,
   renewPaired,
   verifyHousehold,
+  PAIRING_CODE_OTHER_CLIENT,
   type ConnectionProfile,
   type PairingClient,
   type PendingEnrollment,
   type StoredSession,
 } from "./companion-pairing";
+import { PairingCodeError } from "./pairing-code";
 import { createCompanionRequest, networkKey, type DeviceNetwork, type Transport } from "./companion-request";
 
 /**
@@ -276,6 +278,15 @@ export function createCompanionSession(deps: {
     async trust() {
       if (!state.pending) return;
       const claimed = await claimHousehold(transport, state.pending, deviceName());
+      // The code's client type is unsigned text, so what the claim signed the device in as decides:
+      // FamilyFi Me keeps only a child's sign-in for a group, and the app never keeps one. Any other
+      // is revoked at once and never stored.
+      const forGroup = claimed.session.session.kind === "group" && Boolean(claimed.session.session.groupId);
+      if (forGroup !== ((deps.client ?? "app") === "me")) {
+        set({ pending: null });
+        void revokeOnServer(claimed.profile, claimed.edgeCredentials, claimed.session);
+        throw new PairingCodeError(PAIRING_CODE_OTHER_CLIENT[deps.client ?? "app"]);
+      }
       await vault.savePairing(claimed.profile, claimed.edgeCredentials, claimed.session);
       credentials = claimed.edgeCredentials;
       // A new pairing remembers no routes, even one made without unpairing first.
