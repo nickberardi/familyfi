@@ -40,9 +40,10 @@ describe("remote access", () => {
   beforeAll(async () => {
     dir = mkdtempSync(path.join(tmpdir(), "familyfi-fake-cf-"));
     log = path.join(dir, "calls.log");
-    // FamilyFi gives cloudflared a minimal environment, so the log path is baked into a wrapper.
+    // FamilyFi gives cloudflared a minimal environment, so the log path is baked into a wrapper. The
+    // sign-in link shows for a second, not the browser tests' four: waitFor polls every 100 ms.
     const wrapper = path.join(dir, "cloudflared");
-    writeFileSync(wrapper, `#!/bin/sh\nFAKE_CLOUDFLARED_LOG='${log}' exec '${FAKE}' "$@"\n`);
+    writeFileSync(wrapper, `#!/bin/sh\nFAKE_CLOUDFLARED_LOG='${log}' FAKE_CLOUDFLARED_LOGIN_SECONDS=1 exec '${FAKE}' "$@"\n`);
     chmodSync(wrapper, 0o755);
     process.env.CLOUDFLARED_BIN = wrapper;
 
