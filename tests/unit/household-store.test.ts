@@ -502,6 +502,39 @@ describe("household store", () => {
     expect(server.calls.filter((call) => call.path === "/api/v1/groups")).toHaveLength(3);
   });
 
+  it("refreshes fully when nothing has loaded or a full load is due, and otherwise only what changes on its own", async () => {
+    vi.useFakeTimers();
+    const { store, server } = setup(reads(() => childGroup()));
+    const sessions = () => server.calls.filter((call) => call.path === "/api/v1/auth/session").length;
+    await expect(store.refresh(2000)).resolves.toBe(true);
+    expect(sessions()).toBe(1);
+    const afterLoad = server.calls.length;
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(store.refresh(2000)).resolves.toBe(false);
+    expect(server.calls.slice(afterLoad).map((call) => call.path).sort()).toEqual([
+      "/api/v1/devices",
+      "/api/v1/groups",
+      "/api/v1/rules",
+      "/api/v1/sync",
+    ]);
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(store.refresh(2000)).resolves.toBe(true);
+    expect(sessions()).toBe(2);
+  });
+
+  it("refreshes fully while the view is stale", async () => {
+    let up = false;
+    const routes = reads(() => childGroup());
+    const { store } = setup(
+      Object.fromEntries(Object.entries(routes).map(([path, handler]) => [path, (...args: Parameters<Handler>) => (up ? handler(...args) : offline())])),
+    );
+    await expect(store.refresh()).resolves.toBe(true);
+    expect(store.getState().stale).toBe(true);
+    up = true;
+    await expect(store.refresh()).resolves.toBe(true);
+    expect(store.getState().stale).toBe(false);
+  });
+
   it("rereads only what changes on its own between full loads", async () => {
     vi.useFakeTimers();
     const { store, server } = setup(reads(() => childGroup()));
