@@ -50,6 +50,8 @@ export function createSessionVault(storage: SecureStorage) {
     edgeCredentials: async () => (await read<EndpointCredential[]>(EDGE)) ?? [],
     session: () => read<StoredSession>(SESSION),
     async savePairing(profile: ConnectionProfile, edgeCredentials: EndpointCredential[], session: StoredSession) {
+      // A new pairing starts with no remembered routes, even where an old one could not be forgotten.
+      await storage.delete(ANSWERED);
       await storage.set(PROFILE, JSON.stringify(profile));
       await storage.set(EDGE, JSON.stringify(edgeCredentials));
       await storage.set(SESSION, JSON.stringify(session));
@@ -103,10 +105,15 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
     edgeCredentials: () => credentials,
     activeRouteId: () => state.activeRouteId,
     network: () => network,
-    onRoute: (route: { id: string }) => {
+    onRoute: (route: { id: string }, askedOn: DeviceNetwork | null) => {
+      // An answer that arrives after the device changed network, or for routes the phone no longer
+      // holds, says nothing about where to start now.
+      const now = network ? networkKey(network) : null;
+      if ((askedOn ? networkKey(askedOn) : null) !== now) return;
+      if (!state.profile?.endpoints.some((endpoint) => endpoint.id === route.id)) return;
       if (state.activeRouteId !== route.id) set({ activeRouteId: route.id });
       // Kept for the next launch on this network; a phone that can't store it just starts in manifest order.
-      if (!network || !state.profile) return;
+      if (!network) return;
       const key = networkKey(network);
       if (answered[key] === route.id) return;
       answered = { ...answered, [key]: route.id };
