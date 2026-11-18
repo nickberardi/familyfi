@@ -93,6 +93,8 @@ export type Session = {
   /** `group`: FamilyFi Me on a child's phone, signed in for its family group. A newer server may add one. */
   kind: "recovery" | "personal" | "group" | (string & {});
   expiresAt: string;
+  /** `group` only: the family group a child's phone signs in for, which it reads its day from. */
+  groupId?: string;
 };
 
 export type UnifiNetwork = { id: string; name: string; vlanId: number; zoneId: string | null };

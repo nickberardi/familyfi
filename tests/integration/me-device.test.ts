@@ -81,13 +81,13 @@ describe("FamilyFi Me on a child's phone", () => {
     const group = await childGroup();
     const claim = await pairMe(admin, group.id);
     expect(claim.device).toMatchObject({ clientType: "me", scope: "me:askOnly", displayName: "Emma's iPhone" });
-    expect(claim.session).toMatchObject({ kind: "group", displayName: "Emma", username: `device:${claim.device.id}` });
+    expect(claim.session).toMatchObject({ kind: "group", displayName: "Emma", username: `device:${claim.device.id}`, groupId: group.id });
     expect(claim.connection?.manifest.signature).toBeTruthy();
     const device = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: claim.device.id } });
     expect(device).toMatchObject({ accountId: null, groupId: group.id, parentDeviceId: null });
     const session = await currentSession(request("/api/v1/auth/session", { auth: bearer(claim.token) }));
     expect(session.status).toBe(200);
-    expect(((await session.json()) as { session: { kind: string } }).session.kind).toBe("group");
+    expect(((await session.json()) as { session: { kind: string; groupId?: string } }).session).toMatchObject({ kind: "group", groupId: group.id });
     await prisma().household.update({ where: { id: "default" }, data: { connectionError: "Gateway refused the key" } });
     const overview = await connection(request("/api/v1/connection", { auth: bearer(claim.token) }));
     expect(overview.status).toBe(200);
@@ -112,8 +112,8 @@ describe("FamilyFi Me on a child's phone", () => {
     const claim = await pairMe(admin, emma.id);
     const renewed = await refresh(request("/api/v1/auth/refresh", { method: "POST", headers: json, body: JSON.stringify({ refreshToken: claim.refreshToken }) }));
     expect(renewed.status).toBe(200);
-    const body = (await renewed.json()) as { token: string; session: { kind: string; displayName: string } };
-    expect(body.session).toMatchObject({ kind: "group", displayName: "Emma" });
+    const body = (await renewed.json()) as { token: string; session: { kind: string; displayName: string; groupId?: string } };
+    expect(body.session).toMatchObject({ kind: "group", displayName: "Emma", groupId: emma.id });
     expect((await meDay(bearer(body.token), emma.id)).status).toBe(200);
   });
 

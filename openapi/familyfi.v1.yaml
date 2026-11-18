@@ -3530,6 +3530,9 @@ components:
         expiresAt:
           type: string
           format: date-time
+        groupId:
+          type: string
+          description: "`group` only: the family group a child's phone signs in for, whose day it reads with `GET /groups/{id}`."
     LoginResponse:
       type: object
       additionalProperties: false
