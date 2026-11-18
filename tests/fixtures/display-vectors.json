@@ -31724,6 +31724,94 @@
     },
     {
       "fn": "groupAskLine",
+      "name": "time off a shared Thing's rule names the child",
+      "input": {
+        "group": {
+          "name": "TV",
+          "ask": {
+            "id": "a1",
+            "about": "rule",
+            "ruleId": "r1",
+            "minutes": 30,
+            "state": "waiting",
+            "at": "2026-11-17T03:25:00Z",
+            "expiresAt": "2026-11-17T04:00:00Z",
+            "from": {
+              "groupId": "g2",
+              "name": "Cassie"
+            }
+          }
+        },
+        "rules": [
+          {
+            "id": "r1",
+            "name": "Bedtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "name": "",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "21:00",
+                "end": "23:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": []
+          }
+        ],
+        "now": "2026-11-17T03:30:00Z"
+      },
+      "expected": "Cassie asked for 30 minutes off Bedtime"
+    },
+    {
+      "fn": "groupAskLine",
+      "name": "to unpause a shared Thing names the child",
+      "input": {
+        "group": {
+          "name": "TV",
+          "ask": {
+            "id": "a1",
+            "about": "pause",
+            "state": "waiting",
+            "at": "2026-11-17T03:25:00Z",
+            "expiresAt": "2026-11-17T04:00:00Z",
+            "from": {
+              "groupId": "g2",
+              "name": "Cassie"
+            }
+          }
+        },
+        "rules": [],
+        "now": "2026-11-17T03:30:00Z"
+      },
+      "expected": "Cassie asked to unpause it"
+    },
+    {
+      "fn": "groupAskLine",
       "name": "time off a rule the card doesn't know",
       "input": {
         "group": {
@@ -31913,6 +32001,28 @@
         "rules": []
       },
       "expected": "Emma asked to be unpaused"
+    },
+    {
+      "fn": "askSheetTitle",
+      "name": "to unpause a shared Thing",
+      "input": {
+        "group": {
+          "name": "TV"
+        },
+        "ask": {
+          "id": "a1",
+          "about": "pause",
+          "from": {
+            "groupId": "g2",
+            "name": "Cassie"
+          },
+          "state": "waiting",
+          "at": "2026-11-17T03:25:00Z",
+          "expiresAt": "2026-11-17T04:00:00Z"
+        },
+        "rules": []
+      },
+      "expected": "Cassie asked to unpause TV"
     },
     {
       "fn": "askSheetBody",

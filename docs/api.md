@@ -81,7 +81,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | POST | `/api/v1/settings/unifi/test` | Probe without saving; returns site networks (id, name, vlanId) |
 | GET/POST | `/api/v1/groups` | Family/Things |
 | GET/PUT/DELETE | `/api/v1/groups/{id}` | PUT sets `blockButtonRuleId`, the group's Block button default (one of its own category, app or website rules, or null for all internet; 400 `invalid_block_button_rule` otherwise). The card unblocks and puts back that rule with the per-group `pause` and `resume` below; what the card does is [Group states](group-states.md). Delete quarantines member devices |
-| POST | `/api/v1/groups/{id}/asks` | FamilyFi Me on a child's phone asks, on its own group, to be unpaused or for minutes in a rule's window; see [Asking for more time](#asking-for-more-time) |
+| POST | `/api/v1/groups/{id}/asks` | FamilyFi Me on a child's phone asks, on its own group or a shared Thing, to be unpaused or for minutes in a rule's window; see [Asking for more time](#asking-for-more-time) |
 | POST | `/api/v1/groups/{id}/asks/{askId}/decline` | A parent's Not now to the group's waiting ask |
 | POST | `/api/v1/groups/{id}/unblock`, `/unblock/end`, `/unblock/extend` | Unblock lifts whatever blocks the group now, for it alone and of any kind but an always-on category, app or website rule, which it leaves on unless it is the group's Block button default: its own pause ends, and each rule blocking it is allowed for the group until its active windows end, or every rule it has until `until`. `end` ends those allowances; `extend` gives each timed one the same new end, the latest plus `minutes`. Only rules that name the group are lifted; a rule for whole networks is paused for everyone from its rule. The rules themselves are untouched. The response is `{ group, rules, change }`, `rules` being the group's own |
 | GET/PUT/DELETE | `/api/v1/groups/{id}/resolver` | GET shows a group's effective source and discovered networks; PUT/DELETE set or remove its DoH override and invalidate affected verdicts |
@@ -283,7 +283,7 @@ that group's id, its `displayName` the group's name and its `username` names the
 paired-device listing shows its `group` with `actsAs` null. It has no parent device, since it belongs to its group: re-pairing or
 revoking the phone that invited it leaves it alone.
 
-It reads its own group with `GET /groups/{id}` (any other group is 404 for it), the rules that cover it with `GET /rules`, and the time zone with `GET /auth/session`. `groupDayOf` (`src/lib/child-day.ts`) builds its day from them, which tells the group's own pause and allowance, the windows of its
+It reads its own group with `GET /groups/{id}` (any other group is 404 for it, except a [shared Thing](#shared-things)), the rules that cover it with `GET /rules`, and the time zone with `GET /auth/session`. `groupDayOf` (`src/lib/child-day.ts`) builds its day from them, which tells the group's own pause and allowance, the windows of its
 internet rules (each with the days it starts on, its household-time start and end, and `allowed`
 while its rule is lifted for the group until a time), and the rules that block something all the
 time (with `allowed` too); nothing else in the household. A rule lifted with no end is left out. A `by` is `null` where FamilyFi recorded no person, or the recovery account acted.
@@ -300,16 +300,29 @@ does. Deleting its group revokes it and cancels invites still
 waiting for the group, keeping the record; an import keeps it where its group comes back with the
 same id and revokes it otherwise.
 
+#### Shared Things
+
+A Things group's `kidsCanAsk`, which an administrator sets with `PUT /groups/{id}` (400
+`invalid_request` on a family group), shares it with every child: one switch, the same for each.
+A child's phone then reads it as it reads its own group: `GET /groups` lists its own group first,
+then the shared Things; `GET /groups/{id}` answers for each; `GET /rules` holds the rules that
+cover any of them, each showing only those groups. Each Thing's day comes from `groupDayOf` like
+the child's own. On a Thing a child reads `ask` only when the ask is their own, and asks on it as
+on their own group (below). A Thing not shared, like any other group, is 404 for the phone, and
+turning the switch off hides it again at once.
+
 #### Asking for more time
 
 FamilyFi Me asks on its own group with `POST /groups/{id}/asks`: `{ "about": "pause" }` to be
 unpaused, or `{ "about": "rule", "ruleId", "minutes" }` (5 to 240) for time in the window of one of
 the group's rules that is blocking it now. Only a child's phone asks (403 `child_only`), and only on
-its own group (404). The ask shows as the group's `ask` (`GroupAsk`) on `GET /groups/{id}` and
+its own group or a shared Thing (404). On a Thing the ask's `from` names the child who asked, the
+`ask.new` alert carries the Thing's name as `t` and opens the Thing, and refusals name the Thing. The ask shows as the group's `ask` (`GroupAsk`) on `GET /groups/{id}` and
 `GET /groups` for a day, and phones with alerts on hear `ask.new`. A group has one waiting ask at a
-time (409 `ask_waiting`); asking about something that is not blocking it now is 409 `not_blocked`,
-and about an always-on rule 409 `always_on`; after a no the child waits the household's
-`askWaitMinutes` (409 `ask_too_soon`); more than six asks an hour is 429 `too_many_asks`.
+time, whichever child filed it (409 `ask_waiting`); asking about something that is not blocking it now is 409 `not_blocked`,
+and about an always-on rule 409 `always_on`; after a no that child waits the household's
+`askWaitMinutes` before asking about that group again (409 `ask_too_soon`); more than six asks an
+hour from one child about one group is 429 `too_many_asks`.
 
 No route says yes: a parent answers with the verb that lifts what the ask is about, adding its
 `askId`. `POST /groups/{id}/rules/internet/resume` ends the pause; `POST
@@ -387,7 +400,7 @@ allowlist in [`src/server/device-scope.ts`](../src/server/device-scope.ts), not 
 | `app:rulesOnly` | Its session, connection manifest, groups, rules and changes; the rule and group-rule verbs; revoking itself (403 `watch_scope` for a Watch, `app_scope` for the app's controls, beyond that) |
 | `agent:full` | Household reads and controls; never accounts, UniFi settings, resolvers, household-settings changes or connection management |
 | `agent:readOnly` | Household reads |
-| `me:askOnly` | Its session, connection manifest and its own group and the rules that cover it (`GET /groups/{id}`, `GET /rules`); asking for more time on its group (`POST /groups/{id}/asks`); revoking itself, and telling its own Screen Time permission (`PATCH /paired/devices/{its id}`) (403 `me_scope` beyond that) |
+| `me:askOnly` | Its session, connection manifest, its own group and the shared Things and the rules that cover them (`GET /groups`, `GET /groups/{id}`, `GET /rules`); asking for more time on those (`POST /groups/{id}/asks`); revoking itself, and telling its own Screen Time permission (`PATCH /paired/devices/{its id}`) (403 `me_scope` beyond that) |
 
 A client type holds only the scopes in its row, and a device holding any other allows nothing. A
 phone, tablet or Mac always pairs as `app`, and a Watch and an app's Siri and shortcuts enroll with

@@ -76,7 +76,9 @@ describe("openapi contract", () => {
       "CheckupFinding.details.drift.changes.familyfi", // every change but `other`
       "CheckupFinding.details.drift.changes.gateway", // every change but `other`
       "Group.blockButtonRuleId", // only when the group's Block button blocks one of its rules, not all internet
+      "Group.kidsCanAsk", // only on a Things group
       "Group.ask", // only when a child's phone asked in the last day
+      "GroupAsk.from", // only for an ask on a shared Thing
       "GroupAsk.ruleId", // only for an ask about a rule
       "GroupAsk.minutes", // only for an ask about a rule
       "GroupAsk.expiresAt", // only while waiting

@@ -2,7 +2,7 @@ import { AskState, RuleMode, type Ask } from "@prisma/client";
 import { z } from "zod";
 import { recordAsk } from "./alerts/producers";
 import type { SignedInSession } from "./auth";
-import { groupForChild } from "./child-day";
+import { groupForChild, requireChildReads } from "./child-day";
 import { prisma } from "./db";
 import { blockRuleOf, groupInclude, lifted, publicGroup, sessionActor } from "./groups";
 import { loadHousehold } from "./household";
@@ -10,8 +10,9 @@ import { ApiError } from "./http";
 import { activeWindowsEnd, builtInRule, ruleInternetWindows } from "./rules";
 
 /*
- * Asking for more time (FamilyFi Me). A child's phone files an ask on its own group, to end the
- * group's pause or to lift one rule's window for a number of minutes. A parent answers no with
+ * Asking for more time (FamilyFi Me). A child's phone files an ask on its own group, or on a Things
+ * group shared with children, to end the group's pause or to lift one rule's window for a number of
+ * minutes. A parent answers no with
  * decline, or yes with the verb that lifts it: the group's `resume` on `internet` for a pause, the
  * rule's `allow` for the group for a window, each with the ask's `askId`. Any write that lifts what
  * a waiting ask is about answers it yes too, however the parent gave it (`answerAsks`).
@@ -43,12 +44,20 @@ export function requireChild(session: SignedInSession) {
   return session.device;
 }
 
-/** Files a child's ask on its own group. Only FamilyFi Me asks, and only for its own group. */
+/**
+ * Files a child's ask on its own group, or on a Things group shared with children (`kidsCanAsk`).
+ * Only FamilyFi Me asks. A group, the child's own or a Thing, has one waiting ask at a time, which a
+ * parent answers once; the wait after a no and the hourly limit are each child's own.
+ */
 export async function fileAsk(session: SignedInSession, groupId: string, input: AskInput) {
   const device = requireChild(session);
-  if (groupId !== device.groupId) throw new ApiError(404, "not_found", "Group not found.");
+  const fromGroupId = device.groupId;
+  if (!fromGroupId) throw new ApiError(404, "not_found", "Group not found.");
+  await requireChildReads(fromGroupId, groupId);
   const group = await prisma().group.findUnique({ where: { id: groupId }, include: groupInclude });
   if (!group) throw new ApiError(404, "not_found", "Group not found.");
+  // A Thing's words name it; the child's own group is "you".
+  const thing = groupId !== fromGroupId ? group.name : null;
   const household = await loadHousehold();
   const now = new Date();
 
@@ -57,15 +66,19 @@ export async function fileAsk(session: SignedInSession, groupId: string, input: 
   let ruleName: string | undefined;
   if (input.about === "pause") {
     const block = blockRuleOf(group);
-    if (!block?.enabled || (block.expiresAt !== null && block.expiresAt <= now)) throw new ApiError(409, "not_blocked", "You aren't paused right now.");
+    if (!block?.enabled || (block.expiresAt !== null && block.expiresAt <= now)) {
+      throw new ApiError(409, "not_blocked", thing ? `${thing} isn't blocked right now.` : "You aren't paused right now.");
+    }
     blockEnd = block.expiresAt;
   } else {
     const link = group.rules.find((item) => item.ruleId === input.ruleId && item.rule.systemGroupId === null && !builtInRule(item.rule));
-    if (!link) throw new ApiError(404, "not_found", "That rule isn't one of yours.");
+    if (!link) throw new ApiError(404, "not_found", thing ? `That rule isn't one of ${thing}'s.` : "That rule isn't one of yours.");
     const { rule } = link;
     if (rule.mode === RuleMode.always) throw new ApiError(409, "always_on", "You can't ask for more time on this one.");
     const ends = activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone);
-    if (!rule.enabled || lifted(rule, now) || lifted(link, now) || !ends) throw new ApiError(409, "not_blocked", "That rule isn't blocking you right now.");
+    if (!rule.enabled || lifted(rule, now) || lifted(link, now) || !ends) {
+      throw new ApiError(409, "not_blocked", thing ? `That rule isn't blocking ${thing} right now.` : "That rule isn't blocking you right now.");
+    }
     blockEnd = ends;
     ruleName = rule.name;
   }
@@ -75,14 +88,20 @@ export async function fileAsk(session: SignedInSession, groupId: string, input: 
   const ask = await prisma().$transaction(async (tx) => {
     // One ask at a time for a group: two phones asking at once wait on its row.
     await tx.$queryRaw`SELECT "id" FROM "Group" WHERE "id" = ${groupId} FOR UPDATE`;
-    if (await tx.ask.findFirst({ where: { groupId, ...open(now) } })) throw new ApiError(409, "ask_waiting", "You already asked. Waiting for an answer.");
-    const no = await tx.ask.findFirst({ where: { groupId, state: AskState.no, askAgainAt: { gt: now } } });
+    const waiting = await tx.ask.findFirst({ where: { groupId, ...open(now) } });
+    if (waiting) {
+      // On a Thing, another child may have asked first: a parent answers that one.
+      const someoneElse = waiting.fromGroupId !== fromGroupId;
+      throw new ApiError(409, "ask_waiting", someoneElse ? `Someone already asked about ${thing ?? group.name}. Waiting for an answer.` : "You already asked. Waiting for an answer.");
+    }
+    const no = await tx.ask.findFirst({ where: { groupId, fromGroupId, state: AskState.no, askAgainAt: { gt: now } } });
     if (no) throw new ApiError(409, "ask_too_soon", "Not this time. You can ask again later.");
-    const recent = await tx.ask.count({ where: { groupId, createdAt: { gt: new Date(now.getTime() - HOUR_MS) } } });
+    const recent = await tx.ask.count({ where: { groupId, fromGroupId, createdAt: { gt: new Date(now.getTime() - HOUR_MS) } } });
     if (recent >= ASKS_PER_HOUR) throw new ApiError(429, "too_many_asks", "You've asked a lot this hour. Try again later.");
     return tx.ask.create({
       data: {
         groupId,
+        fromGroupId,
         deviceId: session.deviceId,
         about: input.about,
         ruleId: input.about === "rule" ? input.ruleId : null,
@@ -93,9 +112,13 @@ export async function fileAsk(session: SignedInSession, groupId: string, input: 
       },
     });
   });
-  await recordAsk({ groupId, groupName: group.name, about: input.about, ruleName, minutes: ask.minutes ?? undefined }, now);
+  const child = thing ? await prisma().group.findUnique({ where: { id: fromGroupId }, select: { name: true } }) : group;
+  await recordAsk(
+    { groupId, groupName: child?.name ?? group.name, ...(thing ? { thingName: thing } : {}), about: input.about, ruleName, minutes: ask.minutes ?? undefined },
+    now,
+  );
   const fresh = await prisma().group.findUniqueOrThrow({ where: { id: groupId }, include: groupInclude });
-  return { group: await groupForChild(publicGroup(fresh, household.timezone, now)) };
+  return { group: await groupForChild(publicGroup(fresh, household.timezone, now), fromGroupId) };
 }
 
 /** A parent's Not now: the ask closes, and the child can ask again after the household's wait. */

@@ -43,14 +43,16 @@ export function alertText(kind: string, data: Record<string, unknown>): AlertTex
       return { title: "New device", body: name ? `${name} is waiting in Unassigned.` : "A new device is waiting in Unassigned." };
     }
     case "ask.new": {
-      const { n, a, r, m } = data as Partial<AskData>;
+      const { n, t, a, r, m } = data as Partial<AskData>;
       const who = text(n) ?? "Your child";
-      if (a === "pause") return { title: `${who} asked to be unpaused`, body: "Open FamilyFi to answer." };
+      // On a shared Thing: what the child asked to use.
+      const thing = text(t);
+      if (a === "pause") return { title: thing ? `${who} asked to unpause ${thing}` : `${who} asked to be unpaused`, body: "Open FamilyFi to answer." };
       const rule = text(r);
       const length = typeof m === "number" && Number.isInteger(m) && m > 0 ? minutesText(m) : null;
       // Time off the rule's block, never "of" it: the child wants out of Bedtime, not more of it.
       const body = length && rule ? `${length} off ${rule}.` : rule ? `Time off ${rule}.` : length ? `${length} more.` : "Open FamilyFi to answer.";
-      return { title: `${who} asked for more time`, body };
+      return { title: thing ? `${who} asked for more time on ${thing}` : `${who} asked for more time`, body };
     }
     case "me.protection": {
       const { p } = data as Partial<MePhoneData>;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { deleteGroup, getGroup, updateGroup } from "@/server/groups";
-import { groupForChild } from "@/server/child-day";
+import { groupForChild, requireChildReads } from "@/server/child-day";
 import { readBody, withMutation, withSession } from "@/server/guard";
 import { ApiError } from "@/server/http";
 
@@ -10,6 +10,8 @@ const Update = z.object({
   familyRole: z.enum(["child", "teen", "adult"]).nullable().optional(),
   /** One of the group's own category, app or website rules, or null for all internet. */
   blockButtonRuleId: z.string().min(1).nullable().optional(),
+  /** A Things group only: children with FamilyFi Me see it and ask for more time on it. */
+  kidsCanAsk: z.boolean().optional(),
 });
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -18,9 +20,11 @@ export async function GET(request: Request, ctx: Ctx) {
   return withSession(request, async (session) => {
     const { id } = await ctx.params;
     if (session.device?.clientType !== "me") return Response.json({ group: await getGroup(id) });
-    // A child's phone (FamilyFi Me) reads its own group alone; any other is not there for it.
-    if (id !== session.device.groupId) throw new ApiError(404, "not_found", "Group not found.");
-    return Response.json({ group: await groupForChild(await getGroup(id)) });
+    // A child's phone (FamilyFi Me) reads its own group and the shared Things; any other is not there for it.
+    const own = session.device.groupId;
+    if (!own) throw new ApiError(404, "not_found", "Group not found.");
+    await requireChildReads(own, id);
+    return Response.json({ group: await groupForChild(await getGroup(id), own) });
   });
 }
 

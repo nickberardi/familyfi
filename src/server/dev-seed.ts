@@ -82,7 +82,7 @@ async function ensureDummyHouseholdMembers() {
       data:
         group.kind === "family"
           ? { kind: GroupKind.family, name: group.name, familyRole: FamilyRole[group.familyRole], createdAt }
-          : { kind: GroupKind.things, name: group.name, monogram: group.monogram, createdAt },
+          : { kind: GroupKind.things, name: group.name, monogram: group.monogram, kidsCanAsk: group.kidsCanAsk ?? false, createdAt },
     });
     groupIds.set(group.name, created.id);
   }

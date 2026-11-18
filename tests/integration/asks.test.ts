@@ -197,7 +197,7 @@ describe("asking for more time", () => {
   it("limits asks to a few an hour", async () => {
     await verb(pauseRoute, "pause", admin, emma.id, "internet");
     await prisma().ask.createMany({
-      data: Array.from({ length: ASKS_PER_HOUR }, () => ({ groupId: emma.id, about: "pause", state: "timedOut" as const, expiresAt: new Date() })),
+      data: Array.from({ length: ASKS_PER_HOUR }, () => ({ groupId: emma.id, fromGroupId: emma.id, about: "pause", state: "timedOut" as const, expiresAt: new Date() })),
     });
     const many = await ask(child, emma.id, { about: "pause" });
     expect(many.status).toBe(429);

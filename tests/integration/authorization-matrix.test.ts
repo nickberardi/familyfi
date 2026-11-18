@@ -188,7 +188,7 @@ const ACCESS: Record<string, Entry> = {
   "POST /api/v1/checkup/leftover-policies/remove": { access: "administrator" },
   "GET /api/v1/dpi/applications": { access: "session", devices: READERS },
   "GET /api/v1/dpi/categories": { access: "session", devices: READERS },
-  "GET /api/v1/groups": { access: "session", devices: READERS_AND_WATCH },
+  "GET /api/v1/groups": { access: "session", devices: [...READERS_AND_WATCH, "me"] },
   "GET /api/v1/groups/{id}/resolver": { access: "session" },
   "POST /api/v1/groups": { access: "session", devices: CONTROLLERS },
   "GET /api/v1/groups/{id}": { access: "session", devices: [...READERS, "me"] },
@@ -217,7 +217,7 @@ const ACCESS: Record<string, Entry> = {
   "POST /api/v1/groups/{id}/unblock": { access: "session", devices: CONTROLLERS_AND_WATCH },
   "POST /api/v1/groups/{id}/unblock/end": { access: "session", devices: CONTROLLERS_AND_WATCH },
   "POST /api/v1/groups/{id}/unblock/extend": { access: "session", devices: CONTROLLERS_AND_WATCH },
-  // A child asks for more time on its own group; a parent's Not now is the app's or the web's alone.
+  // A child asks for more time on its own group or a shared Thing; a parent's Not now is the app's or the web's alone.
   "POST /api/v1/groups/{id}/asks": { access: "child", devices: ["me"] },
   "POST /api/v1/groups/{id}/asks/{askId}/decline": { access: "administrator" },
   "GET /api/v1/settings/export": { access: "administrator" },

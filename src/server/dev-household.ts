@@ -5,7 +5,8 @@
  *
  * It is broad on purpose — every card, rule and device state the UI draws has a subject:
  * adults with no rules, teens sharing rules, a child on suggested schedules, a paused
- * member, a things group with an allowance, a paused rule, a group with no rules, devices
+ * member, a things group with an allowance, Things shared with children (TV and Games), a paused
+ * rule, a group with no rules, devices
  * offline and unassigned. The browser specs lean on some of it: Betsy (desktop) and Abby
  * (phone) are the groups they edit, Betsy holds no category rule, and TV is the things
  * group they pause.
@@ -15,7 +16,7 @@ export type DevNetwork = "lan" | "iot";
 
 export type DevGroup =
   | { kind: "family"; name: string; familyRole: "adult" | "teen" | "child" }
-  | { kind: "things"; name: string; monogram: string };
+  | { kind: "things"; name: string; monogram: string; /** Shared with children in FamilyFi Me. */ kidsCanAsk?: boolean };
 
 export const DEV_GROUPS: readonly DevGroup[] = [
   { kind: "family", name: "Nick", familyRole: "adult" },
@@ -23,9 +24,9 @@ export const DEV_GROUPS: readonly DevGroup[] = [
   { kind: "family", name: "Betsy", familyRole: "teen" },
   { kind: "family", name: "Abby", familyRole: "teen" },
   { kind: "family", name: "Cassie", familyRole: "child" },
-  { kind: "things", name: "TV", monogram: "TV" },
+  { kind: "things", name: "TV", monogram: "TV", kidsCanAsk: true },
   { kind: "things", name: "Computers", monogram: "PC" },
-  { kind: "things", name: "Games", monogram: "GAME" },
+  { kind: "things", name: "Games", monogram: "GAME", kidsCanAsk: true },
   { kind: "things", name: "Servers", monogram: "SRV" },
 ];
 

@@ -19,7 +19,7 @@ export type GroupAccess = "available" | "blocked" | "paused" | "allowed";
 export const groupInclude = {
   _count: { select: { devices: true } },
   rules: { include: { rule: { include: { windows: true } } } },
-  asks: { orderBy: { createdAt: "desc" }, take: 1 },
+  asks: { orderBy: { createdAt: "desc" }, take: 1, include: { fromGroup: { select: { name: true } } } },
 } satisfies Prisma.GroupInclude;
 
 export type GroupWithRules = Prisma.GroupGetPayload<{ include: typeof groupInclude }>;
@@ -121,13 +121,15 @@ export const ASK_SHOWN_MS = 24 * 60 * 60_000;
  * An ask as the API shows it. One left waiting past `expiresAt` reads as closed, before the next
  * sync pass's sweep writes it: `ended` when that was the block's end, else `timedOut`.
  */
-export function presentAsk(ask: Ask, now: Date) {
+export function presentAsk(ask: Ask & { fromGroup?: { name: string } | null }, now: Date) {
   const lapsed = ask.state === AskState.waiting && ask.expiresAt <= now;
   const state = lapsed ? (ask.endsWithBlock ? AskState.ended : AskState.timedOut) : ask.state;
   const answered = state === AskState.yes || state === AskState.no;
   return {
     id: ask.id,
     about: ask.about as "pause" | "rule",
+    // On a shared Thing: the child who asked. Left out on a child's own group, which asked itself.
+    ...(ask.fromGroupId !== ask.groupId && ask.fromGroup ? { from: { groupId: ask.fromGroupId, name: ask.fromGroup.name } } : {}),
     ...(ask.ruleId ? { ruleId: ask.ruleId } : {}),
     ...(ask.minutes !== null ? { minutes: ask.minutes } : {}),
     state,
@@ -161,6 +163,8 @@ export function publicGroup(group: GroupWithRules, timezone: string, now = new D
     access: groupAccess(group, now, timezone),
     /** The rule the group's Block button blocks and unblocks; absent for all internet. */
     ...(blockButton ? { blockButtonRuleId: blockButton.id } : {}),
+    /** A Things group only: whether children with FamilyFi Me see it and ask for more time on it. */
+    ...(group.kind === GroupKind.things ? { kidsCanAsk: group.kidsCanAsk } : {}),
     ...(latestAsk ? { ask: presentAsk(latestAsk, now) } : {}),
   };
 }
@@ -196,13 +200,19 @@ export async function createGroup(input: { kind: GroupKind; name: string; monogr
   return { group: publicGroup(group, household.timezone), change };
 }
 
-/** A field left out stays as it is; `blockButtonRuleId` null puts the Block button back on all internet. */
+/**
+ * A field left out stays as it is; `blockButtonRuleId` null puts the Block button back on all
+ * internet. `kidsCanAsk` is for a Things group only.
+ */
 export async function updateGroup(
   id: string,
-  input: { name?: string; monogram?: string | null; familyRole?: FamilyRole | null; blockButtonRuleId?: string | null },
+  input: { name?: string; monogram?: string | null; familyRole?: FamilyRole | null; blockButtonRuleId?: string | null; kidsCanAsk?: boolean },
 ) {
   const existing = await prisma().group.findUnique({ where: { id }, include: groupInclude });
   if (!existing) throw groupNotFound();
+  if (input.kidsCanAsk !== undefined && existing.kind !== GroupKind.things) {
+    throw new ApiError(400, "invalid_request", "Only a Things group can be shared with kids.");
+  }
   const { blockButtonRuleId } = input;
   if (blockButtonRuleId && !existing.rules.some((link) => link.rule.id === blockButtonRuleId && blockButtonCandidate(link.rule))) {
     throw new ApiError(400, "invalid_block_button_rule", "The Block button can stand for one of this group's own category, app or website rules.");
@@ -210,7 +220,7 @@ export async function updateGroup(
   const household = await loadHousehold();
   const group = await prisma().group.update({
     where: { id },
-    data: { name: input.name, monogram: input.monogram, familyRole: input.familyRole, blockButtonRuleId },
+    data: { name: input.name, monogram: input.monogram, familyRole: input.familyRole, blockButtonRuleId, kidsCanAsk: input.kidsCanAsk },
     include: groupInclude,
   });
   const change = await enqueueChange("group");

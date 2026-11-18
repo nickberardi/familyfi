@@ -33,11 +33,12 @@ export type AlertEnvelope = {
 export type NewDeviceData = { n: number; h?: string };
 
 /**
- * `ask.new`: a child asked for more time in FamilyFi Me. `g` the group's id and `n` its name; `a`
- * `pause` (to be unpaused) or `rule` (more time in a rule's window), with `r` the rule's name and `m`
- * the minutes asked for.
+ * `ask.new`: a child asked for more time in FamilyFi Me. `g` the id of the group asked about and `n`
+ * the child's name; `t` the Thing's name when the ask is on a Things group shared with children
+ * (then `g` is that Thing's); `a` `pause` (to be unpaused) or `rule` (more time in a rule's window),
+ * with `r` the rule's name and `m` the minutes asked for.
  */
-export type AskData = { g: string; n: string; a: "pause" | "rule"; r?: string; m?: number };
+export type AskData = { g: string; n: string; t?: string; a: "pause" | "rule"; r?: string; m?: number };
 
 /**
  * A child's phone (FamilyFi Me): `me.protection` when it says its Screen Time permission was taken

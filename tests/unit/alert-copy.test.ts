@@ -26,6 +26,9 @@ describe("alert copy", () => {
     expect(alertText("ask.new", { g: "g1", n: "Sam", a: "rule", r: "Homework", m: 90 })?.body).toBe("1 hour 30 minutes off Homework.");
     expect(alertText("ask.new", { n: "Sam", a: "rule", r: "Bedtime" })?.body).toBe("Time off Bedtime.");
     // Data a reader cannot use still makes a sentence.
+    // On a shared Thing: the child, and the Thing they asked about.
+    expect(alertText("ask.new", { g: "tv", n: "Cassie", t: "TV", a: "pause" })).toEqual({ title: "Cassie asked to unpause TV", body: "Open FamilyFi to answer." });
+    expect(alertText("ask.new", { g: "tv", n: "Cassie", t: "TV", a: "rule", r: "TV downtime", m: 30 })).toEqual({ title: "Cassie asked for more time on TV", body: "30 minutes off TV downtime." });
     expect(alertText("ask.new", { a: "rule", m: "lots" })).toEqual({ title: "Your child asked for more time", body: "Open FamilyFi to answer." });
   });
 

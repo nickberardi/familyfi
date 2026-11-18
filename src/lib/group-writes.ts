@@ -141,7 +141,7 @@ export function answerAsk(mutate: Mutate, group: Group, ask: GroupAsk, option: A
     return mutate((send) => send(`/api/v1/groups/${group.id}/asks/${ask.id}/decline`, { method: "POST" }), {
       groupId: group.id,
       optimistic: answered("no"),
-      feedback: { notice: `You said not now to ${group.name}.` },
+      feedback: { notice: `You said not now to ${ask.from?.name ?? group.name}.` },
     });
   }
   if (ask.about === "pause") {

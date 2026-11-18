@@ -75,10 +75,12 @@ export function alertChoiceRows(choices: AlertChoices | null): { kind: AlertKind
 
 /**
  * Where a tapped alert opens in the app: new devices in Unassigned, gateway trouble on Sync, a
- * child's ask on that child's group, where the parent answers it.
+ * child's ask on that child's group or on the shared Thing it is about, where the parent answers it.
  */
 export function alertDestination(kind: string, data: Record<string, unknown> = {}): string {
   if (!isAlertKind(kind)) return "/";
+  // A child's ask on a shared Thing opens that Thing, where the parent answers it.
+  if (kind === "ask.new" && typeof data.t === "string" && data.t) return typeof data.g === "string" && data.g ? `/things/${encodeURIComponent(data.g)}` : "/things";
   // A child's ask, or news of a child's phone, opens that family member, whose page lists their phones.
   if (kind === "ask.new" || kind === "me.protection" || kind === "me.quiet") return typeof data.g === "string" && data.g ? `/family/${encodeURIComponent(data.g)}` : "/family";
   return kind === "device.new" ? "/devices?filter=loose" : "/sync";
