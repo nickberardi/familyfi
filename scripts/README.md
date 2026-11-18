@@ -160,7 +160,7 @@ scripts/test.py run scripts/tests/
 Publishing requires the operator's request. `--skip-ci`, `--allow-dirty` and `--force` are explicit operator exceptions, never normal agent workflow. A script accepting an option does not authorize using it.
 
 Does what `.github/workflows/release.yml` does, from this machine: checks that `HEAD` is on
-`origin/main`, runs the checks and tests of `ci.yml`'s verify job and of `container.yml` through
+`origin/main`, runs `ci.yml`'s checks and host tests and `container.yml`'s through
 `test.py`, builds `linux/amd64` and `linux/arm64` in one `buildx`
 build, pushes them to GHCR, and creates the GitHub Release with generated notes. Creating the
 Release creates the tag on GitHub at `HEAD`.

@@ -21,8 +21,11 @@ case " $* " in
     echo "" >&2
     echo "Leave cloudflared running to download the cert automatically." >&2
     # A person takes a while to authorize; long enough for the page to poll and show the link.
-    # The integration tests poll every 100 ms and ask for less with FAKE_CLOUDFLARED_LOGIN_SECONDS.
-    sleep "${FAKE_CLOUDFLARED_LOGIN_SECONDS:-4}"
+    # The integration tests poll every 100 ms and ask for less with FAKE_CLOUDFLARED_LOGIN_SECONDS;
+    # a login-slow file next to the log keeps the four seconds, for a test that cancels the sign-in.
+    seconds="${FAKE_CLOUDFLARED_LOGIN_SECONDS:-4}"
+    [ -e "$state/login-slow" ] && seconds=4
+    sleep "$seconds"
     if [ -e "$state/login-fails" ]; then echo "2026-09-23T00:00:00Z ERR Failed to fetch resource" >&2; exit 1; fi
     mkdir -p "$HOME/.cloudflared"
     if [ -e "$state/legacy-cert" ]; then
