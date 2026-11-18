@@ -8,6 +8,7 @@ import { refreshResolverContexts, type ResolverContext } from "./discovery";
 import { ResolverConfigError, normalizeResolverUrl } from "./resolver-settings";
 import { rescheduleUpstreamProbe } from "./schedule";
 import { withUpstreamLock } from "./transaction";
+import { currentHouseholdId } from "../household-context";
 
 /** What `PUT /upstream/resolver` may carry. */
 export const HouseholdResolverBody = z.object({
@@ -64,7 +65,7 @@ function serialize(household: {
  */
 export async function getHouseholdResolver() {
   const context = (await refreshResolverContexts()).household;
-  const household = await prisma().household.findUnique({ where: { id: "default" }, select: SELECT });
+  const household = await prisma().household.findUnique({ where: { id: currentHouseholdId() }, select: SELECT });
   return serialize(
     household ?? {
       dohUrl: null,
@@ -98,13 +99,13 @@ export async function setHouseholdResolver(input: { url?: string; probeEnabled?:
   }
 
   const household = await withUpstreamLock(async (tx) => {
-    const existing = await tx.household.findUniqueOrThrow({ where: { id: "default" } });
+    const existing = await tx.household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
     if (url !== undefined && url !== existing.dohUrl) {
       await tx.upstreamCheck.deleteMany({ where: { groupId: null } });
     }
     if (input.probeEnabled === false) await tx.upstreamCheck.deleteMany();
     return tx.household.update({
-      where: { id: "default" },
+      where: { id: currentHouseholdId() },
       data: {
         ...(url !== undefined ? { dohUrl: url } : {}),
         ...(url !== undefined && url !== existing.dohUrl ? { upstreamResolverSnapshot: Prisma.DbNull } : {}),
@@ -127,7 +128,7 @@ export async function clearHouseholdResolver() {
   await withUpstreamLock(async (tx) => {
     await tx.upstreamCheck.deleteMany({ where: { groupId: null } });
     await tx.household.update({
-      where: { id: "default" },
+      where: { id: currentHouseholdId() },
       data: { dohUrl: null, upstreamResolverSnapshot: Prisma.DbNull },
     });
   });

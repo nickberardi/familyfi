@@ -8,6 +8,7 @@ import { loadHousehold } from "./household";
 import { ApiError } from "./http";
 import { forgetRouteReached } from "./tunnel/remote-access";
 import { NO_EVIDENCE, checkRoute } from "./tunnel/route-check";
+import { currentHouseholdId } from "./household-context";
 
 /**
  * What Settings does with how phones connect: the routes the household runs, the home network
@@ -72,12 +73,12 @@ export async function setHomeUrl(raw: string | null): Promise<string | null> {
   const blank = raw === null || raw.trim() === "";
   const url = blank ? null : homeOrigin(raw!);
   if (!blank && !url) throw new ApiError(400, "invalid_home_url", "Use an http or https address with no path, such as http://192.168.1.10:7001.");
-  const household = await prisma().household.update({ where: { id: "default" }, data: { homeUrl: url } });
+  const household = await prisma().household.update({ where: { id: currentHouseholdId() }, data: { homeUrl: url } });
   return household.homeUrl;
 }
 
 export async function listEndpoints() {
-  const endpoints = await prisma().connectionEndpoint.findMany({ where: { householdId: "default" }, orderBy: [{ priority: "asc" }, { createdAt: "asc" }] });
+  const endpoints = await prisma().connectionEndpoint.findMany({ where: { householdId: currentHouseholdId() }, orderBy: [{ priority: "asc" }, { createdAt: "asc" }] });
   return endpoints.map(publicEndpoint);
 }
 
@@ -135,7 +136,7 @@ export async function deleteEndpoint(id: string) {
   }
   // Deleting the published route leaves nothing published: remote access is Off.
   const deleted = await prisma().$transaction(async (db) => {
-    await db.household.updateMany({ where: { id: "default", remoteEndpointId: id }, data: { remoteEndpointId: null } });
+    await db.household.updateMany({ where: { id: currentHouseholdId(), remoteEndpointId: id }, data: { remoteEndpointId: null } });
     return db.connectionEndpoint.deleteMany({ where: { id } });
   });
   if (!deleted.count) throw endpointNotFound();

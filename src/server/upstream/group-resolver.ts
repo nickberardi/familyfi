@@ -5,6 +5,7 @@ import { ApiError } from "../http";
 import { refreshResolverContexts } from "./discovery";
 import { ResolverConfigError, normalizeResolverUrl } from "./resolver-settings";
 import { withUpstreamLock } from "./transaction";
+import { currentHouseholdId } from "../household-context";
 
 /**
  * A group's own DNS-over-HTTPS endpoint — "Own endpoint" in the web's Edit sheet, "Override for this group" in the app.
@@ -22,7 +23,7 @@ async function requireGroup(id: string) {
 }
 
 async function householdTimezone() {
-  const household = await prisma().household.findUnique({ where: { id: "default" }, select: { timezone: true } });
+  const household = await prisma().household.findUnique({ where: { id: currentHouseholdId() }, select: { timezone: true } });
   return household?.timezone ?? "UTC";
 }
 

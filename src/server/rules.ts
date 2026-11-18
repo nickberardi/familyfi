@@ -24,6 +24,7 @@ import { prisma } from "./db";
 import { ApiError } from "./http";
 import { quarantinePolicyName } from "./unifi/names";
 import { networkInScope, type NetworkScope } from "./unifi/scope";
+import { currentHouseholdId } from "./household-context";
 
 // A group's and a rule's allow share it with the clients.
 export { activeWindowsEnd } from "@/lib/rules";
@@ -112,7 +113,7 @@ export function publicRule(rule: RuleWithWindows, quarantineEnforced: boolean): 
 /** The rules as the API shows them, reading the household's quarantine switch when one is built in. */
 export async function presentRules(rules: RuleWithWindows[]) {
   const enforced = rules.some(isQuarantineRule)
-    ? (await prisma().household.findUniqueOrThrow({ where: { id: "default" } })).quarantineEnforced
+    ? (await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } })).quarantineEnforced
     : false;
   return rules.map((rule) => publicRule(rule, enforced));
 }
@@ -282,7 +283,7 @@ export async function joinCountriesRule(tx: Prisma.TransactionClient, groupId: s
 
 /** Holds the household row for the rest of the transaction, serializing writes that take it. */
 export async function lockHousehold(tx: Prisma.TransactionClient): Promise<void> {
-  await tx.$queryRaw`SELECT "id" FROM "Household" WHERE "id" = 'default' FOR UPDATE`;
+  await tx.$queryRaw`SELECT "id" FROM "Household" WHERE "id" = ${currentHouseholdId()} FOR UPDATE`;
 }
 
 /**
@@ -293,14 +294,14 @@ export async function lockHousehold(tx: Prisma.TransactionClient): Promise<void>
  */
 export async function setQuarantineEnforced(enforced: boolean, data: Prisma.HouseholdUpdateInput = {}) {
   return prisma().$transaction(async (tx) => {
-    const before = await tx.household.findUniqueOrThrow({ where: { id: "default" } });
+    const before = await tx.household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
     if (enforced !== before.quarantineEnforced || !enforced) {
       await tx.rule.updateMany({
         where: { id: QUARANTINE_RULE_ID },
         data: { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null },
       });
     }
-    return tx.household.update({ where: { id: "default" }, data: { ...data, quarantineEnforced: enforced } });
+    return tx.household.update({ where: { id: currentHouseholdId() }, data: { ...data, quarantineEnforced: enforced } });
   });
 }
 
@@ -560,7 +561,7 @@ export { RuleScope };
 
 /** Settings' managed networks, and the site's network ids when every network is managed. */
 export async function householdNetworkScope(): Promise<{ scope: NetworkScope; known?: Set<string> }> {
-  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
   const scope = { manageAllNetworks: household.unifiManageAllNetworks, managedNetworkIds: household.unifiManagedNetworkIds };
   if (!scope.manageAllNetworks) return { scope };
   const { listSiteNetworks } = await import("./unifi-settings");

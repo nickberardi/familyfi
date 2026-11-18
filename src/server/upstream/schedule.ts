@@ -4,6 +4,7 @@ import { probeEnabledCategories } from "./probe";
 import { ResolverConfigError } from "./resolver-settings";
 import { withUpstreamLock } from "./transaction";
 import { unrefTimer } from "../unref-timer";
+import { currentHouseholdId } from "../household-context";
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let running = false;
@@ -13,7 +14,7 @@ async function sweep(): Promise<void> {
   running = true;
   try {
     const household = await prisma().household.findUnique({
-      where: { id: "default" },
+      where: { id: currentHouseholdId() },
       select: { dohProbeEnabled: true },
     });
     if (!household?.dohProbeEnabled) return;
@@ -35,7 +36,7 @@ async function sweep(): Promise<void> {
  * scheduled time) and an on-time run go through the same conditional update:
  *
  *   UPDATE Household SET dohProbeLastRunAt = due
- *   WHERE id = 'default' AND (dohProbeLastRunAt IS NULL OR dohProbeLastRunAt < due)
+ *   WHERE id = <current household> AND (dohProbeLastRunAt IS NULL OR dohProbeLastRunAt < due)
  *
  * No row updated means another process already accounted for this instant. This is the
  * whole of the cross-process guard — one deployment serves one household, so a claim
@@ -46,7 +47,7 @@ async function sweep(): Promise<void> {
 async function claimAndSweepIfDue(): Promise<boolean> {
   const now = new Date();
   const household = await prisma().household.findUnique({
-    where: { id: "default" },
+    where: { id: currentHouseholdId() },
     select: {
       timezone: true,
       dohProbeTime: true,
@@ -60,7 +61,7 @@ async function claimAndSweepIfDue(): Promise<boolean> {
   const claimed = await withUpstreamLock(async (tx) => {
     const result = await tx.household.updateMany({
       where: {
-        id: "default",
+        id: currentHouseholdId(),
         OR: [{ dohProbeLastRunAt: null }, { dohProbeLastRunAt: { lt: due } }],
       },
       data: { dohProbeLastRunAt: due },
@@ -73,7 +74,7 @@ async function claimAndSweepIfDue(): Promise<boolean> {
 
 async function arm(): Promise<void> {
   const household = await prisma().household.findUnique({
-    where: { id: "default" },
+    where: { id: currentHouseholdId() },
     select: { timezone: true, dohProbeTime: true, dohProbeDays: true, dohProbeEnabled: true },
   });
   if (!household?.dohProbeEnabled || household.dohProbeDays.length === 0) return;

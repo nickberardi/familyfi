@@ -9,6 +9,7 @@ import { ApiError } from "./http";
 import { CLEARED, liftRule, type LiftAction, type LiftBody } from "./rule-lifts";
 import { activeWindowsEnd, ruleInternetWindows } from "./rules";
 import { pauseRuleName } from "./unifi/names";
+import { currentHouseholdId } from "./household-context";
 
 /** The reserved `ruleId` for a group's built-in rule: "this group has internet". */
 export const INTERNET_RULE_ID = "internet";
@@ -31,7 +32,7 @@ export async function liftGroupInternet(
 ) {
   const existing = await prisma().group.findUnique({ where: { id: groupId }, include: groupInclude });
   if (!existing) throw new ApiError(404, "not_found", "Group not found.");
-  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
   const now = new Date();
   const actor = sessionActor(session);
   const block = blockRuleOf(existing);
@@ -156,7 +157,7 @@ async function liftForAsk(session: AnsweringSession, action: LiftAction, target:
     const rule = await prisma().rule.findUnique({ where: { id: target.ruleId }, include: { windows: true } });
     if (!rule) throw new ApiError(404, "not_found", "Rule not found.");
     const now = new Date();
-    const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
     const windowEnd = activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone);
     // A yes lifts the window that is on, and never past its end.
     if (!windowEnd) throw new ApiError(409, "not_in_window", "This rule is not blocking now.");

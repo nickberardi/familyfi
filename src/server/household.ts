@@ -7,10 +7,11 @@ import { storedQuarantineBlocking } from "./quarantine";
 import { setQuarantineEnforced } from "./rules";
 import { rescheduleAutoUpdate } from "./updater";
 import { rescheduleUpstreamProbe } from "./upstream/schedule";
+import { currentHouseholdId } from "./household-context";
 
 /** The one household this deployment serves. */
 export function loadHousehold(): Promise<Household> {
-  return prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  return prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
 }
 
 async function publicHousehold(household: Household) {
@@ -58,7 +59,7 @@ export async function updateHouseholdSettings(input: {
   const household =
     input.quarantineEnforced !== undefined
       ? await setQuarantineEnforced(input.quarantineEnforced, data)
-      : await prisma().household.update({ where: { id: "default" }, data });
+      : await prisma().household.update({ where: { id: currentHouseholdId() }, data });
   // Turned off, nothing more leaves for the relay, including alerts already waiting.
   if (input.alertsRelay === false) await prisma().alertEvent.deleteMany({ where: { sentAt: null } });
   const change = await enqueueChange(input.quarantineEnforced !== undefined ? "quarantine" : "household");
@@ -72,6 +73,6 @@ export async function updateHouseholdSettings(input: {
 
 /** The household's time zone, which every caller may read, a Watch included, which may not read household settings. */
 export async function currentTimezone() {
-  const household = await prisma().household.findUnique({ where: { id: "default" }, select: { timezone: true } });
+  const household = await prisma().household.findUnique({ where: { id: currentHouseholdId() }, select: { timezone: true } });
   return householdTimezone(household);
 }

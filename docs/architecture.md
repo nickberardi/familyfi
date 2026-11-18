@@ -45,6 +45,9 @@ Desired household configuration lives in PostgreSQL. UniFi firewall policies are
 The exact fields and relations live in [schema.prisma](../prisma/schema.prisma). This is a conceptual
 map, not a second schema: one deployment serves one household, including tables without a household
 foreign key.
+Server code reads that household's id from `currentHouseholdId()` in
+`src/server/household-context.ts`, never as a literal, so a hosted server can later choose the household
+once per request or background pass ([#374](https://github.com/nickberardi/familyfi/issues/374)).
 
 | Concept | Owns or relates to |
 | --- | --- |

@@ -22,6 +22,7 @@ import {
 } from "@/lib/constants";
 import { jsonError } from "./http";
 import { deviceRouteAllowed } from "./device-scope";
+import { currentHouseholdId } from "./household-context";
 
 const ARGON2 = {
   memoryCost: 19456,
@@ -82,9 +83,9 @@ export async function settleRecoveryPassword(): Promise<boolean> {
 
 export async function ensureHousehold() {
   await prisma().household.upsert({
-    where: { id: "default" },
+    where: { id: currentHouseholdId() },
     update: {},
-    create: { id: "default" },
+    create: { id: currentHouseholdId() },
   });
   await ensureQuarantineRule();
   await ensureLockDnsRule();

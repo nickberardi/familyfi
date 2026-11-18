@@ -3,6 +3,7 @@ import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { prisma } from "./db";
 import { clientForHousehold, connectionIdentity } from "./unifi/connection";
 import { networkInScope, type NetworkScope } from "./unifi/scope";
+import { currentHouseholdId } from "./household-context";
 
 /**
  * Settings descope: strip unmanaged network ids from network-scoped rules.
@@ -48,7 +49,7 @@ async function deleteNetworkRule(id: string) {
     include: { policies: true },
   });
   if (!existing) return;
-  const household = await prisma().household.findUnique({ where: { id: "default" } });
+  const household = await prisma().household.findUnique({ where: { id: currentHouseholdId() } });
   if (household && household.connectionStatus !== "unconfigured" && household.unifiSiteId) {
     try {
       const client = clientForHousehold(household);

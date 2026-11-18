@@ -11,6 +11,7 @@ import { revokeGroupDevices } from "./connection";
 import { builtInRule, joinCountriesRule, lockHousehold, ruleInternetWindows } from "./rules";
 import { clientForHousehold, connectionIdentity } from "./unifi/connection";
 import { GATEWAY_CONCURRENCY } from "./unifi/networks";
+import { currentHouseholdId } from "./household-context";
 
 export type GroupAccess = "available" | "blocked" | "paused" | "allowed";
 
@@ -234,7 +235,7 @@ export async function deleteGroup(id: string) {
     where: { scope: "group", id: { notIn: [LOCK_DNS_RULE_ID, COUNTRIES_RULE_ID] }, groups: { some: { groupId: id }, every: { groupId: id } } },
     include: { policies: true },
   });
-  const household = await prisma().household.findUnique({ where: { id: "default" } });
+  const household = await prisma().household.findUnique({ where: { id: currentHouseholdId() } });
   if (household && household.connectionStatus !== "unconfigured" && household.unifiSiteId) {
     try {
       const client = clientForHousehold(household);

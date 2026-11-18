@@ -29,6 +29,7 @@ import {
 import { deleteTunnelDnsRecords } from "./cloudflare-dns";
 import { startPhoneGateway } from "./phone-gateway";
 import { NO_EVIDENCE, checkRoute, reachabilityOf, type RouteReachability } from "./route-check";
+import { currentHouseholdId } from "../household-context";
 
 export type RemoteAccessStatus = "off" | "signing-in" | "starting" | "running" | "error" | "unavailable";
 
@@ -172,12 +173,12 @@ function appPort(): number {
 }
 
 async function publishedRoute(db: Db = prisma() as unknown as Db): Promise<ConnectionEndpoint | null> {
-  const row = await db.household.findUnique({ where: { id: "default" } });
+  const row = await db.household.findUnique({ where: { id: currentHouseholdId() } });
   return row?.remoteEndpointId ? db.connectionEndpoint.findUnique({ where: { id: row.remoteEndpointId } }) : null;
 }
 
 async function routeOfKind(kind: typeof RouteKind.quick | typeof RouteKind.domain, db: Db = prisma() as unknown as Db) {
-  return db.connectionEndpoint.findFirst({ where: { householdId: "default", kind } });
+  return db.connectionEndpoint.findFirst({ where: { householdId: currentHouseholdId(), kind } });
 }
 
 function storedCredential(route: ConnectionEndpoint): TunnelCredential | null {
@@ -197,9 +198,9 @@ function storedCredential(route: ConnectionEndpoint): TunnelCredential | null {
  * phones are never handed an address nothing answers yet.
  */
 async function publish(db: Db, endpointId: string | null, enable: boolean) {
-  await db.household.update({ where: { id: "default" }, data: { remoteEndpointId: endpointId } });
+  await db.household.update({ where: { id: currentHouseholdId() }, data: { remoteEndpointId: endpointId } });
   await db.connectionEndpoint.updateMany({
-    where: { householdId: "default", ...(endpointId ? { id: { not: endpointId } } : {}) },
+    where: { householdId: currentHouseholdId(), ...(endpointId ? { id: { not: endpointId } } : {}) },
     data: { enabled: false },
   });
   if (endpointId) await db.connectionEndpoint.update({ where: { id: endpointId }, data: { enabled: enable } });
@@ -632,7 +633,7 @@ async function stopTunnel() {
 async function namedTarget(change: Extract<RemoteAccessChange, { mode: "named" }>) {
   if (change.endpointId) {
     const route = await prisma().connectionEndpoint.findUnique({ where: { id: change.endpointId } });
-    if (!route || route.householdId !== "default") throw new RemoteAccessError("That route doesn't exist.");
+    if (!route || route.householdId !== currentHouseholdId()) throw new RemoteAccessError("That route doesn't exist.");
     if (route.kind !== RouteKind.own) throw new RemoteAccessError("That route belongs to FamilyFi's own tunnel. Choose Quick tunnel or Cloudflare Automatic instead.");
     return { own: route } as const;
   }
@@ -672,7 +673,7 @@ export async function setRemoteAccess(change: RemoteAccessChange) {
     await prisma().$transaction(async (db) => {
       await publish(db, null, false);
       // The credential lives on the domain route, so forgetting the domain deletes it with the route.
-      if (change.forget) await db.connectionEndpoint.deleteMany({ where: { householdId: "default", kind: RouteKind.domain } });
+      if (change.forget) await db.connectionEndpoint.deleteMany({ where: { householdId: currentHouseholdId(), kind: RouteKind.domain } });
     });
     if (domain) forget(new URL(domain.url).hostname, readCredential(domain)?.TunnelID ?? null);
     return;

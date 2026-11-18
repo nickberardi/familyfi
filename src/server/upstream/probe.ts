@@ -6,6 +6,7 @@ import { plainDnsResolver } from "./plain-dns";
 import { contextKey, refreshResolverContexts, type ResolverContext } from "./discovery";
 import { rollUpVerdict, type VerdictRollup } from "./verdict";
 import { withUpstreamLock } from "./transaction";
+import { currentHouseholdId } from "../household-context";
 
 export type ProbeOutcome = {
   categoryId: string;
@@ -83,14 +84,14 @@ async function recordCheck(input: {
   };
   return withUpstreamLock(async (tx) => {
     const [household, category] = await Promise.all([
-      tx.household.findUniqueOrThrow({ where: { id: "default" }, select: { dohProbeDisabledAt: true } }),
+      tx.household.findUniqueOrThrow({ where: { id: currentHouseholdId() }, select: { dohProbeDisabledAt: true } }),
       tx.upstreamCategory.findUnique({ where: { id: input.categoryId }, select: { disabledAt: true } }),
     ]);
     if (!category || (household.dohProbeDisabledAt && household.dohProbeDisabledAt >= input.startedAt)
       || (category.disabledAt && category.disabledAt >= input.startedAt)) return false;
     if (input.context) {
       const owner = input.groupId === null
-        ? await tx.household.findUnique({ where: { id: "default" }, select: { upstreamResolverSnapshot: true } })
+        ? await tx.household.findUnique({ where: { id: currentHouseholdId() }, select: { upstreamResolverSnapshot: true } })
         : await tx.group.findUnique({ where: { id: input.groupId }, select: { upstreamResolverSnapshot: true } });
       if (!owner || contextKey(owner.upstreamResolverSnapshot) !== contextKey(input.context)) return false;
     }
@@ -115,7 +116,7 @@ export async function probeCategory(
   });
   if (!category) throw Object.assign(new Error("Category not found."), { code: "not_found", status: 404 });
   const domains = await activeDomains(category.id);
-  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" }, select: { dohProbeTimeoutMs: true, dohUrl: true } });
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() }, select: { dohProbeTimeoutMs: true, dohUrl: true } });
   const timeoutMs = options.timeoutMs ?? household.dohProbeTimeoutMs;
   const contexts = options.resolve ? null : await refreshResolverContexts();
   const targets: { groupId: string | null; context?: ResolverContext }[] = options.resolve

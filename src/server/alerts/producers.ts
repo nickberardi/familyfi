@@ -3,6 +3,7 @@ import type { AlertKind, AskData, NewDeviceData } from "@/lib/alert-kinds";
 import { randomToken } from "../crypto";
 import { prisma } from "../db";
 import { wakeAlertSender } from "./sender";
+import { currentHouseholdId } from "../household-context";
 
 /**
  * The code that sees a change writes its alerts here, as outbox rows the sender delivers. Alerts are
@@ -39,7 +40,7 @@ async function recipients(kind: AlertKind, now = new Date(), db: Db = prisma()):
 }
 
 async function relayEnabled(db: Db = prisma()): Promise<boolean> {
-  const household = await db.household.findUnique({ where: { id: "default" }, select: { alertsRelayEnabled: true } });
+  const household = await db.household.findUnique({ where: { id: currentHouseholdId() }, select: { alertsRelayEnabled: true } });
   return household?.alertsRelayEnabled === true;
 }
 
@@ -96,7 +97,7 @@ export async function recordNewDevices(found: { hostname: string | null }[], opt
 export async function recordSyncOutcome(ok: boolean, now = new Date()): Promise<void> {
   try {
     const household = await prisma().household.findUnique({
-      where: { id: "default" },
+      where: { id: currentHouseholdId() },
       select: { alertsRelayEnabled: true, syncFailingSince: true, syncTroubleAlertedAt: true },
     });
     if (!household) return;
@@ -107,7 +108,7 @@ export async function recordSyncOutcome(ok: boolean, now = new Date()): Promise<
       const written = await prisma().$transaction(async (tx) => {
         // Cleared only by the pass that finds them set, so two passes cannot both say sync is back.
         const cleared = await tx.household.updateMany({
-          where: { id: "default", syncFailingSince: household.syncFailingSince, syncTroubleAlertedAt: alerted },
+          where: { id: currentHouseholdId(), syncFailingSince: household.syncFailingSince, syncTroubleAlertedAt: alerted },
           data: { syncFailingSince: null, syncTroubleAlertedAt: null },
         });
         if (!cleared.count || !alerted || !(await relayEnabled(tx))) return 0;
@@ -126,7 +127,7 @@ export async function recordSyncOutcome(ok: boolean, now = new Date()): Promise<
       return;
     }
     if (!household.syncFailingSince) {
-      await prisma().household.updateMany({ where: { id: "default", syncFailingSince: null }, data: { syncFailingSince: now } });
+      await prisma().household.updateMany({ where: { id: currentHouseholdId(), syncFailingSince: null }, data: { syncFailingSince: now } });
       return;
     }
     if (household.syncTroubleAlertedAt || !household.alertsRelayEnabled) return;
@@ -135,7 +136,7 @@ export async function recordSyncOutcome(ok: boolean, now = new Date()): Promise<
     // at once, and a failure to record the alerts leaves it unclaimed for the next pass.
     const written = await prisma().$transaction(async (tx) => {
       const claimed = await tx.household.updateMany({
-        where: { id: "default", syncTroubleAlertedAt: null },
+        where: { id: currentHouseholdId(), syncTroubleAlertedAt: null },
         data: { syncTroubleAlertedAt: now },
       });
       // Read again inside: a switch turned off since has already dropped what was waiting.
@@ -155,7 +156,7 @@ export async function recordSyncOutcome(ok: boolean, now = new Date()): Promise<
  */
 export async function recordSyncBackFor(deviceId: string, now = new Date()): Promise<void> {
   try {
-    const household = await prisma().household.findUnique({ where: { id: "default" }, select: { alertsRelayEnabled: true, syncTroubleAlertedAt: true } });
+    const household = await prisma().household.findUnique({ where: { id: currentHouseholdId() }, select: { alertsRelayEnabled: true, syncTroubleAlertedAt: true } });
     if (!household?.alertsRelayEnabled || household.syncTroubleAlertedAt) return;
     if (!(await recipients("sync.up", now)).includes(deviceId)) return;
     await writeEvents("sync.up", [deviceId], {}, now);

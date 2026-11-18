@@ -230,6 +230,11 @@
         "display"
       ]
     },
+    "tests/unit/household-context.test.ts": {
+      "categories": [
+        "repository"
+      ]
+    },
     "tests/unit/household-state.test.ts": {
       "categories": [
         "groups",

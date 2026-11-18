@@ -6,6 +6,7 @@ import { demoModeEnabled } from "../env";
 import { unrefTimer } from "../unref-timer";
 import { AlertTooLargeError, encryptAlert } from "./payload";
 import { recordSyncBackFor, signedInDevice } from "./producers";
+import { currentHouseholdId } from "../household-context";
 
 /**
  * Delivers the alert outbox through the project relay (`push.getfamilyfi.com`), which holds the
@@ -93,7 +94,7 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
 
   /** This server's id and secret at the relay, asked for once and kept encrypted. */
   async function install(): Promise<{ installId: string; secret: string }> {
-    const stored = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+    const stored = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
     if (stored.alertsInstallId && stored.alertsInstallSecretCiphertext && stored.alertsInstallSecretIv && stored.alertsInstallSecretAuthTag) {
       return {
         installId: stored.alertsInstallId,
@@ -108,7 +109,7 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
     // Kept only if no other process stored one first; then that one is used.
     await prisma().household.updateMany({
       // An install id kept without its secret is replaced too, so this never asks again forever.
-      where: { id: "default", OR: [{ alertsInstallId: null }, { alertsInstallSecretCiphertext: null }, { alertsInstallSecretIv: null }, { alertsInstallSecretAuthTag: null }] },
+      where: { id: currentHouseholdId(), OR: [{ alertsInstallId: null }, { alertsInstallSecretCiphertext: null }, { alertsInstallSecretIv: null }, { alertsInstallSecretAuthTag: null }] },
       data: { alertsInstallId: issued.installId, alertsInstallSecretCiphertext: Uint8Array.from(sealed.ciphertext), alertsInstallSecretIv: Uint8Array.from(sealed.iv), alertsInstallSecretAuthTag: Uint8Array.from(sealed.authTag) },
     });
     return install();
@@ -116,7 +117,7 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
 
   async function forgetInstall() {
     await prisma().household.update({
-      where: { id: "default" },
+      where: { id: currentHouseholdId() },
       data: { alertsInstallId: null, alertsInstallSecretCiphertext: null, alertsInstallSecretIv: null, alertsInstallSecretAuthTag: null },
     });
   }
@@ -132,7 +133,7 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
     if (demoModeEnabled()) return;
     const at = now();
     const household = await prisma().household.findUnique({
-      where: { id: "default" },
+      where: { id: currentHouseholdId() },
       select: { alertsRelayEnabled: true, syncTroubleAlertedAt: true },
     });
     const alerted = household?.syncTroubleAlertedAt;
@@ -166,7 +167,7 @@ export function createAlertSender(options: AlertSenderOptions = {}): AlertSender
     for (const [index, event] of due.entries()) {
       // Read again just before it goes: the batch can take a while, and in that time the switch may
       // have gone off, the alert been dropped, or the device been signed out, revoked or re-registered.
-      const switchOn = await prisma().household.findUnique({ where: { id: "default" }, select: { alertsRelayEnabled: true } });
+      const switchOn = await prisma().household.findUnique({ where: { id: currentHouseholdId() }, select: { alertsRelayEnabled: true } });
       if (!switchOn?.alertsRelayEnabled) return;
       const current = await prisma().alertEvent.findFirst({
         where: { id: event.id, sentAt: null },
