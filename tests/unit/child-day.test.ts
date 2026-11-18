@@ -654,6 +654,9 @@ describe("a child's day on the household's clock", () => {
     const group = { id: "g1", name: "Emma", suspension: { active: false, until: null, by: null }, allowance: { active: false, until: null, by: null } };
     expect(groupDayOf({ ...group, ask: { ...ask, by: { accountId: "mom", name: "Mom" } } }, [], ZONE, MONDAY_NIGHT).ask?.by).toBe("Mom");
     expect(groupDayOf(group, [], ZONE, MONDAY_NIGHT).ask).toBeNull();
+    // An ask sent at 10:09:36 PM was sent at 10:09, as the phone's clock said then, never 10:10.
+    const early = meDaySubject(me({ ask: { id: "a3", about: "pause", state: "waiting", at: "2026-11-17T03:09:36Z", expiresAt: again, by: null } }), MONDAY_NIGHT);
+    expect(early.subject.ask).toEqual({ state: "waiting", at: 22 * 60 + 9 });
   });
 
   it("tells a yes as the group's pause and lifts stand now, not as it was asked", () => {

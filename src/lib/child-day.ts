@@ -239,7 +239,7 @@ function spec(window: DayWindow): RuleWindowSpec {
 /** The window helpers, read on one household day. */
 function onDay(day: DayClock) {
   const at = (minutes: Clock) => dayDate(day, minutes);
-  const minutesOf = (date: Date): Clock => Math.round((date.getTime() - day.midnight.getTime()) / 60_000);
+  const minutesOf = (date: Date): Clock => Math.floor((date.getTime() - day.midnight.getTime()) / 60_000);
   /** Whether a window covers `now`, including a window that started last night. */
   const inWindow = (window: DayWindow, now: Clock): boolean => isWindowActive(spec(window), at(now), day.timeZone);
   /** When the occurrence of `window` covering `now` ends: 7 AM today in its morning tail, 7 AM tomorrow at night. */
@@ -355,7 +355,7 @@ function minutesOfHhmm(value: string): Clock {
  */
 export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; now: Clock; clock: DayClock } {
   const { clock, now: minutes } = householdDay(now, me.timezone);
-  const minutesOf = (iso: string) => Math.round((new Date(iso).getTime() - clock.midnight.getTime()) / 60_000);
+  const minutesOf = (iso: string) => Math.floor((new Date(iso).getTime() - clock.midnight.getTime()) / 60_000);
   const windows = me.windows.map((window): DayWindow => {
     const from = minutesOfHhmm(window.start);
     const end = minutesOfHhmm(window.end);
