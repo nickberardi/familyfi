@@ -1,5 +1,10 @@
 package expo.modules.familyfitransport
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.util.Base64
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
@@ -8,10 +13,12 @@ import expo.modules.kotlin.records.Field
 import expo.modules.kotlin.records.Record
 import java.io.ByteArrayInputStream
 import java.io.IOException
+import java.net.Inet4Address
 import java.security.MessageDigest
 import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.X509TrustManager
@@ -29,12 +36,57 @@ import okhttp3.Response
  * CertificatePinner is not enough, because it still requires a system-trusted chain. A system route
  * uses the platform's trust. Redirects are returned, never followed. Any failure without a response
  * rejects with E_TRANSPORT.
+ *
+ * Every client shares one connection pool, and each pin keeps one client for the app's life. OkHttp
+ * reuses a pooled connection only for the same socket factory and hostname verifier, so a client
+ * built afresh per request never reused a pinned route's connection; a cached one does. A route's
+ * TCP and TLS handshake is then paid once, and a server that offers HTTP/2 (Cloudflare, and most
+ * reverse proxies) carries every request over one connection: OkHttp negotiates it by ALPN wherever
+ * the server offers it, and keeps HTTP/1.1 connections alive otherwise. A pinned client's pooled
+ * connections all matched its pin when they were made.
  */
 class FamilyfiTransportModule : Module() {
   private val systemClient: OkHttpClient by lazy { OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).build() }
+  private val pinnedClients = ConcurrentHashMap<String, OkHttpClient>()
 
   override fun definition() = ModuleDefinition {
     Name("FamilyfiTransport")
+
+    Events("onNetwork")
+
+    OnCreate {
+      val manager = appContext.reactContext?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+      if (manager != null) {
+        val callback = object : ConnectivityManager.NetworkCallback() {
+          override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) =
+            update(describe(capabilities, manager.getLinkProperties(network)))
+
+          override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) =
+            update(describe(manager.getNetworkCapabilities(network), properties))
+
+          override fun onLost(network: Network) = update(mapOf("kind" to "other"))
+        }
+        manager.registerDefaultNetworkCallback(callback)
+        networkCallback = callback
+        connectivity = manager
+      }
+    }
+
+    OnDestroy {
+      networkCallback?.let { connectivity?.unregisterNetworkCallback(it) }
+      networkCallback = null
+    }
+
+    /** The network the phone is on now (familyfi `DeviceNetwork`), for the session's route order. */
+    Function("network") {
+      val manager = connectivity
+      val active = manager?.activeNetwork
+      if (manager == null || active == null) {
+        latest
+      } else {
+        describe(manager.getNetworkCapabilities(active), manager.getLinkProperties(active)).also { latest = it }
+      }
+    }
 
     AsyncFunction("request") { options: TransportRequest, promise: Promise ->
       if (!options.url.startsWith("https://")) {
@@ -47,10 +99,14 @@ class FamilyfiTransportModule : Module() {
           promise.reject("E_TRANSPORT", "A pinned route has no pin.", null)
           return@AsyncFunction
         }
-        pinnedClient(pin)
+        pinnedClients.getOrPut(pin) { pinnedClient(pin) }
       } else {
         systemClient
-      }.newBuilder().callTimeout(options.timeoutMs.toLong(), TimeUnit.MILLISECONDS).build()
+      }.newBuilder().callTimeout(options.timeoutMs.toLong(), TimeUnit.MILLISECONDS).apply {
+        // Only for a request that can move to another route (familyfi `LAN_CONNECT_TIMEOUT_MS`).
+        val connectMs = options.connectTimeoutMs
+        if (connectMs != null && connectMs > 0 && connectMs < options.timeoutMs) connectTimeout(connectMs.toLong(), TimeUnit.MILLISECONDS)
+      }.build()
 
       val contentType = options.headers.entries.firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }?.value ?: "application/json"
       val body = options.body?.toRequestBody(contentType.toMediaType())
@@ -79,6 +135,38 @@ class FamilyfiTransportModule : Module() {
       val certificate = CertificateFactory.getInstance("X.509").generateCertificate(ByteArrayInputStream(der)) as X509Certificate
       spkiPin(certificate)
     }
+  }
+
+  private var connectivity: ConnectivityManager? = null
+  private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
+  @Volatile private var latest: Map<String, String> = mapOf("kind" to "other")
+
+  private fun update(next: Map<String, String>) {
+    if (next == latest) return
+    latest = next
+    sendEvent("onNetwork", next)
+  }
+
+  /**
+   * `wifi` for Wi-Fi or Ethernet, `cellular`, else `other`: a VPN (over which a home route may
+   * answer, so it keeps the manifest's order), or no network. A Wi-Fi network's `key` is its IPv4
+   * subnet, which needs no location permission, unlike its name.
+   */
+  private fun describe(capabilities: NetworkCapabilities?, properties: LinkProperties?): Map<String, String> {
+    if (capabilities == null || capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return mapOf("kind" to "other")
+    if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+      val subnet = properties?.linkAddresses?.firstOrNull { it.address is Inet4Address }?.let { link ->
+        val ip = link.address.address.fold(0L) { value, byte -> (value shl 8) or (byte.toLong() and 0xff) }
+        val prefix = link.prefixLength
+        val mask = if (prefix == 0) 0L else (0xffffffffL shl (32 - prefix)) and 0xffffffffL
+        val network = ip and mask
+        "${network shr 24}.${(network shr 16) and 0xff}.${(network shr 8) and 0xff}.${network and 0xff}/$prefix"
+      }
+      return if (subnet != null) mapOf("kind" to "wifi", "key" to subnet) else mapOf("kind" to "wifi")
+    }
+    if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) return mapOf("kind" to "cellular")
+    return mapOf("kind" to "other")
   }
 
   /** A client that trusts only a leaf whose SPKI hash is `pin`; its hostname check passes only because the pin already matched. */
@@ -115,5 +203,8 @@ class TransportRequest : Record {
   @Field val trustMode: String = "system"
   @Field val pin: String? = null
   @Field val timeoutMs: Double = 15_000.0
+
+  /** How long to wait for the connection itself (familyfi `LAN_CONNECT_TIMEOUT_MS`), when set. */
+  @Field val connectTimeoutMs: Double? = null
 }
 
