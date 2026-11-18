@@ -684,6 +684,12 @@ describe("a child's day on the household's clock", () => {
     expect(told.day.kind).toBe("unpaused");
     expect(told.items[0]?.status?.text).toBe("Mom unpaused your apps at 10:05 PM.");
     expect(topAnswer(told).sentence).toMatch(/^Mom unpaused your apps\./);
+    // It is told for the rest of that day only: the next morning, and the next evening, are ordinary days.
+    for (const later of ["2026-11-17T13:00:00Z", "2026-11-18T02:00:00Z"]) {
+      const next = meDaySubject(me({ ask: pauseYes }), new Date(later));
+      expect(next.subject.ask).toBeUndefined();
+      expect(tellDay(next.subject, next.now, PHONE_VOICE, next.clock).day.kind).toBe("open");
+    }
   });
 
   it("names no one for a parent FamilyFi has no name for, and drops a timed-out ask once its block is over", () => {

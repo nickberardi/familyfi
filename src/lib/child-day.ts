@@ -400,7 +400,11 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
   // over, or a parent took it back, the yes is not told.
   function answerNow(ask: KnownAsk): DayAsk | undefined {
     if (ask.state !== "yes") return dayAsk(ask, minutesOf);
-    if (ask.about === "pause") return me.pause ? undefined : dayAsk(ask, minutesOf);
+    // A yes that ended a pause is told for the rest of the day it was answered on, never after.
+    if (ask.about === "pause") {
+      const answered = minutesOf(ask.answeredAt ?? ask.at);
+      return !me.pause && answered >= 0 && answered <= minutes ? dayAsk(ask, minutesOf) : undefined;
+    }
     const allowed = me.windows.find((window) => window.ruleId === ask.ruleId && window.allowed)?.allowed;
     if (!allowed || !ask.answeredAt) return undefined;
     const given = Math.round((new Date(allowed.until).getTime() - new Date(ask.answeredAt).getTime()) / 60_000);
