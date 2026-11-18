@@ -354,8 +354,8 @@ Every invite and paired device holds two separate values ([`src/lib/client-type.
 its **client type**, which says who is talking, and its **scope**, which says what it may call. The
 invite sets both, the claim copies them onto the device, and every signed-in call reads them from the
 session's device; no header carries them. The pairing code carries the client type too, so a client
-can tell a code meant for another before spending it: the app and FamilyFi Me each refuse the other's
-code, and a code with none (from before 2.0.0) is the app's (`verifyHousehold` in
+can tell a code meant for another before spending it: the app spends only an app's code and FamilyFi
+Me only its own, and a code with none (from before 2.0.0) is the app's (`verifyHousehold` in
 `src/lib/companion-pairing.ts`).
 
 | Client type | What it is | Scope |
