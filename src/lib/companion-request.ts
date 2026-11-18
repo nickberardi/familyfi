@@ -114,6 +114,11 @@ export type CompanionConnection = {
   onRoute?: (route: ConnectionRoute, network: DeviceNetwork | null) => void;
   /** The network the device is on now, which orders the routes (`orderRoutes`); unknown when absent. */
   network?: () => DeviceNetwork | null;
+  /**
+   * Every request may move to the next route, writes too. Only for a write that ends the same however
+   * often it lands: a device revoking itself, whose second arrival finds it already revoked.
+   */
+  failover?: boolean;
 };
 
 export function createCompanionRequest(transport: Transport, connection: CompanionConnection): ApiRequest {
@@ -121,7 +126,7 @@ export function createCompanionRequest(transport: Transport, connection: Compani
     // Only the household API: never another host, never another path.
     if (!path.startsWith("/api/v1/")) throw new Error(`Not an /api/v1 path: ${path}`);
     const method = (init.method ?? "GET").toUpperCase();
-    const retryable = SAFE_METHODS.has(method) || FAILOVER_WRITES.has(path);
+    const retryable = connection.failover === true || SAFE_METHODS.has(method) || FAILOVER_WRITES.has(path);
     const token = connection.token?.() ?? null;
     let lastFailure: unknown = new Error("FamilyFi has no route to try.");
 

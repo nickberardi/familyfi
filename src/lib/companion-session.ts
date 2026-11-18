@@ -207,10 +207,27 @@ export function createCompanionSession(deps: {
   /** Still paired with the household `asked` was for: not forgotten, nor replaced by another pairing. */
   const holds = (asked: ConnectionProfile) =>
     state.profile?.instanceId === asked.instanceId && state.profile.deviceId === asked.deviceId;
-  /** Revokes this phone on the server with the routes and session it held, renewing the bearer first if it has run out. */
-  const revokeOnServer = async (profile: ConnectionProfile, edge: EndpointCredential[], held: StoredSession) => {
+  /**
+   * Revokes this phone on the server with the routes and session it held, renewing the bearer first if
+   * it has run out. It starts at the route that last answered on the network the phone was on, and
+   * moves to the next route when one can't be reached: revoking itself twice ends the same as once,
+   * and a phone unpaired away from home otherwise stops at its home route and stays paired there.
+   */
+  const revokeOnServer = async (
+    profile: ConnectionProfile,
+    edge: EndpointCredential[],
+    held: StoredSession,
+    from: { activeRouteId: string | null; network: DeviceNetwork | null } = { activeRouteId: null, network },
+  ) => {
     const over = (token: string | null) =>
-      createCompanionRequest(transport, { routes: () => profile.endpoints, edgeCredentials: () => edge, token: () => token });
+      createCompanionRequest(transport, {
+        routes: () => profile.endpoints,
+        edgeCredentials: () => edge,
+        token: () => token,
+        activeRouteId: () => from.activeRouteId,
+        network: () => from.network,
+        failover: true,
+      });
     let token = held.token;
     if (held.refreshToken && Date.parse(held.session.expiresAt) - Date.now() < RENEW_AHEAD_MS) {
       token = (await renewPaired(over(null), held.refreshToken).catch(() => null))?.token ?? token;
@@ -303,10 +320,11 @@ export function createCompanionSession(deps: {
      * household keeps the record until an administrator revokes it.
      */
     async unpair() {
-      const { profile, session } = state;
+      const { profile, session, activeRouteId } = state;
       const edge = credentials;
+      const from = { activeRouteId, network };
       await lose();
-      if (profile && session) void revokeOnServer(profile, edge, session);
+      if (profile && session) void revokeOnServer(profile, edge, session, from);
     },
     /** The household ended this phone's session (it answers 401): the phone is no longer paired. */
     lost: () => lose(),
