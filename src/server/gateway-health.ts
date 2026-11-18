@@ -5,6 +5,7 @@ import { consoleAddress, findGatewayDevice, hasGatewayFeature, networkGatewayAdd
 import { loadNetworkDetails } from "./unifi/networks";
 import { unifiRequestLoad } from "./unifi/request-meter";
 import type { DeviceLatestStatistics, SiteDeviceOverview } from "./unifi/types";
+import { currentHouseholdId } from "./household-context";
 
 function deviceHealth(device: SiteDeviceOverview, statistics: DeviceLatestStatistics | null, gateway: boolean): GatewayDeviceHealth {
   return {
@@ -29,7 +30,7 @@ function deviceHealth(device: SiteDeviceOverview, statistics: DeviceLatestStatis
  * server has sent the console. Asked only when someone opens it: nothing polls this.
  */
 export async function gatewayHealth(now = new Date()): Promise<GatewayHealth> {
-  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
   let devices: GatewayDeviceHealth[] | null = null;
   let devicesError: string | null = null;
   if (!household.unifiKeyLastFour || !household.unifiSiteId) {

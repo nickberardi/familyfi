@@ -14,6 +14,7 @@ import { settleLostCreates } from "./unifi/lost-creates";
 import { recentSiteNetworks, rememberSiteNetworks } from "./unifi/network-cache";
 import { PolicyOperationIntent, Prisma, type Household } from "@prisma/client";
 import { withReconcileLock } from "./reconciliation";
+import { currentHouseholdId } from "./household-context";
 
 async function probeWithClient(client: ReturnType<typeof probeClient>, siteId?: string) {
   const [info, sites] = await Promise.all([client.getInfo(), client.listSites()]);
@@ -49,7 +50,7 @@ export async function testUnifiConnection(input: {
 }
 
 export async function testStoredUnifiConnection() {
-  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
   if (!household.unifiKeyLastFour) {
     throw new UnifiConfigError("Save a UniFi API key first.");
   }
@@ -152,7 +153,7 @@ async function switchUnifiTarget(
   nextIdentity: string,
   stillHeld: () => void,
 ): Promise<NetworkScope> {
-  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
   const scopedInput =
     unifiMockEnabled() && input.manageAllNetworks === undefined && input.managedNetworkIds === undefined
       ? { ...input, manageAllNetworks: true }
@@ -176,7 +177,7 @@ async function switchUnifiTarget(
   stillHeld();
   const secret = encryptSecret(input.apiKey);
   await prisma().household.update({
-    where: { id: "default" },
+    where: { id: currentHouseholdId() },
     data: {
       unifiMode: input.consoleId ? "cloud" : "local",
       unifiBaseUrl: input.baseUrl ?? null,
@@ -200,14 +201,14 @@ async function switchUnifiTarget(
 }
 
 export async function saveManagedNetworks(input: { manageAllNetworks?: boolean; managedNetworkIds?: string[] }) {
-  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
   if (!household.unifiKeyLastFour) {
     throw new UnifiConfigError("Save a UniFi API key before choosing networks.");
   }
   const networks = await listSiteNetworks(household, { fresh: true });
   const scope = resolveAndValidateScope(input, household, new Set(networks.map((network) => network.id)));
   await prisma().household.update({
-    where: { id: "default" },
+    where: { id: currentHouseholdId() },
     data: {
       unifiManageAllNetworks: scope.manageAllNetworks,
       unifiManagedNetworkIds: scope.managedNetworkIds,
@@ -311,7 +312,7 @@ export const UnifiTestBody = z
 
 /** The saved household row with its site's networks; a console that cannot be reached lists none. */
 async function settingsWithNetworks(always: boolean) {
-  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
   let networks: PublicUnifiNetwork[] = [];
   if (always || household.unifiKeyLastFour) {
     try {

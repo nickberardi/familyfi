@@ -30,6 +30,7 @@ import {
 } from "./rules";
 import { clientForHousehold, connectionIdentity } from "./unifi/connection";
 import { GATEWAY_CONCURRENCY } from "./unifi/networks";
+import { currentHouseholdId } from "./household-context";
 
 export type LiftAction = "pause" | "resume" | "extend" | "allow" | "disallow";
 
@@ -278,7 +279,7 @@ export async function deleteRule(id: string) {
   const builtIn = builtInRule(existing);
   if (builtIn) throw builtInError(builtIn);
   // Delete recorded UniFi policies only (D3). Never touch a group's pause AppPolicy rows.
-  const household = await prisma().household.findUnique({ where: { id: "default" } });
+  const household = await prisma().household.findUnique({ where: { id: currentHouseholdId() } });
   if (household && household.connectionStatus !== "unconfigured" && household.unifiSiteId) {
     try {
       const client = clientForHousehold(household);

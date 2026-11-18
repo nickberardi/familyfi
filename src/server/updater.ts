@@ -9,6 +9,7 @@ import { ApiError } from "./http";
 import { unrefTimer } from "./unref-timer";
 import { compareSemver, getUpdateCheckSnapshot, parseSemver, refreshStaleUpdateCheck, refreshUpdateCheck, type UpdateCheckSnapshot } from "./update-check";
 import { dueWeeklyRunAt, nextWeeklyRunAt, parseWeeklyCron, weeklyCron } from "./weekly-schedule";
+import { currentHouseholdId } from "./household-context";
 
 /**
  * Installing a newer release through the Watchtower sidecar (docker/docker-compose.yml). FamilyFi
@@ -123,7 +124,7 @@ type Db = Pick<ReturnType<typeof prisma>, "household">;
 
 async function latestUpdate(db: Db = prisma()): Promise<LatestUpdate | null> {
   const row = await db.household.findUnique({
-    where: { id: "default" },
+    where: { id: currentHouseholdId() },
     select: { updateRequestedAt: true, updateTargetVersion: true, updateStatus: true, updateError: true },
   });
   if (!row?.updateRequestedAt || !row.updateTargetVersion || !row.updateStatus) return null;
@@ -275,7 +276,7 @@ async function finishRun(requestedAt: Date, status: Exclude<UpdateStatus, "reque
   // Only the open request made at that instant is settled, so two processes settling it agree on the
   // first outcome, and a newer request is never settled with an older one's.
   await prisma().household.updateMany({
-    where: { id: "default", updateStatus: "requested", updateRequestedAt: requestedAt },
+    where: { id: currentHouseholdId(), updateStatus: "requested", updateRequestedAt: requestedAt },
     data: { updateStatus: status, updateError: error },
   });
   return latestUpdate();
@@ -295,7 +296,7 @@ export async function settleUpdateRun(options: UpdaterOptions = {}): Promise<Lat
     // and this release arrived after all: running it is the outcome.
     if (!current || !target || compareSemver(current, target) !== 0) return open;
     await prisma().household.updateMany({
-      where: { id: "default", updateStatus: open.status, updateRequestedAt: open.requestedAt },
+      where: { id: currentHouseholdId(), updateStatus: open.status, updateRequestedAt: open.requestedAt },
       data: { updateStatus: "succeeded", updateError: null },
     });
     return latestUpdate();
@@ -330,12 +331,12 @@ export async function requestUpdate(
   const now = (options.now ?? (() => new Date()))();
   await settleUpdateRun({ ...options, settings });
   const run = await prisma().$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT "id" FROM "Household" WHERE "id" = 'default' FOR UPDATE`;
+    await tx.$queryRaw`SELECT "id" FROM "Household" WHERE "id" = ${currentHouseholdId()} FOR UPDATE`;
     const open = await latestUpdate(tx);
     if (open?.status === "requested") throw new UpdaterError("update_in_progress", `FamilyFi is already installing v${open.targetVersion}.`);
     const requested: LatestUpdate = { requestedAt: now, targetVersion, status: "requested", error: null };
     await tx.household.update({
-      where: { id: "default" },
+      where: { id: currentHouseholdId() },
       data: { updateRequestedAt: now, updateTargetVersion: targetVersion, updateStatus: "requested", updateError: null },
     });
     return requested;
@@ -364,7 +365,7 @@ export async function requestUpdate(
 export async function updateSettings(options: UpdaterOptions = {}): Promise<UpdateSettings> {
   const settings = options.settings === undefined ? updaterSettings() : options.settings;
   const household = await prisma().household.findUnique({
-    where: { id: "default" },
+    where: { id: currentHouseholdId() },
     select: { timezone: true, updateScheduleEnabled: true, updateSchedule: true },
   });
   const schedule = { enabled: household?.updateScheduleEnabled ?? true, ...parseWeeklyCron(household?.updateSchedule ?? "") };
@@ -400,7 +401,7 @@ async function claimAndInstallIfDue(options: UpdaterOptions = {}): Promise<Claim
   const settings = options.settings === undefined ? updaterSettings() : options.settings;
   if (!settings) return "nothing";
   const household = await prisma().household.findUnique({
-    where: { id: "default" },
+    where: { id: currentHouseholdId() },
     select: { timezone: true, updateScheduleEnabled: true, updateSchedule: true, updateScheduleLastRunAt: true },
   });
   if (!household?.updateScheduleEnabled) return "nothing";
@@ -415,7 +416,7 @@ async function claimAndInstallIfDue(options: UpdaterOptions = {}): Promise<Claim
   // tries again within the hour: after a restart Watchtower starts only once FamilyFi has.
   if (!(await watchtowerAnswers(settings, options))) return "retry";
   const claimed = await prisma().household.updateMany({
-    where: { id: "default", OR: [{ updateScheduleLastRunAt: null }, { updateScheduleLastRunAt: { lt: due } }] },
+    where: { id: currentHouseholdId(), OR: [{ updateScheduleLastRunAt: null }, { updateScheduleLastRunAt: { lt: due } }] },
     data: { updateScheduleLastRunAt: due },
   });
   if (claimed.count === 0 || update.available !== true) return "nothing";
@@ -428,7 +429,7 @@ async function claimAndInstallIfDue(options: UpdaterOptions = {}): Promise<Claim
     // Watchtower answered the check but failed the request: give the slot back, to try again within the hour.
     if (error instanceof UpdaterError && error.code === "updater_unreachable") {
       await prisma().household.updateMany({
-        where: { id: "default", updateScheduleLastRunAt: due },
+        where: { id: currentHouseholdId(), updateScheduleLastRunAt: due },
         data: { updateScheduleLastRunAt: household.updateScheduleLastRunAt },
       });
       return "retry";
@@ -448,7 +449,7 @@ function setTimer(run: () => void, delay: number, armed: number) {
 async function arm(armed: number, retry = false): Promise<void> {
   if (!updaterSettings()) return;
   const household = await prisma().household.findUnique({
-    where: { id: "default" },
+    where: { id: currentHouseholdId() },
     select: { timezone: true, updateScheduleEnabled: true, updateSchedule: true },
   });
   if (!household?.updateScheduleEnabled) return;
@@ -518,7 +519,7 @@ export async function setUpdateSchedule(input: { enabled: boolean; days: number[
     throw new ApiError(400, "invalid_request", (error as Error).message);
   }
   await prisma().household.update({
-    where: { id: "default" },
+    where: { id: currentHouseholdId() },
     data: { updateScheduleEnabled: input.enabled, updateSchedule: weeklyCron(input) },
   });
   rescheduleAutoUpdate();

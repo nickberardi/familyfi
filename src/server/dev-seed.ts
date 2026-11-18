@@ -28,15 +28,16 @@ import {
   DEV_MOCK_IOT_ZONE,
   DEV_MOCK_SITE_ID,
 } from "./unifi/dev-mock";
+import { currentHouseholdId } from "./household-context";
 
 export const DEV_SEED_ADULT_USERNAME = DEV_ADMIN.username;
 
 async function ensureMockUnifiConnection() {
-  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
   if (household.unifiKeyLastFour) return;
   const secret = encryptSecret(DEV_MOCK_API_KEY);
   await prisma().household.update({
-    where: { id: "default" },
+    where: { id: currentHouseholdId() },
     data: {
       unifiMode: "local",
       unifiBaseUrl: DEV_MOCK_BASE_URL,

@@ -29,6 +29,7 @@ import { lockDnsExemptionsOf, lockDnsOpenDns } from "./unifi/lock-dns";
 import type { UnifiClient } from "./unifi/client";
 import type { FirewallPolicy, FirewallPolicyWrite } from "./unifi/types";
 import { unrefTimer } from "./unref-timer";
+import { currentHouseholdId } from "./household-context";
 
 const INTERVAL_MS = 30_000;
 // The lock outlives a stalled process by this much, and a running pass renews it well before then:
@@ -244,7 +245,7 @@ async function tick(owner: string): Promise<boolean> {
   // A child's ask nobody answered in time closes.
   await closeLapsedAsks(now);
 
-  const household = await prisma().household.findUnique({ where: { id: "default" } });
+  const household = await prisma().household.findUnique({ where: { id: currentHouseholdId() } });
   if (!household || household.connectionStatus === "unconfigured" || !household.unifiSiteId) return true;
 
   const revision = household.revision;
@@ -382,7 +383,7 @@ async function tick(owner: string): Promise<boolean> {
         accessPointName: null,
       },
     });
-    await prisma().household.update({ where: { id: "default" }, data: { presenceCheckedAt: now } });
+    await prisma().household.update({ where: { id: currentHouseholdId() }, data: { presenceCheckedAt: now } });
     // Phones hear about new devices, except on the household's first pass, when every device is new.
     await recordNewDevices(discovered, { firstPass: !household.presenceCheckedAt, now });
     // An unassigned device unseen for a month is forgotten, so rotating private addresses do not grow
@@ -652,7 +653,7 @@ async function tick(owner: string): Promise<boolean> {
     });
     // The pass reached the gateway, so an error left by an earlier failed pass no longer holds.
     await prisma().household.updateMany({
-      where: { id: "default", connectionStatus: "error" },
+      where: { id: currentHouseholdId(), connectionStatus: "error" },
       data: { connectionStatus: "connected", connectionError: null },
     });
     await prisma().changeResult.updateMany({
@@ -677,7 +678,7 @@ async function tick(owner: string): Promise<boolean> {
     // Not the gateway's fault, and the pass that took over settles the pending changes.
     if (error instanceof LockLostError || lock.lost()) return true;
     await prisma().household.update({
-      where: { id: "default" },
+      where: { id: currentHouseholdId() },
       data: { connectionStatus: "error", connectionError: message },
     });
     await recordSyncOutcome(false, now);

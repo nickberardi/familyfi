@@ -9,6 +9,7 @@ import { storedServiceToken } from "./edge-auth";
 import { loadHousehold } from "./household";
 import { ApiError } from "./http";
 import { encodePairingCode, PAIRING_CODE_VERSION } from "./pairing-code";
+import { currentHouseholdId } from "./household-context";
 
 /**
  * How every paired device joins: an invite, then a claim that signs the device in. Pairing is the
@@ -317,7 +318,7 @@ export async function inviteDevice(session: SignedInSession, input: InviteInput,
     const body = inviteBody(invite, code);
     return { invite: { ...body.invite, url } };
   }
-  const endpoint = await prisma().connectionEndpoint.findFirst({ where: { id: input.endpointId, householdId: "default", enabled: true } });
+  const endpoint = await prisma().connectionEndpoint.findFirst({ where: { id: input.endpointId, householdId: currentHouseholdId(), enabled: true } });
   if (!endpoint) throw new ApiError(404, "not_found", "Connection endpoint not found.");
   if (input.clientType === "me") {
     const group = await prisma().group.findUnique({ where: { id: input.groupId }, select: { id: true, kind: true } });

@@ -32,6 +32,7 @@ import type { ClientOverview, FirewallZone, NetworkDetails } from "./unifi/types
 import type { CheckupPolicy } from "@/lib/checkup";
 import type { UpdateCheck } from "@/lib/types";
 import { getUpdateCheckSnapshot } from "./update-check";
+import { currentHouseholdId } from "./household-context";
 
 /**
  * The network checkup (`src/lib/checkup.ts` holds the checks): it reads what sync already read, plus
@@ -80,7 +81,7 @@ async function checkup(household: Household, client: UnifiClient, preload?: Chec
     // The findings and the time of the last run stay as they were: a failed read says nothing new
     // about the network, and the next sync pass tries again.
     const message = error instanceof Error ? error.message : String(error);
-    await prisma().household.update({ where: { id: "default" }, data: { checkupError: message } });
+    await prisma().household.update({ where: { id: currentHouseholdId() }, data: { checkupError: message } });
     return;
   }
   const run = runChecks(inputs);
@@ -92,7 +93,7 @@ async function checkup(household: Household, client: UnifiClient, preload?: Chec
     await tx.checkupFinding.deleteMany({
       where: { key: { notIn: run.findings.map((finding) => finding.key) }, check: { notIn: [...run.skipped, "update_available"] } },
     });
-    await tx.household.update({ where: { id: "default" }, data: { checkupRanAt: now, checkupError: null, checkupSkipped: run.skipped } });
+    await tx.household.update({ where: { id: currentHouseholdId() }, data: { checkupRanAt: now, checkupError: null, checkupSkipped: run.skipped } });
   });
 }
 
@@ -271,7 +272,7 @@ const dismissed = (row: Pick<FindingRow, "dismissedAt" | "dismissedSubject" | "s
 export async function checkupState(update: UpdateCheck = getUpdateCheckSnapshot()): Promise<CheckupState> {
   await recordUpdateFinding(update);
   const [household, rows] = await Promise.all([
-    prisma().household.findUniqueOrThrow({ where: { id: "default" } }),
+    prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } }),
     prisma().checkupFinding.findMany({ orderBy: { key: "asc" } }),
   ]);
   const findings = rows

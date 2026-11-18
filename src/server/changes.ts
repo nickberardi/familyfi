@@ -2,6 +2,7 @@ import { ChangeStatus } from "@prisma/client";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { prisma } from "./db";
 import { ApiError } from "./http";
+import { currentHouseholdId } from "./household-context";
 
 type ChangeActor = { accountId: string | null; deviceId: string | null };
 const changeActor = new AsyncLocalStorage<ChangeActor>();
@@ -13,7 +14,7 @@ export function withChangeActor<T>(actor: ChangeActor, work: () => Promise<T>): 
 
 export async function bumpRevision(): Promise<number> {
   const household = await prisma().household.update({
-    where: { id: "default" },
+    where: { id: currentHouseholdId() },
     data: { revision: { increment: 1 } },
   });
   return household.revision;

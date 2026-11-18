@@ -4,6 +4,7 @@ import { clientForHousehold } from "../unifi/connection";
 import { networkInScope } from "../unifi/scope";
 import { loadNetworkDetails } from "../unifi/networks";
 import { withUpstreamLock } from "./transaction";
+import { currentHouseholdId } from "../household-context";
 
 export type ResolverNetwork = {
   id: string;
@@ -71,7 +72,7 @@ export function contextKey(context: unknown): string {
 
 /** Refresh the saved source identity and clear only scopes whose resolver changed. */
 export async function refreshResolverContexts(retries = 0): Promise<ResolverContexts> {
-  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
   const groups = await prisma().group.findMany({ include: { devices: { select: { networkId: true } } } });
   const requiresDiscovery = !household.dohUrl;
   let networks: ResolverNetwork[] = [];
@@ -107,7 +108,7 @@ export async function refreshResolverContexts(retries = 0): Promise<ResolverCont
   const applied = await withUpstreamLock(async (tx) => {
     // UniFi reads happen outside the lock. A settings or assignment change during
     // that read must not install an older snapshot over the new configuration.
-    const currentHousehold = await tx.household.findUniqueOrThrow({ where: { id: "default" } });
+    const currentHousehold = await tx.household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
     const currentGroups = await tx.group.findMany({ include: { devices: { select: { networkId: true } } } });
     const identity = (value: typeof household, rows: typeof groups) => ({
       dohUrl: value.dohUrl,
@@ -120,10 +121,10 @@ export async function refreshResolverContexts(retries = 0): Promise<ResolverCont
       })).sort((a, b) => a.id.localeCompare(b.id)),
     });
     if (contextKey(identity(household, groups)) !== contextKey(identity(currentHousehold, currentGroups))) return false;
-    const savedHousehold = await tx.household.findUniqueOrThrow({ where: { id: "default" }, select: { upstreamResolverSnapshot: true } });
+    const savedHousehold = await tx.household.findUniqueOrThrow({ where: { id: currentHouseholdId() }, select: { upstreamResolverSnapshot: true } });
     if (contextKey(savedHousehold.upstreamResolverSnapshot) !== contextKey(householdContext)) {
       await tx.upstreamCheck.deleteMany({ where: { groupId: null } });
-      await tx.household.update({ where: { id: "default" }, data: { upstreamResolverSnapshot: householdContext } });
+      await tx.household.update({ where: { id: currentHouseholdId() }, data: { upstreamResolverSnapshot: householdContext } });
     }
     for (const group of groups) {
       const context = groupContexts.get(group.id)!;

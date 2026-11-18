@@ -5,6 +5,7 @@ import { decryptSecret, encryptSecret, randomToken } from "./crypto";
 import { prisma } from "./db";
 import { isFullApp } from "./device-scope";
 import { edgeCredentials, recordDelivered } from "./edge-auth";
+import { currentHouseholdId } from "./household-context";
 
 const SPKI_SHA256 = /^[A-Za-z0-9_-]{43}$/;
 
@@ -20,8 +21,8 @@ export function isAdministrator(session: ConnectionSession): boolean {
 }
 
 export async function ensureConnectionIdentity() {
-  await prisma().household.upsert({ where: { id: "default" }, update: {}, create: { id: "default" } });
-  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  await prisma().household.upsert({ where: { id: currentHouseholdId() }, update: {}, create: { id: currentHouseholdId() } });
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
   if (household.instanceId && household.instancePublicKey && household.instancePrivateKeyCiphertext && household.instancePrivateKeyIv && household.instancePrivateKeyAuthTag) {
     return household;
   }
@@ -30,7 +31,7 @@ export async function ensureConnectionIdentity() {
   const privateKey = JSON.stringify(keys.privateKey.export({ format: "jwk" }));
   const secret = encryptSecret(privateKey);
   return prisma().household.update({
-    where: { id: "default" },
+    where: { id: currentHouseholdId() },
     data: {
       instanceId: `ff_${randomToken(12)}`,
       instancePublicKey: publicKey,

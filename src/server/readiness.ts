@@ -1,6 +1,7 @@
 import { APP_VERSION } from "@/lib/version";
 import { prisma } from "./db";
 import { ConfigurationError, demoModeEnabled, loadEnv } from "./env";
+import { currentHouseholdId } from "./household-context";
 
 export type Readiness = { body: Record<string, unknown>; status: number };
 
@@ -17,7 +18,7 @@ export async function readiness(): Promise<Readiness> {
   }
   try {
     await prisma().$queryRaw`SELECT 1`;
-    const household = await prisma().household.findUnique({ where: { id: "default" } });
+    const household = await prisma().household.findUnique({ where: { id: currentHouseholdId() } });
     // The demo seeds its household at every start, so without one it has nothing to show.
     if (!household && demoModeEnabled()) {
       return { body: { status: "degraded", db: "ok", version: APP_VERSION, error: "No household yet." }, status: 503 };

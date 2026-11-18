@@ -5,6 +5,7 @@ import { prisma } from "./db";
 import { DEMO_SET_UP_LINK } from "@/lib/demo";
 import { jsonError } from "./http";
 import { demoModeEnabled } from "./env";
+import { currentHouseholdId } from "./household-context";
 
 /**
  * Demo mode (`FAMILYFI_MODE=demo`, `demoModeEnabled` in `env.ts`): the household's side of the hosted
@@ -26,7 +27,7 @@ export function nextDemoResetAt(now: Date, timezone: string): Date {
  * `exit` is injectable for tests.
  */
 export async function startDemoReset(now = new Date(), exit: () => void = () => process.exit(1)): Promise<Date> {
-  const { timezone } = await prisma().household.findUniqueOrThrow({ where: { id: "default" }, select: { timezone: true } });
+  const { timezone } = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() }, select: { timezone: true } });
   const at = nextDemoResetAt(now, timezone);
   setTimeout(() => {
     console.log("demo mode: nightly reset; exiting so the platform restarts with a fresh household");
@@ -60,5 +61,5 @@ export async function ensureDemoRoute(value = process.env.FAMILYFI_DEMO_URL?.tri
     update: {},
     create: { ...route, url, kind: RouteKind.own },
   });
-  await prisma().household.update({ where: { id: "default" }, data: { remoteEndpointId: endpoint.id } });
+  await prisma().household.update({ where: { id: currentHouseholdId() }, data: { remoteEndpointId: endpoint.id } });
 }

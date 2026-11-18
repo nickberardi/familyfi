@@ -35,6 +35,7 @@ import { rescheduleUpstreamProbe } from "./upstream/schedule";
 import { NO_EVIDENCE } from "./tunnel/route-check";
 import { compareSemver, parseSemver } from "./update-check";
 import { parseWeeklyCron, weeklyCron } from "./weekly-schedule";
+import { currentHouseholdId } from "./household-context";
 
 /**
  * A household export: the configuration an administrator built (groups, rules and their windows,
@@ -233,7 +234,7 @@ export function browserOnly(session: { deviceId?: string | null }): Response | n
 export async function householdConfig(): Promise<HouseholdConfig> {
   const db = prisma();
   const [household, groups, accounts, devices, rules, categories, endpoints, lockDns] = await Promise.all([
-    db.household.findUniqueOrThrow({ where: { id: "default" } }),
+    db.household.findUniqueOrThrow({ where: { id: currentHouseholdId() } }),
     db.group.findMany({ orderBy: { createdAt: "asc" } }),
     db.account.findMany({ where: { kind: AccountKind.personal }, orderBy: { username: "asc" } }),
     db.device.findMany({ orderBy: { mac: "asc" } }),
@@ -544,7 +545,7 @@ function summarize(current: Current, endpoints: EndpointRow[], manifest: Manifes
 async function currentState() {
   await ensureConnectionIdentity();
   const [household, endpoints] = await Promise.all([
-    prisma().household.findUniqueOrThrow({ where: { id: "default" } }),
+    prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } }),
     prisma().connectionEndpoint.findMany({
       select: { url: true, kind: true, edgeAuth: true, tunnelCredentialCiphertext: true, edgeTokenCiphertext: true },
     }),
@@ -591,8 +592,8 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
   await ensureConnectionIdentity();
   return prisma().$transaction(
     async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "Household" WHERE "id" = 'default' FOR UPDATE`;
-      const household = await tx.household.findUniqueOrThrow({ where: { id: "default" } });
+      await tx.$queryRaw`SELECT "id" FROM "Household" WHERE "id" = ${currentHouseholdId()} FOR UPDATE`;
+      const household = await tx.household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
       const endpoints = await tx.connectionEndpoint.findMany({
         select: { url: true, kind: true, edgeAuth: true, tunnelCredentialCiphertext: true, edgeTokenCiphertext: true },
       });
@@ -601,7 +602,7 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       const { unifi, resolver, autoUpdate } = config.household;
 
       await tx.household.update({
-        where: { id: "default" },
+        where: { id: currentHouseholdId() },
         data: {
           timezone: config.household.timezone,
           displayName: config.household.displayName,
@@ -752,7 +753,7 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       await ensureCountriesRule(tx);
       // The checkup was about the household this replaces; the next sync checks the imported one.
       await tx.checkupFinding.deleteMany();
-      await tx.household.update({ where: { id: "default" }, data: { checkupRanAt: null, checkupError: null, checkupSkipped: [] } });
+      await tx.household.update({ where: { id: currentHouseholdId() }, data: { checkupRanAt: null, checkupError: null, checkupSkipped: [] } });
 
       await importCategories(tx, config.categories, now);
 

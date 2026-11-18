@@ -9,6 +9,7 @@ import { blockButtonRuleOf, blockRuleOf, groupInclude, lifted, publicGroup, sess
 import { ApiError } from "./http";
 import { CLEARED, readLiftBody, type LiftBody } from "./rule-lifts";
 import { activeWindowsEnd, isLockDnsRule, presentRules, ruleInclude, ruleInternetWindows } from "./rules";
+import { currentHouseholdId } from "./household-context";
 
 export type UnblockAction = "unblock" | "end" | "extend";
 
@@ -30,7 +31,7 @@ export async function unblockGroup(
 ) {
   const existing = await prisma().group.findUnique({ where: { id: groupId }, include: groupInclude });
   if (!existing) throw new ApiError(404, "not_found", "Group not found.");
-  const household = await prisma().household.findUniqueOrThrow({ where: { id: "default" } });
+  const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
   const now = new Date();
   // Lock DNS blocks only the ways around the gateway's DNS, and Block countries is protection, never
   // a block on the group: an unblock leaves both on.
