@@ -401,6 +401,22 @@ describe("a companion session", () => {
     };
   };
 
+  it("as FamilyFi Me, spends only a FamilyFi Me code, refusing the app's before reaching the household", async () => {
+    const home = household();
+    const storage = memory();
+    const child = createCompanionSession({ transport: home.transport, storage, deviceName: () => "A phone", client: "me" });
+    await child.load();
+    await expect(child.verify(home.code)).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.me);
+    expect(child.getState().pending).toBeNull();
+    expect(home.calls).toEqual([]);
+    const meCode = encodePairingCode({ version: 1, url: LAN.url, code: "cm1.token-1", fingerprint: home.fingerprint, pin: LAN.spkiSha256!, clientType: "me" });
+    await child.verify(meCode);
+    expect(child.getState().pending?.code.clientType).toBe("me");
+    // The app's session, without a client, refuses the child's code.
+    const app = createCompanionSession({ transport: home.transport, storage: memory(), deviceName: () => "A phone" });
+    await expect(app.verify(meCode)).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.app);
+  });
+
   it("pairs, which signs the phone in, lands the next launch signed in, and unpairs by revoking it on the server", async () => {
     const home = household();
     const storage = memory();
