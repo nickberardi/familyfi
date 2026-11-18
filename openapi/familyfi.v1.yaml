@@ -3526,13 +3526,14 @@ components:
           description: |
             `recovery` or `personal`: the account the session signs in as. `group`: FamilyFi Me on a
             child's phone, which signs in for its family group and never as an account; its
-            `displayName` is the group's name and its `username` names the device. New kinds may be added.
+            `displayName` is the group's name, its `username` names the device and `groupId` is the
+            group's id. New kinds may be added.
         expiresAt:
           type: string
           format: date-time
         groupId:
           type: string
-          description: "`group` only: the family group a child's phone signs in for, whose day it reads with `GET /groups/{id}`."
+          description: "Sent for, and only for, `group`: the family group a child's phone signs in for, whose day it reads with `GET /groups/{id}`."
     LoginResponse:
       type: object
       additionalProperties: false
