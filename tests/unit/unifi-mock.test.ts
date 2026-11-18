@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Household } from "@prisma/client";
 import { loadEnv, unifiMockEnabled } from "@/server/env";
 import { MockUnifiClient } from "@/server/unifi/mock";
@@ -88,5 +88,13 @@ describe("UniFi mock", () => {
     expect(unifiMockBanner()).toContain("UniFi mock enabled");
     expect(unifiMockBanner()).toContain("mock-unifi-key");
     expect(unifiMockBanner()).toContain(`Administrator login: ${DEV_ADMIN.username}`);
+  });
+
+  it("hands every bundled copy of the module the same mock gateway", async () => {
+    resetDevMockClientForTests();
+    vi.resetModules();
+    const other = await import("@/server/unifi/dev-mock");
+    expect(other.getSharedDevMockClient).not.toBe(getSharedDevMockClient);
+    expect(other.getSharedDevMockClient()).toBe(getSharedDevMockClient());
   });
 });
