@@ -70,6 +70,36 @@ describe("alert producers", () => {
     expect(await events("me.quiet")).toHaveLength(2);
   });
 
+  it("leaves a quiet phone unmarked when its alerts cannot be recorded, so the next pass tells it", async () => {
+    const phone = await registeredPhone();
+    const quiet = await prisma().pairedDevice.create({ data: { displayName: "Cassie's iPad", clientType: "me", scope: "me:askOnly", lastSeenAt: new Date(0) } });
+    // The mark and its alerts are one transaction: an alert write that fails takes the mark with it.
+    const db = prisma();
+    const realTransaction = db.$transaction.bind(db) as (fn: (tx: unknown) => Promise<unknown>) => Promise<unknown>;
+    const failing = vi.spyOn(db, "$transaction").mockImplementation(((fn: (tx: unknown) => Promise<unknown>) =>
+      realTransaction((tx) =>
+        fn(new Proxy(tx as object, {
+          get: (target, key) => {
+            const value = Reflect.get(target, key);
+            if (key !== "alertEvent") return value;
+            return new Proxy(value as object, { get: (events, name) => (name === "createMany" ? () => Promise.reject(new Error("database restarting")) : Reflect.get(events, name)) });
+          },
+        })),
+      )) as never);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      await recordQuietMePhones();
+    } finally {
+      failing.mockRestore();
+      warn.mockRestore();
+    }
+    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: quiet.id } })).quietAlertedAt).toBeNull();
+    expect(await events("me.quiet")).toEqual([]);
+
+    await recordQuietMePhones();
+    expect((await events("me.quiet")).map((event) => event.deviceId)).toEqual([phone]);
+  });
+
   it("marks a quiet phone while the switch is off, so turning it on never tells an old quiet spell", async () => {
     await registeredPhone();
     await prisma().household.update({ where: { id: "default" }, data: { alertsRelayEnabled: false } });

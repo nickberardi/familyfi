@@ -171,6 +171,9 @@ const ACCESS: Record<string, Entry> = {
   "GET /api/v1/paired/devices": { access: "administrator" },
   "DELETE /api/v1/paired/devices": { access: "administrator" },
   "GET /api/v1/paired/devices/{id}": { access: "administrator" },
+  // A FamilyFi Me phone may also PATCH (its Screen Time permission, `protection`) and DELETE its own
+  // record, never another's: every row here names someone else's id, so the own-id rule is in
+  // src/server/device-scope.ts and src/server/paired-devices.ts, and tests/integration/me-device.test.ts.
   "PATCH /api/v1/paired/devices/{id}": { access: "administrator" },
   "DELETE /api/v1/paired/devices/{id}": { access: "administrator", devices: ["app-watch", "app-controls"] },
   // Only the app on that device: the own-id rule is in the route's function and its own test

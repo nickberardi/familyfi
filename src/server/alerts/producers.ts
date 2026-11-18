@@ -221,14 +221,18 @@ export async function recordQuietMePhones(now = new Date()): Promise<void> {
     if (!quiet.length) return;
     const relay = await relayEnabled();
     const phones = relay ? await recipients("me.quiet", now) : [];
+    let written = 0;
     for (const device of quiet) {
-      // Marked first, and only if no one else marked it and it is still quiet, so two passes never tell
-      // it twice and a phone heard from meanwhile is not told as quiet.
-      const marked = await prisma().pairedDevice.updateMany({ where: { id: device.id, quietAlertedAt: null, lastSeenAt: { lt: cutoff } }, data: { quietAlertedAt: now } });
-      if (!marked.count || !phones.length) continue;
       const detail: MePhoneData = { p: device.displayName, ...(device.group ? { g: device.group.id, n: device.group.name } : {}) };
-      await writeEvents("me.quiet", phones, detail, now);
+      // Marked with its alerts in one transaction, and only if no one else marked it and it is still
+      // quiet: two passes never tell it twice, a phone heard from meanwhile is not told as quiet, and
+      // alerts that fail to record leave it unmarked for the next pass.
+      written += await prisma().$transaction(async (tx) => {
+        const marked = await tx.pairedDevice.updateMany({ where: { id: device.id, quietAlertedAt: null, lastSeenAt: { lt: cutoff } }, data: { quietAlertedAt: now } });
+        return marked.count ? writeEvents("me.quiet", phones, detail, now, tx) : 0;
+      });
     }
+    if (written) wakeAlertSender();
   } catch (error) {
     warn(error);
   }
