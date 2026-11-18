@@ -97,6 +97,7 @@ export function createCompanionSession(deps: {
   client?: PairingClient;
 }) {
   const { transport, deviceName } = deps;
+  const client = deps.client ?? "app";
   const vault = createSessionVault(deps.storage);
   let state: CompanionSessionState = { status: "loading", profile: null, session: null, pending: null, activeRouteId: null };
   let credentials: EndpointCredential[] = [];
@@ -269,7 +270,7 @@ export function createCompanionSession(deps: {
     },
     /** Reads a pairing code and verifies the household it names. Throws; `pairingErrorMessage` words it. */
     async verify(code: string) {
-      set({ pending: await verifyHousehold(transport, code, deps.client) });
+      set({ pending: await verifyHousehold(transport, code, client) });
     },
     /**
      * The explicit trust action: spends the code, which signs the phone in, and keeps the household
@@ -282,10 +283,10 @@ export function createCompanionSession(deps: {
       // FamilyFi Me keeps only a child's sign-in for a group, and the app never keeps one. Any other
       // is revoked at once and never stored.
       const forGroup = claimed.session.session.kind === "group" && Boolean(claimed.session.session.groupId);
-      if (forGroup !== ((deps.client ?? "app") === "me")) {
+      if (forGroup !== (client === "me")) {
         set({ pending: null });
         void revokeOnServer(claimed.profile, claimed.edgeCredentials, claimed.session);
-        throw new PairingCodeError(PAIRING_CODE_OTHER_CLIENT[deps.client ?? "app"]);
+        throw new PairingCodeError(PAIRING_CODE_OTHER_CLIENT[client]);
       }
       await vault.savePairing(claimed.profile, claimed.edgeCredentials, claimed.session);
       credentials = claimed.edgeCredentials;
