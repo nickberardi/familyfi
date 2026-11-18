@@ -100,12 +100,12 @@ export function GroupCardFrame({
         </View>
       ) : null}
       {ask ? (
-        <View style={[styles.more, under ? styles.afterUnder : null, { paddingLeft: inset }]}>
+        <View pointerEvents="box-none" style={[styles.more, under ? styles.afterUnder : null, { paddingLeft: inset }]}>
           <CardTextButton action={ask} />
         </View>
       ) : null}
       {open && more ? (
-        <View style={[styles.more, ask ? styles.afterAsk : under ? styles.afterUnder : null, { paddingLeft: inset }]}>
+        <View pointerEvents="box-none" style={[styles.more, ask ? styles.afterAsk : under ? styles.afterUnder : null, { paddingLeft: inset }]}>
           <CardTextButton action={more} />
         </View>
       ) : null}
@@ -145,8 +145,9 @@ const styles = StyleSheet.create({
   caret: { marginTop: 2, flexShrink: 0 },
   action: { position: "absolute", top: 14, right: 16, zIndex: 10 },
   under: { marginTop: -4, paddingRight: HEADER_PAD, paddingBottom: 12, flexDirection: "row" },
-  // On a phone a text button is 44pt tall, its own room above and below its line: it starts where the
-  // header's or the button's padding does, so it covers neither, and a second one starts under the first.
+  // On a phone a text button is 44pt tall, its own room above and below its line: it starts at the
+  // header's or the button's bottom padding, never over their content, and a second one starts under
+  // the first. The row passes touches beside the link through to the header (`box-none`).
   more: TEXT_BUTTON_EXTRA ? { marginTop: -12, flexDirection: "row" } : { marginTop: -8, paddingBottom: 10, flexDirection: "row" },
   afterUnder: { marginTop: TEXT_BUTTON_EXTRA ? -12 : -6 },
   afterAsk: { marginTop: TEXT_BUTTON_EXTRA ? 0 : -4 },

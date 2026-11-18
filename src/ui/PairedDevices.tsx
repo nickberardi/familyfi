@@ -27,7 +27,7 @@ function TextButton({ label, token, onPress, disabled, testID }: { label: string
       disabled={disabled}
       onPress={onPress}
       testID={testID}
-      style={({ pressed }) => [disabled && { opacity: 0.4 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
+      style={({ pressed }) => [styles.textButton, disabled && { opacity: 0.4 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
     >
       <Text style={[text(14, 21, token), styles.bold]}>{label}</Text>
     </Pressable>
@@ -266,10 +266,12 @@ const styles = StyleSheet.create({
   phoneWords: { flex: 1, minWidth: 0 },
   nameRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 },
   name: { flexShrink: 1 },
-  actions: { flexShrink: 0, alignItems: "flex-end", gap: 4 },
+  actions: { flexShrink: 0, alignItems: "flex-end", gap: Platform.OS === "web" ? 4 : 0 },
   phoneLarge: { alignItems: "flex-start" },
-  // Each 44pt tall to touch, side by side under the words.
-  actionsUnder: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 20, minHeight: 44, marginTop: 4 },
+  // Side by side under the words.
+  actionsUnder: { flexDirection: "row", flexWrap: "wrap", columnGap: 20 },
+  // 44 to touch on a phone, the line centred in it; the web keeps the line's own height.
+  textButton: { minHeight: Platform.OS === "web" ? 0 : 44, justifyContent: "center" },
   listButton: { paddingHorizontal: 18, paddingVertical: 10 },
   remoteBody: { gap: 12, paddingHorizontal: 18, paddingVertical: 12 },
 });
