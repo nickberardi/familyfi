@@ -61,7 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # Every commit: the merge commit's first parent, the base branch, and the commit
+          # Every commit: the base branch, for changed-line coverage, and the commit
           # tests/integration/min-app.test.ts reads.
           fetch-depth: 0
       - uses: ./.github/actions/runner-cleanup
@@ -132,7 +132,8 @@ jobs:
       - id: chromium
         run: pnpm exec playwright install chromium
       # Audit: known high or critical advisories in what ships.
-      - run: scripts/test.py check audit lint typecheck api catalog
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: scripts/test.py check audit lint typecheck api catalog
       # db-drift: exit 2 when schema.prisma differs from what the migrations built. db-upgrade: a
       # database from every supported release upgraded to these migrations, so a household that
       # skipped releases is covered. A pull request runs them only when it changes their inputs;
