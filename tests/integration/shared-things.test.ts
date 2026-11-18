@@ -192,7 +192,7 @@ describe("shared Things", () => {
     const notTv = await windowRule([servers.id], "Backups");
     const other = await ask(cassie, tv.id, { about: "rule", ruleId: notTv.id, minutes: 30 });
     expect(other.status).toBe(404);
-    expect((await errorOf(other)).message).toBe("That rule isn't one of TV's.");
+    expect((await errorOf(other)).message).toBe("That rule doesn't cover TV.");
 
     const waiting = await askOf(await ask(cassie, tv.id, { about: "rule", ruleId: downtime.id, minutes: 30 }));
     expect(waiting).toMatchObject({ about: "rule", ruleId: downtime.id, minutes: 30, from: { name: "Cassie" } });
@@ -228,8 +228,11 @@ describe("shared Things", () => {
     expect((await errorOf(await ask(cassie, tv.id, { about: "pause" }))).code).toBe("ask_too_soon");
     const abbys = await askOf(await ask(abby, tv.id, { about: "pause" }));
     expect(abbys.from).toEqual({ groupId: abbyGroup.id, name: "Abby" });
-    // Cassie now reads her own no, never Abby's waiting ask.
-    expect((await readGroup(cassie, tv.id)).ask).toBeUndefined();
+    // Cassie still reads her own no and when she can ask again, never Abby's waiting ask.
+    const cassies = (await readGroup(cassie, tv.id)).ask;
+    expect(cassies).toMatchObject({ id: first.id, state: "no" });
+    expect(cassies?.askAgainAt).toBeDefined();
+    expect((await readGroup(abby, tv.id)).ask).toMatchObject({ id: abbys.id, state: "waiting" });
   });
 
   it("goes with the child's group", async () => {

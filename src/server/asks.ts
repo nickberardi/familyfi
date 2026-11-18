@@ -20,7 +20,7 @@ import { activeWindowsEnd, builtInRule, ruleInternetWindows } from "./rules";
 
 /** The fewest and most minutes a child can ask for. */
 export const ASK_MINUTES = { min: 5, max: 240 } as const;
-/** At most this many asks from one group an hour. */
+/** At most this many asks an hour from one child about one group. */
 export const ASKS_PER_HOUR = 6;
 const HOUR_MS = 60 * 60_000;
 
@@ -72,7 +72,7 @@ export async function fileAsk(session: SignedInSession, groupId: string, input: 
     blockEnd = block.expiresAt;
   } else {
     const link = group.rules.find((item) => item.ruleId === input.ruleId && item.rule.systemGroupId === null && !builtInRule(item.rule));
-    if (!link) throw new ApiError(404, "not_found", thing ? `That rule isn't one of ${thing}'s.` : "That rule isn't one of yours.");
+    if (!link) throw new ApiError(404, "not_found", thing ? `That rule doesn't cover ${thing}.` : "That rule isn't one of yours.");
     const { rule } = link;
     if (rule.mode === RuleMode.always) throw new ApiError(409, "always_on", "You can't ask for more time on this one.");
     const ends = activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone);
