@@ -462,6 +462,16 @@ export function createHouseholdStore(deps: {
     /** Whether a control may send a write now: always, unless an offline guard says the view is stale. */
     canControl,
     reload,
+    /**
+     * One scheduled refresh, for a client that runs its own schedule: a full reload when nothing has
+     * loaded, the view is stale, or the last full reload is `fullInterval` old; otherwise only what
+     * changes on its own. Resolves to whether it was a full reload.
+     */
+    async refresh(fullInterval = FULL_REFRESH_MS): Promise<boolean> {
+      const full = !state.loaded || state.stale || Date.now() - fullLoadAt >= fullInterval;
+      await (full ? reload() : refreshLive());
+      return full;
+    },
     mutate,
     dismissFeedback: () => set({ error: "", notice: "", noticeAction: null }),
     /** Runs a notice's action (such as Undo) as a write of its own. */
