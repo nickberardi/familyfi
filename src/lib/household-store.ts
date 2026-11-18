@@ -468,7 +468,8 @@ export function createHouseholdStore(deps: {
      * changes on its own. Resolves to whether it was a full reload.
      */
     async refresh(fullInterval = FULL_REFRESH_MS): Promise<boolean> {
-      const full = !state.loaded || state.stale || Date.now() - fullLoadAt >= fullInterval;
+      // An incompatible server is read in full each time (refreshLive hands it to reload).
+      const full = !state.loaded || state.stale || state.status === "incompatible" || Date.now() - fullLoadAt >= fullInterval;
       await (full ? reload() : refreshLive());
       return full;
     },
