@@ -19,11 +19,15 @@ import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.X509TrustManager
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.Connection
+import okhttp3.EventListener
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -104,8 +108,14 @@ class FamilyfiTransportModule : Module() {
         systemClient
       }.newBuilder().callTimeout(options.timeoutMs.toLong(), TimeUnit.MILLISECONDS).apply {
         // Only for a request that can move to another route (familyfi `LAN_CONNECT_TIMEOUT_MS`).
+        // OkHttp's connectTimeout covers the TCP connect alone (the TLS handshake runs under the read
+        // timeout), so a watchdog cancels the call unless a connection, handshake included, or a
+        // pooled one is acquired in time.
         val connectMs = options.connectTimeoutMs
-        if (connectMs != null && connectMs > 0 && connectMs < options.timeoutMs) connectTimeout(connectMs.toLong(), TimeUnit.MILLISECONDS)
+        if (connectMs != null && connectMs > 0 && connectMs < options.timeoutMs) {
+          connectTimeout(connectMs.toLong(), TimeUnit.MILLISECONDS)
+          eventListener(ConnectWatchdog(connectMs.toLong()))
+        }
       }.build()
 
       val contentType = options.headers.entries.firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }?.value ?: "application/json"
@@ -186,6 +196,32 @@ class FamilyfiTransportModule : Module() {
       .sslSocketFactory(context.socketFactory, trustManager)
       .hostnameVerifier { _, _ -> true }
       .build()
+  }
+}
+
+/** Cancels a call that has not acquired a connection (TCP and TLS, or a pooled one) within `limitMs`. */
+private class ConnectWatchdog(private val limitMs: Long) : EventListener() {
+  @Volatile private var pending: ScheduledFuture<*>? = null
+
+  override fun callStart(call: Call) {
+    pending = timers.schedule({ call.cancel() }, limitMs, TimeUnit.MILLISECONDS)
+  }
+
+  override fun connectionAcquired(call: Call, connection: Connection) = stop()
+
+  override fun callEnd(call: Call) = stop()
+
+  override fun callFailed(call: Call, ioe: IOException) = stop()
+
+  private fun stop() {
+    pending?.cancel(false)
+    pending = null
+  }
+
+  companion object {
+    private val timers = Executors.newSingleThreadScheduledExecutor { runnable ->
+      Thread(runnable, "familyfi-transport-connect").apply { isDaemon = true }
+    }
   }
 }
 
