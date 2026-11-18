@@ -32,13 +32,14 @@ describe("alert copy", () => {
   it("says which child's phone lost Screen Time or went quiet", () => {
     expect(alertText("me.protection", { p: "Cassie's iPad", n: "Cassie" })).toEqual({
       title: "Screen Time is off on Cassie's iPad",
-      body: "FamilyFi Me can't block apps there until it's allowed again.",
+      body: "Allow FamilyFi Me in Screen Time on that phone so it can block apps.",
     });
+    expect(alertText("me.protection", {})?.title).toBe("Screen Time is off on a child's phone");
     expect(alertText("me.quiet", { p: "Cassie's iPad" })).toEqual({
-      title: "Cassie's iPad hasn't checked in",
-      body: "FamilyFi Me there hasn't reached FamilyFi for a day. It may be off or offline.",
+      title: "Cassie's iPad isn't checking in",
+      body: "It hasn't reached FamilyFi for a day. It may be off or offline.",
     });
-    expect(alertText("me.quiet", {})?.title).toBe("A child's phone hasn't checked in");
+    expect(alertText("me.quiet", {})?.title).toBe("A child's phone isn't checking in");
   });
 
   it("has words for every kind, and none for a kind it does not know", () => {

@@ -250,7 +250,7 @@ describe("FamilyFi Me on a child's phone", () => {
     ]);
   });
 
-  it("says whether Screen Time is on, once the phone has said, and that it has gone quiet", () => {
+  it("says whether Screen Time is on, once the phone has said, and that it isn't checking in", () => {
     const now = new Date("2026-09-15T12:00:00Z");
     const recent = { lastSeenAt: "2026-09-15T11:00:00Z" };
     const tagsOf = (over: Partial<PairedPhone>) => phoneLines(child({ ...recent, ...over }), now).tags.slice(2);
@@ -262,7 +262,7 @@ describe("FamilyFi Me on a child's phone", () => {
     expect(tagsOf({ protection: "paused" })).toEqual([]);
     expect(tagsOf({ protection: "on", lastSeenAt: "2026-09-14T11:59:00Z" })).toEqual([
       { label: "Screen Time on", name: "Screen Time on", tone: "green" },
-      { label: "Quiet for a day", name: "Not heard from for a day", tone: "yellow" },
+      { label: "Not checking in", name: "Not checking in", tone: "yellow" },
     ]);
     // A revoked phone says neither.
     expect(tagsOf({ protection: "on", lastSeenAt: "2026-09-01T00:00:00Z", revokedAt: "2026-09-10T00:00:00Z" })).toEqual([]);

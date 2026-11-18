@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ApiRequest } from "@/lib/api-client";
 import { ALERT_KINDS } from "@/lib/alert-kinds";
-import { alertChoiceRows, alertDestination, readAlertChoices, registerAlerts, setAlertChoice, supportsAlerts, unregisterAlerts } from "@/lib/alert-registration";
+import { ALERTS_SCREEN_COPY, alertChoiceRows, alertDestination, readAlertChoices, registerAlerts, setAlertChoice, supportsAlerts, unregisterAlerts } from "@/lib/alert-registration";
 
 describe("alert registration", () => {
   it("is offered only by a server whose contract has alerts", () => {
@@ -39,6 +39,10 @@ describe("alert registration", () => {
       { kind: "me.quiet", on: true },
     ]);
     expect(alertChoiceRows(null).every((row) => row.on)).toBe(true);
+  });
+
+  it("names every kind of alert in the Alerts screen's intro", () => {
+    expect(ALERTS_SCREEN_COPY.intro).toBe("Get an alert on this device about new devices in Unassigned, your gateway, and your children's asks and phones.");
   });
 
   it("opens new devices in Unassigned and gateway trouble on Sync", () => {

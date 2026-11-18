@@ -140,8 +140,9 @@ export async function setMeProtection(session: Viewer, id: string, protection: M
   if (!device || device.clientType !== "me" || device.revokedAt) throw new ApiError(403, "own_device_required", "Only FamilyFi Me on this phone can tell its Screen Time permission.");
   const now = new Date();
   if (device.protection !== protection) {
-    await prisma().pairedDevice.update({ where: { id }, data: { protection, protectionAt: now } });
-    if (device.protection === "on") await recordMeProtectionLost({ phone: device.displayName, group: device.group }, now);
+    // Only from what it read, so two reports at once change it, and tell parents, once.
+    const changed = await prisma().pairedDevice.updateMany({ where: { id, protection: device.protection }, data: { protection, protectionAt: now } });
+    if (changed.count && device.protection === "on") await recordMeProtectionLost({ phone: device.displayName, group: device.group }, now);
   }
   const updated = await prisma().pairedDevice.findUniqueOrThrow({ where: { id }, include: deviceInclude() });
   return publicPairedDevice(updated);

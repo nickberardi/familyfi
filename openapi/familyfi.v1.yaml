@@ -3097,9 +3097,9 @@ paths:
       description: |
         An administrator renames a device or changes an agent's scope, between `agent:full` and
         `agent:readOnly`; any other scope change answers 400 `invalid_scope`. FamilyFi Me on a child's
-        phone (`me:askOnly`) sends only `protection`, for its own id; anyone else sending `protection`
-        gets 403 `own_device_required`, and a child's phone sending anything else 403
-        `administrator_required`. A `protection` that was `on` and changes tells parents' phones
+        phone (`me:askOnly`) sends only `protection`, for its own id: an administrator sending
+        `protection` gets 403 `own_device_required`, a child's phone sending anything else 403
+        `administrator_required`, and anyone else is refused before the body is read. A `protection` that was `on` and changes tells parents' phones
         (`me.protection`).
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
