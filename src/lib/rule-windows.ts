@@ -1,4 +1,4 @@
-import { bedtimeEndDays, formatClock, minutesFromHhmm, nextClockOnDays } from "./clock";
+import { bedtimeEndDays, formatClock, minutesFromHhmm, nextClockOnDays, zonedFormat } from "./clock";
 
 /*
  * Recurring rule windows, and a group's internet state and day timeline built from them.
@@ -201,14 +201,10 @@ export function internetDayBands(group: InternetGroup, windows: InternetWindow[]
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+const LOCAL_PARTS: Intl.DateTimeFormatOptions = { weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" };
+
 function localParts(now: Date, timeZone: string): { weekday: number; minutes: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(now);
+  const parts = zonedFormat(LOCAL_PARTS, timeZone).formatToParts(now);
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
   return { weekday: WEEKDAYS.indexOf(get("weekday")), minutes: Number(get("hour")) * 60 + Number(get("minute")) };
 }

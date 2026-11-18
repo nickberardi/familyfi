@@ -6,6 +6,39 @@
 
 export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
+const formatters = new WeakMap<Intl.DateTimeFormatOptions, Map<string, Intl.DateTimeFormat>>();
+
+/**
+ * An en-US formatter for `options` in `timeZone`, made once and reused. Building one costs far more
+ * than formatting with it (on the phones' Hermes, each is a fresh ICU or NSDateFormatter set-up), and
+ * the display logic formats per group and rule on every refresh. `options` must be a module constant:
+ * formatters are kept per options object, then per time zone.
+ */
+export function zonedFormat(options: Intl.DateTimeFormatOptions, timeZone: string): Intl.DateTimeFormat {
+  let byZone = formatters.get(options);
+  if (!byZone) {
+    byZone = new Map();
+    formatters.set(options, byZone);
+  }
+  let formatter = byZone.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", { ...options, timeZone });
+    byZone.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
+const CLOCK: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" };
+const PARTS: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+};
+
 export function minutesFromHhmm(value: string | null): number | null {
   if (!value) return null;
   const match = /^(\d{2}):(\d{2})$/.exec(value);
@@ -19,11 +52,7 @@ export function minutesFromHhmm(value: string | null): number | null {
  * same bytes, so the shared display vectors match and labels compare equal across clients.
  */
 export function formatClock(date: Date, timezone: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    hour: "numeric",
-    minute: "2-digit",
-  })
+  return zonedFormat(CLOCK, timezone)
     .format(date)
     .replace(/[  ]/g, " ");
 }
@@ -68,16 +97,7 @@ export type ZonedParts = {
 };
 
 export function zonedParts(date: Date, timeZone: string): ZonedParts {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
+  const parts = zonedFormat(PARTS, timeZone).formatToParts(date);
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
   return {
     year: Number(get("year")),
