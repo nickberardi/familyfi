@@ -271,8 +271,8 @@ like a phone, over a route for five minutes, but names the family group it is fo
 of things) instead of an account. Its code carries what a phone's does: the route, its pin, and a
 Cloudflare Access token where the route has one, so it reaches the household away from home. It
 signs in for that group and never as an account: its session's `kind` is `group`, its `groupId`
-that group's id, its `displayName` the group's name and its `username` names the device, and a paired-device listing shows its
-`group` with `actsAs` null. It has no parent device, since it belongs to its group: re-pairing or
+that group's id, its `displayName` the group's name and its `username` names the device, and a
+paired-device listing shows its `group` with `actsAs` null. It has no parent device, since it belongs to its group: re-pairing or
 revoking the phone that invited it leaves it alone.
 
 It reads its own group with `GET /groups/{id}` (any other group is 404 for it), the rules that cover it with `GET /rules`, and the time zone with `GET /auth/session`. `groupDayOf` (`src/lib/child-day.ts`) builds its day from them, which tells the group's own pause and allowance, the windows of its
