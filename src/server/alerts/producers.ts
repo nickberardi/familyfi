@@ -213,16 +213,18 @@ export async function recordMeProtectionLost(phone: { phone: string; group: { id
  */
 export async function recordQuietMePhones(now = new Date()): Promise<void> {
   try {
+    const cutoff = new Date(now.getTime() - ME_QUIET_AFTER_MS);
     const quiet = await prisma().pairedDevice.findMany({
-      where: { clientType: "me", revokedAt: null, quietAlertedAt: null, lastSeenAt: { lt: new Date(now.getTime() - ME_QUIET_AFTER_MS) } },
+      where: { clientType: "me", revokedAt: null, quietAlertedAt: null, lastSeenAt: { lt: cutoff } },
       select: { id: true, displayName: true, group: { select: { id: true, name: true } } },
     });
     if (!quiet.length) return;
     const relay = await relayEnabled();
     const phones = relay ? await recipients("me.quiet", now) : [];
     for (const device of quiet) {
-      // Marked first, and only if no one else marked it, so two passes never tell it twice.
-      const marked = await prisma().pairedDevice.updateMany({ where: { id: device.id, quietAlertedAt: null }, data: { quietAlertedAt: now } });
+      // Marked first, and only if no one else marked it and it is still quiet, so two passes never tell
+      // it twice and a phone heard from meanwhile is not told as quiet.
+      const marked = await prisma().pairedDevice.updateMany({ where: { id: device.id, quietAlertedAt: null, lastSeenAt: { lt: cutoff } }, data: { quietAlertedAt: now } });
       if (!marked.count || !phones.length) continue;
       const detail: MePhoneData = { p: device.displayName, ...(device.group ? { g: device.group.id, n: device.group.name } : {}) };
       await writeEvents("me.quiet", phones, detail, now);

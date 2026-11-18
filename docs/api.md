@@ -67,7 +67,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | GET/DELETE | `/api/v1/paired/invites/{id}` | Administrator reads an invite's status (`pending`, `claimed`, `expired`) or cancels it early |
 | POST | `/api/v1/paired/invites/{id}/claim` | Join with the code: every client is signed in at once (bearer and refresh token, never a password or device credential); a phone also gets its route and signed manifest |
 | GET | `/api/v1/paired/devices` | Paired devices with each one's `scope`, the account it acts as (`actsAs`) and its parent: all of them for an administrator, itself and what it set up for a paired device; `?clientType=` and `?status=` narrow it; the route each phone paired through (`pairedVia`), the Cloudflare Access token version it last received per route (`edgeTokens`), and active sessions |
-| GET/PATCH/DELETE | `/api/v1/paired/devices/{id}` | Read one; an administrator renames it or changes an agent's scope (no other kind changes scope: 400 `invalid_scope`); an administrator, the device itself or its parent phone revokes it and its sessions. Only an administrator may use `?remove=true` to delete its record |
+| GET/PATCH/DELETE | `/api/v1/paired/devices/{id}` | Read one; an administrator renames it or changes an agent's scope (no other kind changes scope: 400 `invalid_scope`), and FamilyFi Me on a child's phone tells its own Screen Time permission (`protection` only); an administrator, the device itself or its parent phone revokes it and its sessions. Only an administrator may use `?remove=true` to delete its record |
 | PUT/DELETE | `/api/v1/paired/devices/{id}/push` | The app on that device (`app:full`, its own id only: 403 `own_device_required` for anyone else, a browser included) stores or forgets its push token and alert key; see [Phone alerts](#phone-alerts) |
 | GET/PUT | `/api/v1/paired/devices/{id}/alerts` | The same app reads or sets which alert kinds it gets (`{ "kinds": { "device.new": true } }`); 404 `push_not_registered` before it registered |
 | DELETE | `/api/v1/paired/devices?status=revoked` | Administrator removes every revoked device's record; active ones are untouched |
@@ -294,8 +294,8 @@ waits when the phone that made it is revoked, or its administrator is demoted or
 (`meDaySubject`, `tellDay`) turns that answer into the day FamilyFi Me shows. It renews like any
 paired device, and may revoke itself. On an iPhone or iPad it tells its Screen Time permission,
 which it needs to block apps, with `PATCH /paired/devices/{its id}` `{ "protection": "on" |
-"notAllowed" | "removed" }` and nothing else (403 `own_device_required` for anyone else, an
-administrator included); its record then shows `protection` and `protectionAt`, and Android's never
+"notAllowed" | "removed" }` and nothing else (403 `own_device_required` for an administrator, and
+any other device is refused by its scope or as no administrator); its record then shows `protection` and `protectionAt`, and Android's never
 does. Deleting its group revokes it and cancels invites still
 waiting for the group, keeping the record; an import keeps it where its group comes back with the
 same id and revokes it otherwise.

@@ -18,7 +18,8 @@ import { mayHoldScope, type ClientScope } from "@/lib/client-type";
  * - `agent:readOnly`: household reads.
  * - `me:askOnly`: FamilyFi Me on a child's phone (`me`), which signs in for its family group and
  *   never as an account: its session, `GET /connection` for the manifest it needs away from home, its
- *   own group (`GET /groups/{id}`) and the rules that cover it (`GET /rules`), and un-pairing itself. It reads nothing else in the household.
+ *   own group (`GET /groups/{id}`) and the rules that cover it (`GET /rules`), un-pairing itself, and telling
+ *   its own Screen Time permission (`PATCH /paired/devices/{its id}`). It reads nothing else in the household.
  *
  * The built-in quarantine rule's switch is the household's quarantine setting, so an `app:rulesOnly` device or an
  * agent may pause, extend and resume it, never switch, edit or delete it.

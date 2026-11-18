@@ -54,13 +54,13 @@ export function alertText(kind: string, data: Record<string, unknown>): AlertTex
     }
     case "me.protection": {
       const { p } = data as Partial<MePhoneData>;
-      const phone = text(p) ?? "A child's phone";
-      return { title: `Screen Time is off on ${phone}`, body: "FamilyFi Me can't block apps there until it's allowed again." };
+      const phone = text(p) ?? "a child's phone";
+      return { title: `Screen Time is off on ${phone}`, body: "Allow FamilyFi Me in Screen Time on that phone so it can block apps." };
     }
     case "me.quiet": {
       const { p } = data as Partial<MePhoneData>;
       const phone = text(p) ?? "A child's phone";
-      return { title: `${phone} hasn't checked in`, body: "FamilyFi Me there hasn't reached FamilyFi for a day. It may be off or offline." };
+      return { title: `${phone} isn't checking in`, body: "It hasn't reached FamilyFi for a day. It may be off or offline." };
     }
     case "sync.down":
       return { title: "Can't reach your gateway", body: "Your rules may not apply until FamilyFi reaches it again." };
@@ -85,8 +85,8 @@ export const ALERT_KIND_LABELS: Record<string, string> = {
   "sync.down": "Can't reach your gateway",
   "sync.up": "Gateway back",
   "ask.new": "Asks from children",
-  "me.protection": "Screen Time turned off",
-  "me.quiet": "A child's phone goes quiet",
+  "me.protection": "Screen Time off on a child's phone",
+  "me.quiet": "Child's phone not checking in",
 };
 
 /** The Alerts card in Settings. */
@@ -94,7 +94,7 @@ export const ALERTS_CARD_COPY = {
   title: "Alerts",
   switchLabel: "Send alerts to the FamilyFi app",
   description:
-    "Tells the FamilyFi app on your devices when a new device is waiting in Unassigned, when FamilyFi can't reach your gateway or when a child asks for more time.",
+    "Tells the FamilyFi app on your devices about new devices in Unassigned, your gateway, and your children's asks and phones.",
   disclosureTitle: "What leaves your home",
   disclosure: [
     "Alerts go through FamilyFi's push relay, which hands them to Apple or Google.",

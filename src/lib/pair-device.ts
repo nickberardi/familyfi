@@ -167,8 +167,7 @@ const SCOPE_TONES: Record<string, TagTone> = { "app:full": "green", "agent:full"
 export const CHILD_PHONE_TAGS = {
   on: "Screen Time on",
   off: "Screen Time off",
-  quiet: "Quiet for a day",
-  quietName: "Not heard from for a day",
+  quiet: "Not checking in",
 } as const;
 
 /**
@@ -180,7 +179,7 @@ function childPhoneTags(phone: PairedPhone, now: Date): { label: string; name: s
   if (phone.protection === "on") tags.push({ label: CHILD_PHONE_TAGS.on, name: CHILD_PHONE_TAGS.on, tone: "green" });
   else if (phone.protection === "notAllowed" || phone.protection === "removed") tags.push({ label: CHILD_PHONE_TAGS.off, name: CHILD_PHONE_TAGS.off, tone: "red" });
   if (phone.lastSeenAt && now.getTime() - Date.parse(phone.lastSeenAt) > ME_QUIET_AFTER_MS) {
-    tags.push({ label: CHILD_PHONE_TAGS.quiet, name: CHILD_PHONE_TAGS.quietName, tone: "yellow" });
+    tags.push({ label: CHILD_PHONE_TAGS.quiet, name: CHILD_PHONE_TAGS.quiet, tone: "yellow" });
   }
   return tags;
 }
