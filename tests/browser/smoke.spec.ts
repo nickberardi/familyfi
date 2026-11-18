@@ -139,6 +139,8 @@ test("reconciling from the collapsed notices keeps the row, and Escape returns f
   await page.keyboard.press("Escape");
   await expect(popover).toHaveCount(0);
   await expect(row).toBeFocused();
+  // The page keeps polling sync; a poll still being fetched when the test ends must not fail the next one.
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
 test("a sidebar section collapses, stays collapsed, and opens when one of its pages is visited", { tag: "@desktop" }, async ({ page }) => {
