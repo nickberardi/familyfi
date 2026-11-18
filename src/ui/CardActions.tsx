@@ -51,18 +51,20 @@ export function CardButton({ action }: { action: ZoneAction }) {
   );
 }
 
-/** A text link on a card, such as More time. */
+/**
+ * A text link on a card, such as More time or a child's ask. On a phone it is 44pt tall itself, the
+ * line centred in it, since a touch outside its parent's bounds never reaches a `hitSlop`.
+ */
 export function CardTextButton({ action }: { action: ZoneAction }) {
   const ui = useUI();
   return (
     <Pressable
       role="button"
       aria-disabled={action.disabled}
-      hitSlop={{ top: 10, bottom: 10 }}
       disabled={action.disabled}
       onPress={action.onPress}
       testID={action.testID}
-      style={({ pressed }) => [pressed && { opacity: PRESS_OPACITY }]}
+      style={({ pressed }) => [styles.textButton, pressed && { opacity: PRESS_OPACITY }]}
     >
       <Text style={{ fontFamily: ui.font, fontSize: 14, lineHeight: 21, fontWeight: "600", color: ui.color(action.disabled ? "disabled" : "accent") }}>
         {action.label}
@@ -263,7 +265,12 @@ export function CardMenuButton({
   );
 }
 
+/** How much taller than its 21pt line a text button is on a phone, to reach 44pt. */
+export const TEXT_BUTTON_EXTRA = Platform.OS === "web" ? 0 : 44 - 21;
+
 const styles = StyleSheet.create({
+  // 44 to touch on a phone; the web keeps the line's own height.
+  textButton: { minHeight: 21 + TEXT_BUTTON_EXTRA, justifyContent: "center" },
   button: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, minHeight: 32, justifyContent: "center" },
   split: { flexDirection: "row", borderRadius: 8, overflow: "hidden", minHeight: 32 },
   splitMain: { paddingHorizontal: 10, paddingVertical: 6, justifyContent: "center" },

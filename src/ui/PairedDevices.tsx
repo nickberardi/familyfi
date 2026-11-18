@@ -58,8 +58,18 @@ export function PairedPhoneRow({
   const ui = useUI();
   const text = useText();
   const lines = phoneLines(phone, new Date(), parentName);
+  // At large text the actions go under the words, so the name and address keep the row's width.
+  const large = useLargeText();
+  const actions =
+    onRevoke || onRepair || onRemove ? (
+      <View style={large ? styles.actionsUnder : styles.actions}>
+        {onRevoke ? <TextButton label={COPY.revoke} token="danger" onPress={onRevoke} disabled={disabled} testID={`phone-revoke-${phone.id}`} /> : null}
+        {onRepair ? <TextButton label={COPY.repair} token="accent" onPress={onRepair} disabled={disabled} testID={`phone-repair-${phone.id}`} /> : null}
+        {onRemove ? <TextButton label={COPY.remove} token="danger" onPress={onRemove} disabled={disabled} testID={`phone-remove-${phone.id}`} /> : null}
+      </View>
+    ) : null;
   return (
-    <View style={[styles.phone, { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]} testID="phone-row">
+    <View style={[styles.phone, large && styles.phoneLarge, { borderTopWidth: 1, borderTopColor: ui.color("hairline") }]} testID="phone-row">
       <View style={[styles.phoneIcon, { backgroundColor: ui.color("field") }]}>
         <ui.Icon name={phone.clientType === "app-watch" ? "watch" : phone.clientType === "agent" ? "robot" : "device-mobile"} size={18} color={ui.color("ink")} />
       </View>
@@ -86,12 +96,9 @@ export function PairedPhoneRow({
         {lines.expired ? (
           <Text style={[text(14, 21, "danger"), styles.bold, styles.line]}>{isApp(phone) ? COPY.expired : isAppControls(phone) ? COPY.expiredControls : COPY.expiredPairAgain}</Text>
         ) : null}
+        {large ? actions : null}
       </View>
-      <View style={styles.actions}>
-        {onRevoke ? <TextButton label={COPY.revoke} token="danger" onPress={onRevoke} disabled={disabled} testID={`phone-revoke-${phone.id}`} /> : null}
-        {onRepair ? <TextButton label={COPY.repair} token="accent" onPress={onRepair} disabled={disabled} testID={`phone-repair-${phone.id}`} /> : null}
-        {onRemove ? <TextButton label={COPY.remove} token="danger" onPress={onRemove} disabled={disabled} testID={`phone-remove-${phone.id}`} /> : null}
-      </View>
+      {large ? null : actions}
     </View>
   );
 }
@@ -260,6 +267,9 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 4 },
   name: { flexShrink: 1 },
   actions: { flexShrink: 0, alignItems: "flex-end", gap: 4 },
+  phoneLarge: { alignItems: "flex-start" },
+  // Each 44pt tall to touch, side by side under the words.
+  actionsUnder: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 20, minHeight: 44, marginTop: 4 },
   listButton: { paddingHorizontal: 18, paddingVertical: 10 },
   remoteBody: { gap: 12, paddingHorizontal: 18, paddingVertical: 12 },
 });

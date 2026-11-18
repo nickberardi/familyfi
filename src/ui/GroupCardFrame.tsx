@@ -7,7 +7,7 @@ import type { InternetWindow } from "@/lib/rule-windows";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
-import { CardButton, CardMenuButton, CardTextButton, type ZoneAction } from "./CardActions";
+import { CardButton, CardMenuButton, CardTextButton, TEXT_BUTTON_EXTRA, type ZoneAction } from "./CardActions";
 import { GROUP_TILE_INSET, GroupCardHeader } from "./GroupCardHeader";
 import { useUI } from "./UIContext";
 import { useLargeText } from "./use-large-text";
@@ -145,7 +145,9 @@ const styles = StyleSheet.create({
   caret: { marginTop: 2, flexShrink: 0 },
   action: { position: "absolute", top: 14, right: 16, zIndex: 10 },
   under: { marginTop: -4, paddingRight: HEADER_PAD, paddingBottom: 12, flexDirection: "row" },
-  more: { marginTop: -8, paddingBottom: 10, flexDirection: "row" },
-  afterUnder: { marginTop: -6 },
-  afterAsk: { marginTop: -4 },
+  // On a phone a text button is 44pt tall, its own room above and below its line: it starts where the
+  // header's or the button's padding does, so it covers neither, and a second one starts under the first.
+  more: TEXT_BUTTON_EXTRA ? { marginTop: -12, flexDirection: "row" } : { marginTop: -8, paddingBottom: 10, flexDirection: "row" },
+  afterUnder: { marginTop: TEXT_BUTTON_EXTRA ? -12 : -6 },
+  afterAsk: { marginTop: TEXT_BUTTON_EXTRA ? 0 : -4 },
 });
