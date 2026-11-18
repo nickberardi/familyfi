@@ -271,7 +271,9 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
       const claimed = await claimHousehold(transport, state.pending, deviceName());
       await vault.savePairing(claimed.profile, claimed.edgeCredentials, claimed.session);
       credentials = claimed.edgeCredentials;
-      set({ pending: null, profile: claimed.profile, session: claimed.session, status: "signedIn" });
+      // A new pairing remembers no routes, even one made without unpairing first.
+      answered = {};
+      set({ pending: null, profile: claimed.profile, session: claimed.session, status: "signedIn", activeRouteId: null });
     },
     /** "Not my household — start over": drops the unspent code. */
     reject: () => set({ pending: null }),
