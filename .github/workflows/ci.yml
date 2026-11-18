@@ -78,22 +78,6 @@ jobs:
         with:
           python-version: '3.12'
       - run: pnpm install --frozen-lockfile
-      # Audit: known high or critical advisories in what ships.
-      - run: scripts/test.py check audit lint typecheck api catalog
-      # db-drift: exit 2 when schema.prisma differs from what the migrations built. db-upgrade: a
-      # database from every supported release upgraded to these migrations, so a household that
-      # skipped releases is covered. A pull request runs them only when it changes their inputs;
-      # a release runs them always.
-      - id: changes
-        if: github.event_name == 'pull_request'
-        run: |
-          # Without the base commit, run them rather than skip them.
-          if ! git rev-parse --verify --quiet HEAD^1 >/dev/null ||
-            git diff --name-only HEAD^1 HEAD | grep -qE '^(prisma/|prisma\.config\.ts|scripts/test\.py|scripts/ci/check-migration-upgrade\.mjs|scripts/runtime/|scripts/testing/|package\.json|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'; then
-            echo "database=true" >> "$GITHUB_OUTPUT"
-          fi
-      - if: github.event_name != 'pull_request' || steps.changes.outputs.database == 'true'
-        run: scripts/test.py check db-drift db-upgrade
       # Unit, integration and harness tests in one run, failing if coverage drops below its floors.
       - id: tests
         run: scripts/test.py run --platform host --coverage
@@ -118,13 +102,18 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # Also the UTC+14 unit replay, which keeps verify, the longer job, shorter.
+  # Also the static and database checks and the UTC+14 unit replay, which keep verify, the longer job,
+  # shorter: verify's coverage run alone takes about ten minutes, this job's browser run about five.
   browser:
     needs: contract
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Every commit: the merge commit's first parent, for the database checks' change detection,
+          # and the release commits db-upgrade extracts its start points from.
+          fetch-depth: 0
       - uses: ./.github/actions/runner-cleanup
       # Node first: pnpm/action-setup bootstraps with the npm on PATH, and the runner's own
       # Node has a broken npm since runner 2.338.0.
@@ -140,9 +129,26 @@ jobs:
           python-version: '3.12'
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install chromium
+      # Audit: known high or critical advisories in what ships.
+      - run: scripts/test.py check audit lint typecheck api catalog
+      # db-drift: exit 2 when schema.prisma differs from what the migrations built. db-upgrade: a
+      # database from every supported release upgraded to these migrations, so a household that
+      # skipped releases is covered. A pull request runs them only when it changes their inputs;
+      # a release runs them always.
+      - id: changes
+        if: github.event_name == 'pull_request'
+        run: |
+          # Without the base commit, run them rather than skip them.
+          if ! git rev-parse --verify --quiet HEAD^1 >/dev/null ||
+            git diff --name-only HEAD^1 HEAD | grep -qE '^(prisma/|prisma\.config\.ts|scripts/test\.py|scripts/ci/check-migration-upgrade\.mjs|scripts/runtime/|scripts/testing/|package\.json|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'; then
+            echo "database=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: ${{ !cancelled() && (github.event_name != 'pull_request' || steps.changes.outputs.database == 'true') }}
+        run: scripts/test.py check db-drift db-upgrade
       # A production build (the only one this workflow makes), then desktop and phone, each against its own
-      # database and server.
-      - run: scripts/test.py run --layer ui
+      # database and server. It runs even when a check above failed, so one failure never hides the other.
+      - if: ${{ !cancelled() }}
+        run: scripts/test.py run --layer ui
       # The image ships this build's standalone output (docker/Dockerfile). A filesystem or spawn call the
       # bundler cannot scope traces the whole repository into it, which check-image.sh only sees at release.
       - if: ${{ !cancelled() }}

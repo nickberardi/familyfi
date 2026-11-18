@@ -12,7 +12,7 @@
 #   --force         allow a tag that already exists, if it is HEAD: rebuild and push its image,
 #                   create the GitHub Release if it is missing, and name the new image in its notes;
 #                   :next moves only if it is the newest tag
-#   --skip-ci       don't run the checks and tests (ci.yml's verify job, and container.yml) first
+#   --skip-ci       don't run the checks and tests (ci.yml's checks and host tests, and container.yml) first
 #   --no-push       build only: no GHCR login, no push, no GitHub Release
 #   --allow-dirty   allow uncommitted changes in the working tree (the build uses them)
 #   -h, --help      print this help
@@ -83,7 +83,7 @@ repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || die "gh could n
 image="ghcr.io/$(tr '[:upper:]' '[:lower:]' <<<"$repo")"
 sha=$(git rev-parse HEAD)
 
-# ci.yml's verify job and container.yml, through the same harness. ci.yml's browser job and
+# ci.yml's checks and host tests, and container.yml, through the same harness. ci.yml's browser tests and
 # the OpenAPI checks are not repeated here.
 if ((run_ci)); then
   npx --yes "pnpm@$(node -p 'require("./package.json").packageManager.split("@")[1]')" install --frozen-lockfile
