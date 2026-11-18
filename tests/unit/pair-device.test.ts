@@ -273,7 +273,7 @@ describe("FamilyFi Me on a child's phone", () => {
     expect(copy.name.title).toBe(PAIR_COPY.pairMe);
     expect(copy.code.title).toBe("Scan with FamilyFi Me");
     expect(copy.phone).toBe("Phone name");
-    expect(pairingSheetCopy({ child: true, claimed: true, claimedName: "Emma's phone" }).code).toEqual({ title: "Phone paired", sub: "Emma's phone is paired." });
+    expect(pairingSheetCopy({ child: true, claimed: true, claimedName: "Emma's phone" }).code).toEqual({ title: "Phone paired", sub: "Emma's phone is paired. If it has app limits, add FamilyFi Me to its always allowed apps so they can still ask you for more time." });
     expect(CHILD_PHONES_COPY.empty("Emma")).toBe("Pair FamilyFi Me on Emma's phone so they can see their rules and ask you for more time.");
   });
 

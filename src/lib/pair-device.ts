@@ -215,7 +215,11 @@ export function pairingSheetCopy({
         },
     code: claimed
       ? child
-        ? { title: "Phone paired", sub: `${claimedName ?? "The phone"} is paired.` }
+        ? {
+            title: "Phone paired",
+            // The phone's own app limits (Screen Time, Family Link) can lock FamilyFi Me, the app they ask from.
+            sub: `${claimedName ?? "The phone"} is paired. If it has app limits, add FamilyFi Me to its always allowed apps so they can still ask you for more time.`,
+          }
         : { title: "Device paired", sub: `${claimedName ?? "The device"} is paired and signed in${replacing ? "; its old entry is gone" : ""}.` }
       : child
         ? {
