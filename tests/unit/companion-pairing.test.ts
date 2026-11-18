@@ -620,6 +620,32 @@ describe("a companion session", () => {
     expect(storage.keys()).toEqual([]);
   });
 
+  it("revokes over the next route when the first can't be reached, so unpairing away from home still revokes it", async () => {
+    const home = household();
+    const storage = memory();
+    await paired(home, home.transport, storage);
+    // Away from home: the home route reaches nothing, the Cloudflare route answers.
+    const away: Transport = async (request) =>
+      request.url.startsWith(LAN.url) ? Promise.reject(new TransportError(new Error("unreachable"))) : home.transport(request);
+    const later = createCompanionSession({ transport: away, storage, deviceName: () => "A phone" });
+    await later.load();
+    await later.unpair();
+    await settle(() => home.calls.some((call) => call.method === "DELETE"));
+    expect(home.calls.filter((call) => call.method === "DELETE").map((call) => new URL(call.url).origin)).toEqual([new URL(EDGE.url).origin]);
+  });
+
+  it("revokes first over the route that last answered on the device's network", async () => {
+    const home = household();
+    const session = await paired(home, home.transport);
+    session.setNetwork({ kind: "cellular" });
+    await session.request("/api/v1/connection");
+    expect(session.getState().activeRouteId).toBe(EDGE.id);
+    const before = home.calls.length;
+    await session.unpair();
+    await settle(() => home.calls.slice(before).some((call) => call.method === "DELETE"));
+    expect(home.calls.slice(before).map((call) => `${call.method} ${new URL(call.url).origin}`)).toEqual([`DELETE ${new URL(EDGE.url).origin}`]);
+  });
+
   it("renews an expired bearer before revoking, so unpairing a phone left idle still revokes it", async () => {
     const home = household();
     const storage = memory();
