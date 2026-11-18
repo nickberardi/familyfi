@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextClockOnDays, zonedWallTimeToUtc } from "@/lib/clock";
+import { formatClock, nextClockOnDays, zonedFormat, zonedParts, zonedWallTimeToUtc } from "@/lib/clock";
 import { nextWindowStart, windowEndsAt } from "@/lib/rule-windows";
 
 /**
@@ -79,5 +79,30 @@ describe("rule windows across a clock change", () => {
     // Sunday 00:00 EDT.
     expect(nextWindowStart(sundayEarly, new Date("2026-11-01T04:00:00Z"), NEW_YORK)?.toISOString())
       .toBe(at("2026-11-01T09:00:00Z")); // 04:00 EST
+  });
+});
+
+describe("zonedFormat", () => {
+  const OPTIONS: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" };
+
+  it("makes one formatter per options and time zone, and reuses it", () => {
+    const first = zonedFormat(OPTIONS, "America/New_York");
+    expect(zonedFormat(OPTIONS, "America/New_York")).toBe(first);
+    expect(zonedFormat(OPTIONS, "Europe/London")).not.toBe(first);
+    expect(zonedFormat({ ...OPTIONS }, "America/New_York")).not.toBe(first);
+  });
+
+  it("formats as a formatter made afresh does", () => {
+    const at = new Date("2026-01-15T07:30:00Z");
+    for (const zone of ["America/New_York", "Pacific/Kiritimati", "Asia/Kolkata"]) {
+      expect(zonedFormat(OPTIONS, zone).format(at)).toBe(new Intl.DateTimeFormat("en-US", { ...OPTIONS, timeZone: zone }).format(at));
+    }
+    expect(formatClock(at, "America/New_York")).toBe("2:30 AM");
+    expect(zonedParts(at, "America/New_York")).toEqual({ year: 2026, month: 1, day: 15, weekday: 4, hour: 2, minute: 30 });
+  });
+
+  it("refuses an unknown time zone every time, keeping nothing", () => {
+    expect(() => zonedFormat(OPTIONS, "Not/AZone")).toThrow(RangeError);
+    expect(() => zonedFormat(OPTIONS, "Not/AZone")).toThrow(RangeError);
   });
 });

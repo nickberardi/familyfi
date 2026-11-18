@@ -1,3 +1,4 @@
+import { zonedFormat } from "./clock";
 import type { SyncStatus } from "./types";
 
 const ACTION: Record<string, string> = {
@@ -83,14 +84,10 @@ export function noMembersAttention(
   };
 }
 
+const LOG_WHEN: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" };
+
 export function formatLogWhen(iso: string, timezone: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(iso));
+  return zonedFormat(LOG_WHEN, timezone).format(new Date(iso));
 }
 
 /** The Sync page's words. */
