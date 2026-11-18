@@ -357,7 +357,7 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
     }
     return INVALID_REFRESH;
   }
-  await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: now } });
+  await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: now, quietAlertedAt: null } });
   return { ok: true, session: { username: session.username, expiresAt: next.expiresAt, account: session.account, device: session.device }, token: next.token, refreshToken: next.refreshToken, refreshExpiresAt: next.refreshExpiresAt };
 }
 
@@ -399,7 +399,8 @@ export async function readSessionFromRequest(request: Request) {
     await prisma().session.updateMany({ where: { id: session.id, tokenHash: session.tokenHash, previousRefreshUntil: { gt: until } }, data: { previousRefreshUntil: until } });
   }
   if (session.device && (!session.device.lastSeenAt || session.device.lastSeenAt < new Date(Date.now() - 15 * 60 * 1000))) {
-    await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: new Date() } });
+    // Heard from again: a child's phone told as quiet can be told again next time.
+    await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: new Date(), quietAlertedAt: null } });
   }
   return session;
 }

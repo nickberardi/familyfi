@@ -1,3 +1,4 @@
+import { ME_QUIET_AFTER_MS } from "./me-protection";
 import { ALERTS_CARD_COPY } from "./alert-copy";
 import { scopeLabel } from "./agent-prompt";
 import type { ApiRequest } from "./api-client";
@@ -162,6 +163,28 @@ export type TagTone = "neutral" | "green" | "yellow" | "red" | "blue";
 /** Each access in its colour, as the operator chose: full green, rules only blue, read only red. */
 const SCOPE_TONES: Record<string, TagTone> = { "app:full": "green", "agent:full": "green", "app:rulesOnly": "blue", "agent:readOnly": "red", "me:askOnly": "neutral" };
 
+/** What a child's phone's tags say: its Screen Time permission, and that it has gone quiet. */
+export const CHILD_PHONE_TAGS = {
+  on: "Screen Time on",
+  off: "Screen Time off",
+  quiet: "Quiet for a day",
+  quietName: "Not heard from for a day",
+} as const;
+
+/**
+ * A child's phone (FamilyFi Me): whether Screen Time is on, once an iPhone or iPad has said (Android
+ * never does), and that it hasn't been heard from for `ME_QUIET_AFTER_MS`, as parents are alerted.
+ */
+function childPhoneTags(phone: PairedPhone, now: Date): { label: string; name: string; tone: TagTone }[] {
+  const tags: { label: string; name: string; tone: TagTone }[] = [];
+  if (phone.protection === "on") tags.push({ label: CHILD_PHONE_TAGS.on, name: CHILD_PHONE_TAGS.on, tone: "green" });
+  else if (phone.protection === "notAllowed" || phone.protection === "removed") tags.push({ label: CHILD_PHONE_TAGS.off, name: CHILD_PHONE_TAGS.off, tone: "red" });
+  if (phone.lastSeenAt && now.getTime() - Date.parse(phone.lastSeenAt) > ME_QUIET_AFTER_MS) {
+    tags.push({ label: CHILD_PHONE_TAGS.quiet, name: CHILD_PHONE_TAGS.quietName, tone: "yellow" });
+  }
+  return tags;
+}
+
 /**
  * A paired device's tags and lines, the same for phones, Watches and agents. Tags beside its name say
  * what it may do, whose account it acts as and, for an app, whether it takes alerts; the lines say
@@ -176,6 +199,7 @@ export function phoneLines(phone: PairedPhone, now = new Date(), parentName: str
   if (phone.actsAs) tags.push({ label: phone.actsAs.displayName, name: `Acts as ${phone.actsAs.displayName}`, tone: "neutral" });
   // A child's phone signs in for its family group, never as an account.
   if (phone.group) tags.push({ label: `For ${phone.group.name}`, name: `For ${phone.group.name}`, tone: "neutral" });
+  if (phone.clientType === "me" && !phone.revokedAt) tags.push(...childPhoneTags(phone, now));
   if (phone.alerts !== undefined && !phone.revokedAt) {
     const alerts = phone.alerts ? ALERTS_CARD_COPY.accessOn : ALERTS_CARD_COPY.accessOff;
     tags.push({ label: alerts, name: alerts, tone: phone.alerts ? "green" : "yellow" });

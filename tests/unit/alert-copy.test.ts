@@ -29,6 +29,18 @@ describe("alert copy", () => {
     expect(alertText("ask.new", { a: "rule", m: "lots" })).toEqual({ title: "Your child asked for more time", body: "Open FamilyFi to answer." });
   });
 
+  it("says which child's phone lost Screen Time or went quiet", () => {
+    expect(alertText("me.protection", { p: "Cassie's iPad", n: "Cassie" })).toEqual({
+      title: "Screen Time is off on Cassie's iPad",
+      body: "FamilyFi Me can't block apps there until it's allowed again.",
+    });
+    expect(alertText("me.quiet", { p: "Cassie's iPad" })).toEqual({
+      title: "Cassie's iPad hasn't checked in",
+      body: "FamilyFi Me there hasn't reached FamilyFi for a day. It may be off or offline.",
+    });
+    expect(alertText("me.quiet", {})?.title).toBe("A child's phone hasn't checked in");
+  });
+
   it("has words for every kind, and none for a kind it does not know", () => {
     for (const kind of ALERT_KINDS) {
       expect(alertText(kind, { n: 1 }), kind).not.toBeNull();

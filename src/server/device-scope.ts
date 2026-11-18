@@ -108,7 +108,8 @@ function meAskOnly({ method, path, deviceId }: ScopedCall): boolean {
   if (method === "GET") return path === "/api/v1/auth/session" || path === "/api/v1/connection" || ONE_GROUP.test(path) || path === "/api/v1/rules";
   // Asking for more time; the route answers only for the device's own group.
   if (method === "POST") return GROUP_ASKS.test(path);
-  return method === "DELETE" && path === `/api/v1/paired/devices/${encodeURIComponent(deviceId)}`;
+  // Un-pairing itself, and telling its Screen Time permission (the route takes only that from it).
+  return (method === "DELETE" || method === "PATCH") && path === `/api/v1/paired/devices/${encodeURIComponent(deviceId)}`;
 }
 
 const ALLOWLISTS: Record<ClientScope, (request: ScopedCall) => boolean> = {

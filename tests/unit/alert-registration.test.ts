@@ -35,6 +35,8 @@ describe("alert registration", () => {
       { kind: "sync.down", on: true },
       { kind: "sync.up", on: false },
       { kind: "ask.new", on: true },
+      { kind: "me.protection", on: true },
+      { kind: "me.quiet", on: true },
     ]);
     expect(alertChoiceRows(null).every((row) => row.on)).toBe(true);
   });
@@ -47,5 +49,8 @@ describe("alert registration", () => {
     // A child's ask opens that child's group, where the parent answers it.
     expect(alertDestination("ask.new", { g: "sam" })).toBe("/family/sam");
     expect(alertDestination("ask.new")).toBe("/family");
+    // News of a child's phone opens their family member, where the phone is listed.
+    expect(alertDestination("me.quiet", { g: "cassie", p: "Cassie's iPad" })).toBe("/family/cassie");
+    expect(alertDestination("me.protection", {})).toBe("/family");
   });
 });

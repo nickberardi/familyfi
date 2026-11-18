@@ -238,6 +238,12 @@ model PairedDevice {
   children        PairedDevice[] @relation("pairedDeviceParent")
   revokedAt       DateTime? @db.Timestamptz(3)
   lastSeenAt      DateTime? @db.Timestamptz(3)
+  /// A child's phone (FamilyFi Me) only: what it last said of its Screen Time permission, `on`,
+  /// `notAllowed` or `removed` (src/lib/me-protection.ts), and when. Null until it says.
+  protection      String?
+  protectionAt    DateTime? @db.Timestamptz(3)
+  /// When parents were told this child's phone had gone quiet; cleared when it is heard from again.
+  quietAlertedAt  DateTime? @db.Timestamptz(3)
   createdAt       DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime       @updatedAt @db.Timestamptz(3)
   sessions        Session[]

@@ -12,7 +12,7 @@ import { GET as groups } from "@/app/api/v1/groups/route";
 import { GET as oneGroup } from "@/app/api/v1/groups/[id]/route";
 import { GET as listRules } from "@/app/api/v1/rules/route";
 import { POST as invite } from "@/app/api/v1/paired/invites/route";
-import { DELETE as unpair, GET as pairedDevice } from "@/app/api/v1/paired/devices/[id]/route";
+import { DELETE as unpair, GET as pairedDevice, PATCH as updateDevice } from "@/app/api/v1/paired/devices/[id]/route";
 import { groupDayOf, meDaySubject, tellDay, PHONE_VOICE, type GroupDay } from "@/lib/child-day";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
@@ -244,6 +244,47 @@ describe("FamilyFi Me on a child's phone", () => {
     expect(own.status).toBe(200);
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(first.token) }))).status).toBe(401);
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(second.token) }))).status).toBe(200);
+  });
+
+  it("tells its own Screen Time permission, and nothing else, and no one else may", async () => {
+    const group = await childGroup();
+    const first = await pairMe(admin, group.id);
+    const second = await pairMe(admin, group.id);
+    const patch = (auth: SessionAuth, id: string, body: Record<string, unknown>) =>
+      updateDevice(request(`/api/v1/paired/devices/${id}`, { method: "PATCH", auth, headers: json, body: JSON.stringify(body) }), params(id));
+
+    const told = await patch(bearer(first.token), first.device.id, { protection: "on" });
+    expect(told.status).toBe(200);
+    const { device } = (await told.json()) as { device: { protection: string; protectionAt: string } };
+    expect(device).toMatchObject({ protection: "on" });
+    expect(Date.parse(device.protectionAt)).not.toBeNaN();
+    // An administrator reads it on the device, and a phone that has never said has none.
+    const read = (await (await pairedDevice(request(`/api/v1/paired/devices/${first.device.id}`, { auth: admin }), params(first.device.id))).json()) as { device: Record<string, unknown> };
+    expect(read.device.protection).toBe("on");
+    const silent = (await (await pairedDevice(request(`/api/v1/paired/devices/${second.device.id}`, { auth: admin }), params(second.device.id))).json()) as { device: Record<string, unknown> };
+    expect(silent.device).not.toHaveProperty("protection");
+
+    // Another child's phone, an administrator, a name with it, or a value it doesn't know: refused.
+    expect((await patch(bearer(first.token), second.device.id, { protection: "removed" })).status).toBe(403);
+    const byAdmin = await patch(admin, first.device.id, { protection: "removed" });
+    expect([byAdmin.status, await errorCode(byAdmin)]).toEqual([403, "own_device_required"]);
+    const renamed = await patch(bearer(first.token), first.device.id, { protection: "on", displayName: "Mine now" });
+    expect([renamed.status, await errorCode(renamed)]).toEqual([403, "administrator_required"]);
+    expect((await patch(bearer(first.token), first.device.id, { displayName: "Mine now" })).status).toBe(403);
+    expect((await patch(bearer(first.token), first.device.id, { protection: "maybe" })).status).toBe(400);
+    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: first.device.id } })).displayName).toBe("Emma's iPhone");
+    // An administrator still renames it.
+    expect((await patch(admin, first.device.id, { displayName: "Emma's old iPhone" })).status).toBe(200);
+  });
+
+  it("is heard from again when it next reads, so going quiet again is told again", async () => {
+    const group = await childGroup();
+    const phone = await pairMe(admin, group.id);
+    await prisma().pairedDevice.update({ where: { id: phone.device.id }, data: { lastSeenAt: new Date(0), quietAlertedAt: new Date() } });
+    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(phone.token) }))).status).toBe(200);
+    const after = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: phone.device.id } });
+    expect(after.quietAlertedAt).toBeNull();
+    expect(after.lastSeenAt!.getTime()).toBeGreaterThan(Date.now() - 60_000);
   });
 
   it("is revoked, its record kept, when its group is deleted", async () => {

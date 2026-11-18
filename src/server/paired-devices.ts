@@ -1,7 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import { CLIENT_TYPES } from "@/lib/client-type";
+import { isMeProtection, type MeProtection } from "@/lib/me-protection";
 import { z } from "zod";
 import { isAdministrator, removeDevice, revokeDevice } from "./connection";
+import { recordMeProtectionLost } from "./alerts/producers";
 import { prisma } from "./db";
 import { isFullApp, isValidScope } from "./device-scope";
 import { ApiError } from "./http";
@@ -45,6 +47,10 @@ function publicPairedDevice(device: Listed) {
     actsAs: device.account ? { username: device.account.username, displayName: device.account.displayName } : null,
     // A child's phone (FamilyFi Me) signs in for its family group instead of an account.
     ...(device.clientType === "me" ? { group: device.group ? { id: device.group.id, name: device.group.name } : null } : {}),
+    // What it last said of its Screen Time permission, once it has (an iPhone or iPad; Android never says).
+    ...(device.clientType === "me" && isMeProtection(device.protection)
+      ? { protection: device.protection, protectionAt: device.protectionAt?.toISOString() ?? null }
+      : {}),
     parentDeviceId: device.parentDeviceId,
     enrolledAt: device.createdAt.toISOString(),
     lastSeenAt: device.lastSeenAt?.toISOString() ?? null,
@@ -110,12 +116,33 @@ export async function getPairedDevice(session: Viewer, id: string) {
  * Rename a paired device, or change an agent's scope between `agent:full` and `agent:readOnly`. No
  * other client type changes scope: each holds only its own from the moment it joins.
  */
-export async function updatePairedDevice(id: string, input: { displayName?: string; scope?: string }) {
+export async function updatePairedDevice(session: Viewer, id: string, input: { displayName?: string; scope?: string }) {
+  if (!isAdministrator(session)) throw new ApiError(403, "administrator_required", "A FamilyFi administrator is required.");
   const device = await prisma().pairedDevice.findUnique({ where: { id } });
   if (!device) throw deviceNotFound();
   const scope = input.scope && input.scope !== device.scope ? (device.clientType === "agent" && isValidScope("agent", input.scope) ? input.scope : null) : undefined;
   if (scope === null) throw new ApiError(400, "invalid_scope", `A device of client type ${device.clientType} cannot hold the ${input.scope} scope.`);
   await prisma().pairedDevice.update({ where: { id }, data: { displayName: input.displayName, ...(scope ? { scope } : {}) } });
+  const updated = await prisma().pairedDevice.findUniqueOrThrow({ where: { id }, include: deviceInclude() });
+  return publicPairedDevice(updated);
+}
+
+/**
+ * A child's phone (FamilyFi Me) tells its own Screen Time permission. Only that phone, and only
+ * this: an administrator or any other device gets 403 `own_device_required`, and a phone that sends
+ * a name or scope with it gets 403 `administrator_required`. A permission that was on and no longer
+ * is tells the parents' phones (`me.protection`).
+ */
+export async function setMeProtection(session: Viewer, id: string, protection: MeProtection, rest: { displayName?: string; scope?: string }) {
+  if (!session.deviceId || session.deviceId !== id) throw new ApiError(403, "own_device_required", "Only FamilyFi Me on this phone can tell its Screen Time permission.");
+  if (rest.displayName !== undefined || rest.scope !== undefined) throw new ApiError(403, "administrator_required", "A FamilyFi administrator is required.");
+  const device = await prisma().pairedDevice.findUnique({ where: { id }, include: { group: { select: { id: true, name: true } } } });
+  if (!device || device.clientType !== "me" || device.revokedAt) throw new ApiError(403, "own_device_required", "Only FamilyFi Me on this phone can tell its Screen Time permission.");
+  const now = new Date();
+  if (device.protection !== protection) {
+    await prisma().pairedDevice.update({ where: { id }, data: { protection, protectionAt: now } });
+    if (device.protection === "on") await recordMeProtectionLost({ phone: device.displayName, group: device.group }, now);
+  }
   const updated = await prisma().pairedDevice.findUniqueOrThrow({ where: { id }, include: deviceInclude() });
   return publicPairedDevice(updated);
 }

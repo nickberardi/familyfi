@@ -51,6 +51,8 @@ describe("openapi contract", () => {
       "Household.askWaitMinutes", // likewise
       "PairedDevice.alerts", // only for app:full devices, the only ones that register for alerts
       "PairedDevice.group", // only for a child's phone (me), which signs in for its group
+      "PairedDevice.protection", // only for a child's iPhone or iPad (me) once it has told its Screen Time permission
+      "PairedDevice.protectionAt", // with protection
       "Session.groupId", // only for a child's phone (kind group), which signs in for its group
       "Change.actor", // never to an agent, nor once the adult's account is removed; servers before 1.5.0 leave it out
       "Change.actor.device", // only through a paired device that is still on record, never for a web sign-in

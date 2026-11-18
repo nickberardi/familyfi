@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
-import type { AlertKind, AskData, NewDeviceData } from "@/lib/alert-kinds";
+import type { AlertKind, AskData, MePhoneData, NewDeviceData } from "@/lib/alert-kinds";
+import { ME_QUIET_AFTER_MS } from "@/lib/me-protection";
 import { randomToken } from "../crypto";
 import { prisma } from "../db";
 import { wakeAlertSender } from "./sender";
@@ -184,6 +185,48 @@ export async function recordAsk(
       ...(ask.minutes ? { m: ask.minutes } : {}),
     };
     await writeEvents("ask.new", await recipients("ask.new", now), detail, now);
+  } catch (error) {
+    warn(error);
+  }
+}
+
+/**
+ * A child's phone said its Screen Time permission, on until now, is no longer: every phone that takes
+ * `me.protection` hears it. Made by that phone's request; like every producer it reads and writes
+ * nothing on the gateway.
+ */
+export async function recordMeProtectionLost(phone: { phone: string; group: { id: string; name: string } | null }, now = new Date()): Promise<void> {
+  try {
+    if (!(await relayEnabled())) return;
+    const detail: MePhoneData = { p: phone.phone, ...(phone.group ? { g: phone.group.id, n: phone.group.name } : {}) };
+    await writeEvents("me.protection", await recipients("me.protection", now), detail, now);
+  } catch (error) {
+    warn(error);
+  }
+}
+
+/**
+ * The sync pass's sweep: a child's phone, still paired, not heard from for `ME_QUIET_AFTER_MS` has gone
+ * quiet, and parents' phones hear it once (`me.quiet`). Its next request clears the mark (src/server/auth.ts),
+ * so a phone that goes quiet again is told again. The mark is set even while the relay is off, so
+ * turning the relay on never tells of an old quiet spell.
+ */
+export async function recordQuietMePhones(now = new Date()): Promise<void> {
+  try {
+    const quiet = await prisma().pairedDevice.findMany({
+      where: { clientType: "me", revokedAt: null, quietAlertedAt: null, lastSeenAt: { lt: new Date(now.getTime() - ME_QUIET_AFTER_MS) } },
+      select: { id: true, displayName: true, group: { select: { id: true, name: true } } },
+    });
+    if (!quiet.length) return;
+    const relay = await relayEnabled();
+    const phones = relay ? await recipients("me.quiet", now) : [];
+    for (const device of quiet) {
+      // Marked first, and only if no one else marked it, so two passes never tell it twice.
+      const marked = await prisma().pairedDevice.updateMany({ where: { id: device.id, quietAlertedAt: null }, data: { quietAlertedAt: now } });
+      if (!marked.count || !phones.length) continue;
+      const detail: MePhoneData = { p: device.displayName, ...(device.group ? { g: device.group.id, n: device.group.name } : {}) };
+      await writeEvents("me.quiet", phones, detail, now);
+    }
   } catch (error) {
     warn(error);
   }
