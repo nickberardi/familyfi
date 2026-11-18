@@ -6,6 +6,7 @@ import {
   renewPaired,
   verifyHousehold,
   type ConnectionProfile,
+  type PairingClient,
   type PendingEnrollment,
   type StoredSession,
 } from "./companion-pairing";
@@ -86,7 +87,13 @@ export type CompanionSessionState = {
 
 export type CompanionSession = ReturnType<typeof createCompanionSession>;
 
-export function createCompanionSession(deps: { transport: Transport; storage: SecureStorage; deviceName: () => string }) {
+export function createCompanionSession(deps: {
+  transport: Transport;
+  storage: SecureStorage;
+  deviceName: () => string;
+  /** Which client this is, so it spends only a code made for it: the app by default. */
+  client?: PairingClient;
+}) {
   const { transport, deviceName } = deps;
   const vault = createSessionVault(deps.storage);
   let state: CompanionSessionState = { status: "loading", profile: null, session: null, pending: null, activeRouteId: null };
@@ -260,7 +267,7 @@ export function createCompanionSession(deps: { transport: Transport; storage: Se
     },
     /** Reads a pairing code and verifies the household it names. Throws; `pairingErrorMessage` words it. */
     async verify(code: string) {
-      set({ pending: await verifyHousehold(transport, code) });
+      set({ pending: await verifyHousehold(transport, code, deps.client) });
     },
     /**
      * The explicit trust action: spends the code, which signs the phone in, and keeps the household

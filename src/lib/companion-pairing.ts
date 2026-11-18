@@ -24,6 +24,7 @@ import {
   type EndpointManifest,
   TrustError,
 } from "./companion-trust";
+import type { ClientType } from "./client-type";
 import { createCompanionRequest, type Transport } from "./companion-request";
 import { PairingCodeError, parsePairingCode, type PairingCode } from "./pairing-code";
 import type { ConnectionRoute, Session } from "./types";
@@ -86,6 +87,15 @@ export function companionStaleMessage(message: string, localNetwork: boolean): s
   return message === COMPANION_OFFLINE_GUARD.stale && !localNetwork ? LOCAL_NETWORK_OFF : message;
 }
 
+/** The clients that pair by scanning or pasting a code: the FamilyFi app, and FamilyFi Me on a child's phone. */
+export type PairingClient = Extract<ClientType, "app" | "me">;
+
+/** A code made for the other client, worded for the one that read it. */
+export const PAIRING_CODE_OTHER_CLIENT: Record<PairingClient, string> = {
+  app: "This code is for another kind of device. To pair this app, make a code with Pair a device.",
+  me: "This code isn't for FamilyFi Me. Make a code with Pair FamilyFi Me in the FamilyFi app.",
+};
+
 /** A household that verified but is not yet trusted: it holds the unspent code, so it lives only in memory. */
 export type PendingEnrollment = { code: PairingCode; identity: ConnectionIdentity };
 
@@ -102,12 +112,17 @@ function codeRequest(transport: Transport, code: PairingCode): ApiRequest {
  * each other. Throws a PairingCodeError, TrustError, ApiMismatchError or transport error. A health
  * read that fails decides nothing, as in the household store.
  */
-export async function verifyHousehold(transport: Transport, text: string): Promise<PendingEnrollment> {
+export async function verifyHousehold(transport: Transport, text: string, client: PairingClient = "app"): Promise<PendingEnrollment> {
   const code = parsePairingCode(text);
+  // A code admits one client type, and spending it makes a device of that type: FamilyFi Me must never
+  // become an administrator's app on a child's phone, nor the app a child's phone. A code from before
+  // API 2.0.0 names none, and only the app's existed then.
+  const admits = code.clientType ?? "app";
+  if (admits !== client) throw new PairingCodeError(PAIRING_CODE_OTHER_CLIENT[client]);
   const request = codeRequest(transport, code);
   const identity = await request<ConnectionIdentity>("/api/v1/connection/identity");
   verifyIdentity(identity, code.keyFingerprint);
-  const health = await request<HealthVersions>("/api/v1/health").catch(() => null);
+  const health = await request<HealthVersions>(`/api/v1/health?clientType=${client}`).catch(() => null);
   const compatibility = health ? apiCompatibility(health) : null;
   if (compatibility && compatibility.status !== "ok") throw new ApiMismatchError(compatibility);
   return { code, identity };

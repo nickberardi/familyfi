@@ -9,6 +9,7 @@ import { API_COMPAT_COPY, API_VERSION, MIN_APP_API_VERSION, type HealthVersions 
 import {
   LOCAL_NETWORK_DENIED,
   LOCAL_NETWORK_OFF,
+  PAIRING_CODE_OTHER_CLIENT,
   PAIRING_UNREACHABLE,
   ROUTES_UNREACHABLE,
   claimHousehold,
@@ -184,6 +185,26 @@ describe("pairing a phone", () => {
     const impostor = household();
     await expect(verifyHousehold(impostor.transport, home.code)).rejects.toThrow(IDENTITY_MISMATCH);
     expect(impostor.calls.map((call) => call.method)).toEqual(["GET"]); // the code was never spent, nor its health asked
+  });
+
+  it("reads only a code made for this client, before reaching the household, and asks for that client's floor", async () => {
+    const home = household();
+    const meCode = (clientType?: string) =>
+      encodePairingCode({ version: 1, url: LAN.url, code: "cm1.token-1", fingerprint: home.fingerprint, pin: LAN.spkiSha256!, ...(clientType ? { clientType } : {}) });
+    // FamilyFi Me never spends the app's code, nor one from before codes named their client.
+    await expect(verifyHousehold(home.transport, meCode("app"), "me")).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.me);
+    await expect(verifyHousehold(home.transport, meCode(), "me")).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.me);
+    // The app never spends a child's phone's code, or an agent's.
+    await expect(verifyHousehold(home.transport, meCode("me"))).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.app);
+    await expect(verifyHousehold(home.transport, meCode("agent"))).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.app);
+    expect(home.calls).toEqual([]);
+
+    await expect(verifyHousehold(home.transport, meCode("me"), "me")).resolves.toMatchObject({ code: { clientType: "me" } });
+    await expect(verifyHousehold(home.transport, meCode("app"))).resolves.toMatchObject({ code: { clientType: "app" } });
+    expect(home.calls.filter((call) => new URL(call.url).pathname === "/api/v1/health").map((call) => new URL(call.url).search)).toEqual([
+      "?clientType=me",
+      "?clientType=app",
+    ]);
   });
 
   it("stops before spending the code when this app and the server can't read each other", async () => {
