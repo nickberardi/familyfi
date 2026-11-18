@@ -394,8 +394,8 @@ async function main() {
     }
     starts = options.latest ? all.slice(-1) : all;
   }
-  // Shallow only in a shallow clone: --depth on a full one would cut its history at each tag, and
-  // tests/integration/min-app.test.ts, later in the same job, reads that history.
+  // Shallow only in a shallow clone: --depth on a full one would cut its history at each tag, which
+  // other steps of the job and a local checkout (tests/integration/min-app.test.ts among them) read.
   const depth = git("rev-parse", "--is-shallow-repository") === "true" ? ["--depth=1"] : [];
   git("fetch", "--quiet", ...depth, "origin", "--no-tags", ...starts.map((tag) => `refs/tags/${tag}:refs/tags/${tag}`));
 
