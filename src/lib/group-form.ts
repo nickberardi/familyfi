@@ -168,7 +168,7 @@ export const GROUP_EDIT_COPY = {
   blockButton: "Block button default",
   blockButtonAll: "All internet",
   kidsCanAsk: "Kids can ask",
-  kidsCanAskHelp: (name: string) => `Children with FamilyFi Me on their phone see ${name}, whether it's blocked, and can ask you for more time on it.`,
+  kidsCanAskHelp: (name: string) => `Children with FamilyFi Me on their phone can see whether ${name} is blocked and ask you for more time on it.`,
   blockButtonHelp: (name: string) => `Choose the rule that Unblock on the card lifts for ${name}, with the same timers, and Block puts back. When that rule isn't blocking, Block still blocks all internet.`,
   doh: "DNS-over-HTTPS",
   dohModes: [

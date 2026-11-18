@@ -2,6 +2,7 @@ import { AccountKind, GroupKind } from "@prisma/client";
 import type { Rule } from "@/lib/rules";
 import type { Actor, Group } from "@/lib/types";
 import { prisma } from "./db";
+import { ASK_SHOWN_MS, presentAsk } from "./groups";
 import { ApiError } from "./http";
 
 /*
@@ -38,13 +39,26 @@ export async function requireChildReads(ownGroupId: string, groupId: string): Pr
 }
 
 /**
+ * A shared Thing's latest ask from this child in the last day, whatever other children asked since,
+ * so the child keeps its own answer and when it can ask again.
+ */
+async function ownAskOn(thingId: string, ownGroupId: string, now = new Date()): Promise<Group["ask"]> {
+  const ask = await prisma().ask.findFirst({
+    where: { groupId: thingId, fromGroupId: ownGroupId, createdAt: { gt: new Date(now.getTime() - ASK_SHOWN_MS) } },
+    orderBy: { createdAt: "desc" },
+    include: { fromGroup: { select: { name: true } } },
+  });
+  return ask ? presentAsk(ask, now) : undefined;
+}
+
+/**
  * A group as a child's phone reads it. On a shared Thing the child sees only its own latest ask,
- * so another child's ask is never told as theirs.
+ * so another child's ask is never told as theirs, and its own is never hidden by a later one.
  */
 export async function groupForChild(group: Group, ownGroupId: string = group.id): Promise<Group> {
   const actor = unnamed(await recoveryAccountIds());
   const { ask, ...rest } = group;
-  const own = ask && (group.id === ownGroupId || ask.from?.groupId === ownGroupId) ? ask : undefined;
+  const own = group.id === ownGroupId ? ask : ask?.from?.groupId === ownGroupId ? ask : await ownAskOn(group.id, ownGroupId);
   return {
     ...rest,
     suspension: { ...group.suspension, by: actor(group.suspension.by) },
