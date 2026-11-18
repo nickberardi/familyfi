@@ -678,6 +678,12 @@ describe("a child's day on the household's clock", () => {
     expect(again.subject.ask).toBeUndefined();
     expect(tellDay(again.subject, again.now, PHONE_VOICE, again.clock).day.kind).toBe("paused");
     expect(meDaySubject(me({ ask: pauseYes }), new Date("2026-11-17T03:20:00Z")).subject.ask).toMatchObject({ state: "yes", by: "Mom" });
+    // FamilyFi reports no pause once a parent ends it: the yes alone tells who unpaused.
+    const unpaused = meDaySubject(me({ ask: pauseYes }), new Date("2026-11-17T03:20:00Z"));
+    const told = tellDay(unpaused.subject, unpaused.now, PHONE_VOICE, unpaused.clock);
+    expect(told.day.kind).toBe("unpaused");
+    expect(told.items[0]?.status?.text).toBe("Mom unpaused your apps at 10:05 PM.");
+    expect(topAnswer(told).sentence).toMatch(/^Mom unpaused your apps\./);
   });
 
   it("names no one for a parent FamilyFi has no name for, and drops a timed-out ask once its block is over", () => {
