@@ -16,7 +16,7 @@ Work from the repository root. Read [release operations](../../../docs/operation
 
 ## Prepare and validate
 
-Use the applicable checks in [testing.md](../../../docs/testing.md). The local release script runs the checks and tests of `ci.yml`'s verify job and `container.yml` through `scripts/test.py` itself; account for the browser tests (`run --layer ui`) and OpenAPI checks separately. Keep checks tied to the intended commit. Use `scripts/release.sh --help` for current options and keep the normal checks enabled under the repository's bypass rules.
+Use the applicable checks in [testing.md](../../../docs/testing.md). The local release script runs `ci.yml`'s checks and host tests and `container.yml`'s through `scripts/test.py` itself; account for the browser tests (`run --layer ui`) and OpenAPI checks separately. Keep checks tied to the intended commit. Use `scripts/release.sh --help` for current options and keep the normal checks enabled under the repository's bypass rules.
 
 Prepare the release notes, including whether a block was checked on a real gateway, as operations requires. A release request alone does not authorize live UniFi experiments; when policy writes changed, raise the missing hardware evidence with the operator.
 

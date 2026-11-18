@@ -127,8 +127,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install chromium
+      - id: install
+        run: pnpm install --frozen-lockfile
+      - id: chromium
+        run: pnpm exec playwright install chromium
       # Audit: known high or critical advisories in what ships.
       - run: scripts/test.py check audit lint typecheck api catalog
       # db-drift: exit 2 when schema.prisma differs from what the migrations built. db-upgrade: a
@@ -136,18 +138,18 @@ jobs:
       # skipped releases is covered. A pull request runs them only when it changes their inputs;
       # a release runs them always.
       - id: changes
-        if: github.event_name == 'pull_request'
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && github.event_name == 'pull_request' }}
         run: |
           # Without the base commit, run them rather than skip them.
           if ! git rev-parse --verify --quiet HEAD^1 >/dev/null ||
             git diff --name-only HEAD^1 HEAD | grep -qE '^(prisma/|prisma\.config\.ts|scripts/test\.py|scripts/ci/check-migration-upgrade\.mjs|scripts/runtime/|scripts/testing/|package\.json|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'; then
             echo "database=true" >> "$GITHUB_OUTPUT"
           fi
-      - if: ${{ !cancelled() && (github.event_name != 'pull_request' || steps.changes.outputs.database == 'true') }}
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' && (github.event_name != 'pull_request' || steps.changes.outputs.database == 'true') }}
         run: scripts/test.py check db-drift db-upgrade
       # A production build (the only one this workflow makes), then desktop and phone, each against its own
       # database and server. It runs even when a check above failed, so one failure never hides the other.
-      - if: ${{ !cancelled() }}
+      - if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
         run: scripts/test.py run --layer ui
       # The image ships this build's standalone output (docker/Dockerfile). A filesystem or spawn call the
       # bundler cannot scope traces the whole repository into it, which check-image.sh only sees at release.

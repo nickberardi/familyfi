@@ -81,7 +81,7 @@ describe("remote access", () => {
   beforeEach(async () => {
     await resetDatabase();
     rmSync(log, { force: true });
-    for (const file of ["dns", "quick-hold", "tunnels", "created", "legacy-cert", "list-broken", "delete-fails", "login-fails"]) rmSync(path.join(dir, file), { force: true, recursive: true });
+    for (const file of ["dns", "quick-hold", "tunnels", "created", "legacy-cert", "list-broken", "delete-fails", "login-fails", "login-slow"]) rmSync(path.join(dir, file), { force: true, recursive: true });
     records = [];
     dnsFailure = null;
     dnsCalls = [];
@@ -208,6 +208,8 @@ describe("remote access", () => {
 
   it("leaves Cloudflare alone when Forget's sign-in is cancelled", async () => {
     await connect("familyfi.example.com");
+    // The sign-in lasts four seconds, so the cancel below always lands while it is still open.
+    writeFileSync(path.join(dir, "login-slow"), "");
     await put({ mode: "off", forget: true });
     await waitFor((t) => t.loginUrl !== null, "the Cloudflare link for Forget");
     // Cancel: the domain stays forgotten, and nothing is touched in Cloudflare.
