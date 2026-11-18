@@ -5,7 +5,7 @@
  * envelope, the encryption and the relay are kind-agnostic, and a phone is only ever sent the kinds
  * it registered as understanding.
  */
-export const ALERT_KINDS = ["device.new", "sync.down", "sync.up", "ask.new"] as const;
+export const ALERT_KINDS = ["device.new", "sync.down", "sync.up", "ask.new", "me.protection", "me.quiet"] as const;
 
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
@@ -38,3 +38,10 @@ export type NewDeviceData = { n: number; h?: string };
  * the minutes asked for.
  */
 export type AskData = { g: string; n: string; a: "pause" | "rule"; r?: string; m?: number };
+
+/**
+ * A child's phone (FamilyFi Me): `me.protection` when it says its Screen Time permission was taken
+ * away or turned down after being on, `me.quiet` when it hasn't been heard from for a day. `p` the
+ * phone's name, `g` its family member's group id and `n` their name.
+ */
+export type MePhoneData = { p: string; g?: string; n?: string };

@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/server/db";
-import { recordNewDevices, recordSyncOutcome, SYNC_TROUBLE_AFTER_MS } from "@/server/alerts/producers";
+import { recordMeProtectionLost, recordNewDevices, recordQuietMePhones, recordSyncOutcome, SYNC_TROUBLE_AFTER_MS } from "@/server/alerts/producers";
+import { ME_QUIET_AFTER_MS } from "@/lib/me-protection";
 import { registerPush, setAlertChoices } from "@/server/alerts/registrations";
 import { updateHouseholdSettings } from "@/server/household";
 import { runReconcileOnce, setReconcileClientForTests } from "@/server/reconciliation";
@@ -10,7 +11,7 @@ import { configureConnectedHousehold, resetDatabase } from "../helpers/db";
 import { pairingAdminAuth, pairPhone } from "../helpers/pairing";
 import { fixtureUnifiClient } from "../helpers/unifi-world";
 
-const KINDS = ["device.new", "sync.down", "sync.up"];
+const KINDS = ["device.new", "sync.down", "sync.up", "me.protection", "me.quiet"];
 
 async function registeredPhone(displayName = "iPhone") {
   const phone = await pairPhone(await pairingAdminAuth(), { displayName });
@@ -45,6 +46,45 @@ describe("alert producers", () => {
 
   afterEach(() => {
     setReconcileClientForTests(undefined);
+  });
+
+  it("tells parents once when a child's phone goes quiet, and again only after it is heard from", async () => {
+    const phone = await registeredPhone();
+    const now = new Date();
+    const group = await prisma().group.create({ data: { kind: "family", name: "Cassie" } });
+    const quiet = await prisma().pairedDevice.create({
+      data: { displayName: "Cassie's iPad", clientType: "me", scope: "me:askOnly", groupId: group.id, lastSeenAt: new Date(now.getTime() - ME_QUIET_AFTER_MS - 60_000) },
+    });
+    // Heard from within the day, or revoked: not quiet.
+    await prisma().pairedDevice.create({ data: { displayName: "Recent", clientType: "me", scope: "me:askOnly", groupId: group.id, lastSeenAt: new Date(now.getTime() - 60_000) } });
+    await prisma().pairedDevice.create({ data: { displayName: "Gone", clientType: "me", scope: "me:askOnly", groupId: group.id, lastSeenAt: new Date(0), revokedAt: now } });
+
+    await recordQuietMePhones(now);
+    await recordQuietMePhones(now);
+    const told = await events("me.quiet");
+    expect(told.map((event) => [event.deviceId, event.detail])).toEqual([[phone, { p: "Cassie's iPad", g: group.id, n: "Cassie" }]]);
+
+    // Heard from, then quiet again: told again.
+    await prisma().pairedDevice.update({ where: { id: quiet.id }, data: { quietAlertedAt: null } });
+    await recordQuietMePhones(now);
+    expect(await events("me.quiet")).toHaveLength(2);
+  });
+
+  it("marks a quiet phone while the switch is off, so turning it on never tells an old quiet spell", async () => {
+    await registeredPhone();
+    await prisma().household.update({ where: { id: "default" }, data: { alertsRelayEnabled: false } });
+    const quiet = await prisma().pairedDevice.create({ data: { displayName: "Cassie's iPad", clientType: "me", scope: "me:askOnly", lastSeenAt: new Date(0) } });
+    await recordQuietMePhones();
+    await prisma().household.update({ where: { id: "default" }, data: { alertsRelayEnabled: true } });
+    await recordQuietMePhones();
+    expect(await events("me.quiet")).toEqual([]);
+    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: quiet.id } })).quietAlertedAt).not.toBeNull();
+  });
+
+  it("tells parents when a child's phone loses its Screen Time permission", async () => {
+    const phone = await registeredPhone();
+    await recordMeProtectionLost({ phone: "Cassie's iPad", group: { id: "g-cassie", name: "Cassie" } });
+    expect((await events("me.protection")).map((event) => [event.deviceId, event.detail])).toEqual([[phone, { p: "Cassie's iPad", g: "g-cassie", n: "Cassie" }]]);
   });
 
   it("tells each phone once about the devices a pass found, but not on the household's first pass", async () => {

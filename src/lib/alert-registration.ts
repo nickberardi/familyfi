@@ -79,14 +79,15 @@ export function alertChoiceRows(choices: AlertChoices | null): { kind: AlertKind
  */
 export function alertDestination(kind: string, data: Record<string, unknown> = {}): string {
   if (!isAlertKind(kind)) return "/";
-  if (kind === "ask.new") return typeof data.g === "string" && data.g ? `/family/${encodeURIComponent(data.g)}` : "/family";
+  // A child's ask, or news of a child's phone, opens that family member, whose page lists their phones.
+  if (kind === "ask.new" || kind === "me.protection" || kind === "me.quiet") return typeof data.g === "string" && data.g ? `/family/${encodeURIComponent(data.g)}` : "/family";
   return kind === "device.new" ? "/devices?filter=loose" : "/sync";
 }
 
 /** The app's Alerts screen. */
 export const ALERTS_SCREEN_COPY = {
   title: "Alerts",
-  intro: "Get an alert on this device when a new device is waiting in Unassigned, when FamilyFi can't reach your gateway or when a child asks for more time.",
+  intro: "Get an alert on this device when a new device is waiting in Unassigned, when FamilyFi can't reach your gateway when a child asks for more time, or when a child's phone loses Screen Time or goes quiet.",
   /** The one switch for this device's alerts; turning it on asks to send notifications. */
   deviceSwitch: "Alerts on this device",
   /** The system's notification permission was refused. */

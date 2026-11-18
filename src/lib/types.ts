@@ -279,6 +279,9 @@ export type PairedPhone = {
   actsAs: { username: string; displayName: string } | null;
   /** A child's phone (`me`) only: the family group it signs in for; null once that group is deleted. */
   group?: { id: string; name: string } | null;
+  /** A child's iPhone or iPad (`me`) only, once it has said: its Screen Time permission (src/lib/me-protection.ts), and when it changed. */
+  protection?: string;
+  protectionAt?: string | null;
   /** The device that vouched for this one: the app that set up a Watch or its own Siri and shortcuts. */
   parentDeviceId: string | null;
   enrolledAt: string;

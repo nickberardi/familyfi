@@ -183,7 +183,10 @@ Administrators do all of this from **System → Pair Device** in the web app. Ad
 FamilyFi can tell administrators' phones when devices join a managed network and wait in
 Unassigned (`device.new`), when no sync pass has reached the gateway for 10 minutes (`sync.down`),
 when one does again (`sync.up`, only to phones told `sync.down`), and when a child asks for more
-time in FamilyFi Me (`ask.new`, made by the child's request rather than a sync pass). Kinds are listed once in
+time in FamilyFi Me (`ask.new`, made by the child's request rather than a sync pass), when a
+child's phone says its Screen Time permission is no longer on (`me.protection`, made by that phone's
+request) and when a child's phone has not reached FamilyFi for a day (`me.quiet`, once, by the sync
+pass's sweep, until the phone is heard from again). Kinds are listed once in
 `src/lib/alert-kinds.ts`. Reminders that a pause or allowance is ending are scheduled on the phone
 and never sent by the server.
 
@@ -198,7 +201,9 @@ and never sent by the server.
   with no sentence in it: the phone writes the words from `k` and `d` (`src/lib/alert-copy.ts`).
   `device.new` carries `n`, the number of new devices, and `h`, the hostname when `n` is 1.
   `ask.new` carries `g` and `n`, the group's id and name, `a` (`pause` or `rule`), and for a rule
-  `r`, its name, and `m`, the minutes asked for; a tap opens the group. Readers
+  `r`, its name, and `m`, the minutes asked for; a tap opens the group. `me.protection` and
+  `me.quiet` carry `p`, the phone's name, and `g` and `n`, its family member's group id and name; a
+  tap opens that family member. Readers
   ignore keys they do not know; `v` rises only for an incompatible envelope.
 - FamilyFi encrypts the envelope for each phone with its key: base64url of
   `0x01 || 12-byte nonce || AES-256-GCM ciphertext || 16-byte tag`, additional data
@@ -287,7 +292,11 @@ windows it marks `allowed`; it does not read `allowance` itself, or always-on ca
 website rules, which an app lists on its own. An invite for a child's phone is cancelled while it
 waits when the phone that made it is revoked, or its administrator is demoted or deleted. `src/lib/child-day.ts`
 (`meDaySubject`, `tellDay`) turns that answer into the day FamilyFi Me shows. It renews like any
-paired device, and may revoke itself. Deleting its group revokes it and cancels invites still
+paired device, and may revoke itself. On an iPhone or iPad it tells its Screen Time permission,
+which it needs to block apps, with `PATCH /paired/devices/{its id}` `{ "protection": "on" |
+"notAllowed" | "removed" }` and nothing else (403 `own_device_required` for anyone else, an
+administrator included); its record then shows `protection` and `protectionAt`, and Android's never
+does. Deleting its group revokes it and cancels invites still
 waiting for the group, keeping the record; an import keeps it where its group comes back with the
 same id and revokes it otherwise.
 
@@ -378,7 +387,7 @@ allowlist in [`src/server/device-scope.ts`](../src/server/device-scope.ts), not 
 | `app:rulesOnly` | Its session, connection manifest, groups, rules and changes; the rule and group-rule verbs; revoking itself (403 `watch_scope` for a Watch, `app_scope` for the app's controls, beyond that) |
 | `agent:full` | Household reads and controls; never accounts, UniFi settings, resolvers, household-settings changes or connection management |
 | `agent:readOnly` | Household reads |
-| `me:askOnly` | Its session, connection manifest and its own group and the rules that cover it (`GET /groups/{id}`, `GET /rules`); asking for more time on its group (`POST /groups/{id}/asks`); revoking itself (403 `me_scope` beyond that) |
+| `me:askOnly` | Its session, connection manifest and its own group and the rules that cover it (`GET /groups/{id}`, `GET /rules`); asking for more time on its group (`POST /groups/{id}/asks`); revoking itself, and telling its own Screen Time permission (`PATCH /paired/devices/{its id}`) (403 `me_scope` beyond that) |
 
 A client type holds only the scopes in its row, and a device holding any other allows nothing. A
 phone, tablet or Mac always pairs as `app`, and a Watch and an app's Siri and shortcuts enroll with

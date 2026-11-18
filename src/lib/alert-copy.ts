@@ -1,4 +1,4 @@
-import type { AskData, NewDeviceData } from "./alert-kinds";
+import type { AskData, MePhoneData, NewDeviceData } from "./alert-kinds";
 
 /**
  * The words of phone alerts and of the Alerts card. A push carries only codes (src/lib/alert-kinds.ts);
@@ -52,6 +52,16 @@ export function alertText(kind: string, data: Record<string, unknown>): AlertTex
       const body = length && rule ? `${length} off ${rule}.` : rule ? `Time off ${rule}.` : length ? `${length} more.` : "Open FamilyFi to answer.";
       return { title: `${who} asked for more time`, body };
     }
+    case "me.protection": {
+      const { p } = data as Partial<MePhoneData>;
+      const phone = text(p) ?? "A child's phone";
+      return { title: `Screen Time is off on ${phone}`, body: "FamilyFi Me can't block apps there until it's allowed again." };
+    }
+    case "me.quiet": {
+      const { p } = data as Partial<MePhoneData>;
+      const phone = text(p) ?? "A child's phone";
+      return { title: `${phone} hasn't checked in`, body: "FamilyFi Me there hasn't reached FamilyFi for a day. It may be off or offline." };
+    }
     case "sync.down":
       return { title: "Can't reach your gateway", body: "Your rules may not apply until FamilyFi reaches it again." };
     case "sync.up":
@@ -75,6 +85,8 @@ export const ALERT_KIND_LABELS: Record<string, string> = {
   "sync.down": "Can't reach your gateway",
   "sync.up": "Gateway back",
   "ask.new": "Asks from children",
+  "me.protection": "Screen Time turned off",
+  "me.quiet": "A child's phone goes quiet",
 };
 
 /** The Alerts card in Settings. */

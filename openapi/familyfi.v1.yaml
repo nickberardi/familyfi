@@ -3093,8 +3093,14 @@ paths:
     patch:
       operationId: updatePairedDevice
       tags: [Paired]
-      summary: Rename a paired device or change its scope
-      description: Administrator only. Only an agent's scope changes, between `agent:full` and `agent:readOnly`; any other change answers 400 `invalid_scope`.
+      summary: Rename a paired device, change its scope, or tell a child's phone's Screen Time permission
+      description: |
+        An administrator renames a device or changes an agent's scope, between `agent:full` and
+        `agent:readOnly`; any other scope change answers 400 `invalid_scope`. FamilyFi Me on a child's
+        phone (`me:askOnly`) sends only `protection`, for its own id; anyone else sending `protection`
+        gets 403 `own_device_required`, and a child's phone sending anything else 403
+        `administrator_required`. A `protection` that was `on` and changes tells parents' phones
+        (`me.protection`).
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/CsrfToken" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PairedDeviceUpdate" } } } }
@@ -3985,6 +3991,8 @@ components:
         parentDeviceId: { type: [string, "null"], description: "The paired device whose invite this one joined with: a Watch's phone, or the phone that paired a phone or agent. Revoking it revokes this device. A child's phone has none: it belongs to its group." }
         enrolledAt: { type: string, format: date-time }
         lastSeenAt: { type: [string, "null"], format: date-time }
+        protection: { $ref: "#/components/schemas/MeProtection", description: "A child's phone (`me`) only, once it has said: its Screen Time permission. Absent on Android and on every other device." }
+        protectionAt: { type: [string, "null"], format: date-time, description: "When a child's phone last changed `protection`; present with it." }
         revokedAt: { type: [string, "null"], format: date-time }
         pairedVia:
           type: [object, "null"]
@@ -4025,9 +4033,12 @@ components:
         An alert a phone can get. `device.new`: devices joined a managed network and wait in Unassigned.
         `sync.down`: no sync pass has reached the gateway for 10 minutes. `sync.up`: one has again, sent
         only to phones told `sync.down`. `ask.new`: a child asked for more time in FamilyFi Me (data `g` the
-        group's id, `n` its name, `a` `pause` or `rule`, with `r` the rule's name and `m` the minutes). New
-        kinds may be added; FamilyFi sends a phone only the kinds it registered.
-      x-extensible-enum: [device.new, sync.down, sync.up, ask.new]
+        group's id, `n` its name, `a` `pause` or `rule`, with `r` the rule's name and `m` the minutes).
+        `me.protection`: a child's phone said its Screen Time permission, on until then, is not any more.
+        `me.quiet`: a child's phone has not reached FamilyFi for a day, told once until it does. Both
+        carry `p` the phone's name, and `g` and `n` its family member's group id and name. New kinds may be added; FamilyFi
+        sends a phone only the kinds it registered.
+      x-extensible-enum: [device.new, sync.down, sync.up, ask.new, me.protection, me.quiet]
     PushRegistration:
       type: object
       additionalProperties: false
@@ -4059,6 +4070,14 @@ components:
       properties:
         displayName: { type: string, minLength: 1, maxLength: 80 }
         scope: { type: string, enum: ["agent:full", "agent:readOnly"], description: An agent's new scope. No other device changes scope. }
+        protection: { $ref: "#/components/schemas/MeProtection" }
+    MeProtection:
+      type: string
+      description: |
+        What FamilyFi Me on a child's iPhone or iPad says of its Screen Time permission, which it needs to
+        block apps: `on` allowed, `notAllowed` never allowed or turned down, `removed` taken away after
+        being on. Only that phone sets it, on its own record; Android never does. New values may be added.
+      x-extensible-enum: ["on", notAllowed, removed]
     ConnectionStatus:
       type: object
       additionalProperties: false
