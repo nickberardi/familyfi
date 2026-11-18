@@ -211,7 +211,7 @@ The native app keeps the shared meaning above and adapts the presentation to eac
 
 - Same cards and verdict colours; 16px page padding; object titles 19px.
 - The tab bar holds Family, Things, Devices and More, never a fifth tab.
-- The Apple Watch and Wear OS show a child's waiting ask as plain secondary text under the group's devices line, not as the accent line: it is read-only there, and answered on the phone.
+- The Apple Watch and Wear OS show a child's waiting ask as plain secondary text under the group's status lines, not as the accent line: it is read-only there, and answered on the phone.
 - Dialogs are the app's own `Sheet` (in familyfi-mobile) with the same content and copy as the web's `Modal`.
 - The card stack replaces the card grid on phones.
 - A one-tap Block switch (Control Center, Quick Settings, a widget) is another surface for group status: it is on exactly when the group's internet is off (what the card badge says unless a Block button default takes the badge), its state line is Blocked or Online, it offers no timed choices, and unblocking waits for the device to be unlocked. On iPhone a control has only one action, so from the lock screen blocking asks for the unlock too. Its glyph is the block sign in both states (SF Symbols `nosign`, the same sign on an Android tile), never the shield and never a Wi-Fi glyph, which Control Center already uses for the network switch; its state shows in the platform's own on colour (system red on iPhone, the system accent on Android) and its state word. Its copy is `src/lib/block-switch.ts`.
