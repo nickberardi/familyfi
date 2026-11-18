@@ -345,7 +345,7 @@ export function groupDayOf(group: Pick<Group, "id" | "name" | "suspension" | "al
 }
 
 function minutesOfHhmm(value: string): Clock {
-  const [hours, minutes] = value.split(":").map(Number);
+  const [hours = 0, minutes = 0] = value.split(":").map(Number);
   return hours * 60 + minutes;
 }
 
