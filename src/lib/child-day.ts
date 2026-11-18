@@ -1,3 +1,4 @@
+import { zonedFormat } from "@/lib/clock";
 import type { TimelineBand } from "@/lib/day-timeline";
 import { daysLabel, formatHhmm } from "@/lib/display";
 import { groupLift, rulePaused, type Rule, type RulePause } from "@/lib/rules";
@@ -204,8 +205,10 @@ export function dayDate(day: DayClock, minutes: Clock): Date {
 }
 
 /** Minutes after the household's midnight at `now`, by its wall clock. */
+const WALL: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit", hourCycle: "h23" };
+
 function wallMinutes(now: Date, timeZone: string): Clock {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+  const parts = zonedFormat(WALL, timeZone).formatToParts(now);
   const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? 0);
   return get("hour") * 60 + get("minute");
 }
