@@ -86,13 +86,17 @@ export function askSheetBody(ask: GroupAsk, rules: Rule[], timezone: string, now
 }
 
 /**
- * The answer sheet's quick choices. To unpause: Unpause, which ends the pause. To time off a rule:
+ * The answer sheet's quick choices. To unpause: Unpause, which ends the pause; on a shared Thing,
+ * Unblock, which ends the block. To time off a rule:
  * what the child asked for, and the rest of the window when that is longer, each never past the
  * window's end, as the server caps it; nothing while the rule's window is not on, since then there is
  * nothing to lift. Not now comes last (`askSheetChoices`).
  */
 export function askSheetOptions(ask: GroupAsk, rules: Rule[], timezone: string, now: Date): AskSheetOption[] {
-  if (ask.about === "pause") return [{ label: "Unpause", note: "ends the pause now", request: { kind: "asked" } }];
+  // A shared Thing's ask names the child who asked; the Thing is blocked, as its card and the child say.
+  if (ask.about === "pause") {
+    return [ask.from ? { label: "Unblock", note: "ends the block now", request: { kind: "asked" } } : { label: "Unpause", note: "ends the pause now", request: { kind: "asked" } }];
+  }
   const rule = ruleOf(ask, rules);
   const end = rule ? activeWindowsEnd(ruleInternetWindows(rule), now, timezone) : undefined;
   // Not on now, or always on: no window to lift time off, and the server refuses it.
