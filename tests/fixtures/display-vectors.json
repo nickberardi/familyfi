@@ -32375,6 +32375,79 @@
     },
     {
       "fn": "askSheetOptions",
+      "name": "to unblock a shared Thing only a category rule blocks too",
+      "input": {
+        "ask": {
+          "id": "a2",
+          "about": "pause",
+          "state": "waiting",
+          "at": "2026-11-17T03:25:00Z",
+          "expiresAt": "2026-11-17T04:25:00Z",
+          "from": {
+            "groupId": "g1",
+            "name": "Cassie"
+          }
+        },
+        "rules": [
+          {
+            "id": "r2",
+            "name": "Games",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g2"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "name": "",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "21:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": []
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-11-17T03:30:00Z",
+        "group": {
+          "id": "g2",
+          "blockButtonRuleId": null
+        }
+      },
+      "expected": [
+        {
+          "label": "Unblock",
+          "note": "ends the block now",
+          "request": {
+            "kind": "asked"
+          }
+        }
+      ]
+    },
+    {
+      "fn": "askSheetOptions",
       "name": "less than the rest of the window",
       "input": {
         "ask": {
@@ -33163,6 +33236,87 @@
         {
           "label": "Unpause",
           "note": "ends the pause; Bedtime still blocks it",
+          "request": {
+            "kind": "asked"
+          }
+        },
+        {
+          "label": "Not now",
+          "note": "they can ask again at 11:00 PM",
+          "request": {
+            "kind": "decline"
+          }
+        }
+      ]
+    },
+    {
+      "fn": "askSheetChoices",
+      "name": "to unblock a shared Thing only a category rule blocks too",
+      "input": {
+        "ask": {
+          "id": "a2",
+          "about": "pause",
+          "state": "waiting",
+          "at": "2026-11-17T03:25:00Z",
+          "expiresAt": "2026-11-17T04:25:00Z",
+          "from": {
+            "groupId": "g1",
+            "name": "Cassie"
+          }
+        },
+        "rules": [
+          {
+            "id": "r2",
+            "name": "Games",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g2"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "name": "",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "21:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": []
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-11-17T03:30:00Z",
+        "waitMinutes": 30,
+        "group": {
+          "id": "g2",
+          "blockButtonRuleId": null
+        }
+      },
+      "expected": [
+        {
+          "label": "Unblock",
+          "note": "ends the block now",
           "request": {
             "kind": "asked"
           }
