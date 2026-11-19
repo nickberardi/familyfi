@@ -43,9 +43,10 @@ jobs:
           fi
           # Both sides of a rename: moving code into docs/ is still a code change.
           files="$(git diff --no-renames --name-only HEAD^1 HEAD)"
-          docs='^(docs/.*|(README|CONTRIBUTING|SECURITY|CLAUDE)\.md|scripts/README\.md|\.github/PULL_REQUEST_TEMPLATE\.md|\.agents/skills/.*\.md)$'
+          docs='^(docs/.*\.(md|png)|(README|CONTRIBUTING|SECURITY|CLAUDE)\.md|scripts/README\.md|\.github/PULL_REQUEST_TEMPLATE\.md|\.agents/skills/.*\.md)$'
+          added="$(git diff --no-renames HEAD^1 HEAD)"
           if [[ -n "$files" ]] && ! grep -vqE "$docs" <<<"$files" &&
-            ! git diff --no-renames HEAD^1 HEAD | grep -qE '^\+.*-----BEGIN [A-Z ]*PRIVATE KEY-----'; then
+            ! grep -qE '^\+.*-----BEGIN [A-Z ]*PRIVATE KEY-----' <<<"$added"; then
             echo "code=false" >>"$GITHUB_OUTPUT"
             echo "Only documentation changed, so the build and tests were skipped." >>"$GITHUB_STEP_SUMMARY"
           else
@@ -97,6 +98,8 @@ jobs:
   # Each job calls scripts/test.py, which starts and removes its own PostgreSQL containers.
   verify:
     needs: contract
+    # Explicit: a bare `if` would also skip this when `changes` failed, which a required check reads as success.
+    if: ${{ !cancelled() && needs.contract.result == 'success' }}
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
@@ -163,6 +166,8 @@ jobs:
   # verify's coverage run takes about seven minutes, this job's browser run about five.
   browser:
     needs: contract
+    # Explicit: a bare `if` would also skip this when `changes` failed, which a required check reads as success.
+    if: ${{ !cancelled() && needs.contract.result == 'success' }}
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
