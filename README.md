@@ -85,7 +85,7 @@ Next, open **Devices** and put each device in the right group. The [first-time s
 
 ## Get the app
 
-Get the FamilyFi app for iPhone, iPad, Mac and Apple Watch on the [App Store](APP_STORE_FAMILYFI_URL), and for Android and Wear OS through the [Google Play beta](https://getfamilyfi.com/android/). For your child's iPhone or iPad, get [FamilyFi Me](APP_STORE_ME_URL).
+Get the FamilyFi app for iPhone, iPad, Mac and Apple Watch through the [TestFlight beta](https://testflight.apple.com/join/5nuDQjJq) until it reaches the App Store, and for Android and Wear OS through the [Google Play beta](https://getfamilyfi.com/android/). For your child's iPhone or iPad, FamilyFi Me is coming to the App Store.
 
 To connect it, open **Pair Device** in FamilyFi and scan the code with the app. Your Apple Watch pairs through your iPhone, with nothing to scan. To use the app away from home, choose how your phone reaches home under **Pair Device › Remote access**. The [phone and Watch guide](https://github.com/nickberardi/familyfi/wiki/Phone-and-Watch-app) explains each choice. Nobody can sign in with a password from outside your home: only phones you paired can get in. To set up a child's phone, choose **Pair FamilyFi Me**; the [FamilyFi Me guide](https://github.com/nickberardi/familyfi/wiki/FamilyFi-Me) walks through it.
 
