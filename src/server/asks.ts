@@ -6,7 +6,7 @@ import type { SignedInSession } from "./auth";
 import { groupForChild, requireChildReads } from "./child-day";
 import { prisma } from "./db";
 import { isFullApp } from "./device-scope";
-import { groupInclude, lifted, publicGroup, sessionActor } from "./groups";
+import { groupInclude, type GroupWithRules, lifted, publicGroup, sessionActor } from "./groups";
 import { loadHousehold } from "./household";
 import { ApiError } from "./http";
 import { activeWindowsEnd, builtInRule, ruleInternetWindows } from "./rules";
@@ -39,6 +39,19 @@ function open(now: Date) {
   return { state: AskState.waiting, expiresAt: { gt: now } };
 }
 
+/**
+ * When what an ask to unblock is about ends on its own: the later of the group's pause and its
+ * Block button rule's window, null when either has no end, undefined when neither blocks it now.
+ */
+function unblockAskEnd(group: GroupWithRules, now: Date, timezone: string): Date | null | undefined {
+  const { block, blockedByPause, buttonRuleId, candidates, ends } = unblockTargets(group, now, timezone);
+  const button = candidates.find(({ rule, ...link }) => rule.id === buttonRuleId && !lifted(link, now));
+  const buttonEnd = button ? ends.get(button.rule.id) : undefined;
+  if (!blockedByPause && buttonEnd === undefined) return undefined;
+  const lasts = [...(blockedByPause ? [block!.expiresAt] : []), ...(buttonEnd !== undefined ? [buttonEnd] : [])];
+  return lasts.some((end) => end === null) ? null : new Date(Math.max(...lasts.map((end) => end!.getTime())));
+}
+
 /** Refuses anyone but FamilyFi Me on a child's phone, which alone asks for more time. */
 export function requireChild(session: SignedInSession) {
   if (session.device?.clientType !== "me") throw new ApiError(403, "child_only", "Only FamilyFi Me on a child's phone asks for more time.");
@@ -68,14 +81,9 @@ export async function fileAsk(session: SignedInSession, groupId: string, input: 
   if (input.about === "pause") {
     // An ask to unblock is the group's Unblock: it may be asked while the group is paused, or while
     // its Block button rule blocks it (Video on TV), and it ends with the last of them.
-    const { block, blockedByPause, buttonRuleId, candidates, ends } = unblockTargets(group, now, household.timezone);
-    const button = candidates.find(({ rule, ...link }) => rule.id === buttonRuleId && !lifted(link, now));
-    const buttonEnd = button ? ends.get(button.rule.id) : undefined;
-    if (!blockedByPause && buttonEnd === undefined) {
-      throw new ApiError(409, "not_blocked", thing ? `${thing} isn't blocked right now.` : "You aren't paused right now.");
-    }
-    const lasts = [...(blockedByPause ? [block!.expiresAt] : []), ...(buttonEnd !== undefined ? [buttonEnd] : [])];
-    blockEnd = lasts.some((end) => end === null) ? null : new Date(Math.max(...lasts.map((end) => end!.getTime())));
+    const end = unblockAskEnd(group, now, household.timezone);
+    if (end === undefined) throw new ApiError(409, "not_blocked", thing ? `${thing} isn't blocked right now.` : "You aren't paused right now.");
+    blockEnd = end;
   } else {
     const link = group.rules.find((item) => item.ruleId === input.ruleId && item.rule.systemGroupId === null && !builtInRule(item.rule));
     if (!link) throw new ApiError(404, "not_found", thing ? `That rule doesn't cover ${thing}.` : "That rule isn't one of yours.");
@@ -197,38 +205,46 @@ export async function releaseAsk(askId: string): Promise<void> {
 /**
  * A parent's write lifted a group's pause (`pause`) or rules (`ruleIds`), for one group or, with
  * `groupId` null, every group a rule covers: each waiting ask about what was lifted is answered yes,
- * by that parent, whether or not they answered it by its id.
+ * by that parent, whether or not they answered it by its id. An ask to unblock is answered only once
+ * nothing it is about blocks the group: neither its pause nor its Block button rule.
  */
 export async function answerAsks(
   session: Parameters<typeof sessionActor>[0],
   groupId: string | null,
   lifted: { pause?: boolean; ruleIds?: string[] },
 ): Promise<void> {
-  const about = [
-    ...(lifted.pause ? [{ about: "pause" }] : []),
-    ...(lifted.ruleIds?.length ? [{ about: "rule", ruleId: { in: lifted.ruleIds } }] : []),
-  ];
-  if (!about.length) return;
   const now = new Date();
   const by = sessionActor(session);
-  await prisma().ask.updateMany({
-    where: { ...(groupId ? { groupId } : {}), ...open(now), OR: about },
-    data: { state: AskState.yes, answeredAt: now, answeredByAccountId: by.accountId, answeredByName: by.name },
-  });
+  const yes = { state: AskState.yes, answeredAt: now, answeredByAccountId: by.accountId, answeredByName: by.name };
+  if (lifted.ruleIds?.length) {
+    await prisma().ask.updateMany({ where: { ...(groupId ? { groupId } : {}), ...open(now), about: "rule", ruleId: { in: lifted.ruleIds } }, data: yes });
+  }
+  // A rule lifted may be a group's Block button rule, which an ask to unblock is about too.
+  if (!lifted.pause && !lifted.ruleIds?.length) return;
+  const waiting = await prisma().ask.findMany({ where: { ...(groupId ? { groupId } : {}), about: "pause", ...open(now) }, select: { groupId: true } });
+  if (!waiting.length) return;
+  const { timezone } = await loadHousehold();
+  for (const id of new Set(waiting.map((ask) => ask.groupId))) {
+    const group = await prisma().group.findUnique({ where: { id }, include: groupInclude });
+    if (group && unblockAskEnd(group, now, timezone) !== undefined) continue;
+    await prisma().ask.updateMany({ where: { groupId: id, about: "pause", ...open(now) }, data: yes });
+  }
 }
 
 /**
- * A group's pause was set again or extended: a waiting ask to be unpaused now closes at the
- * earlier of the household's timeout and the pause's new end (`end` null: none).
+ * A group's pause was set again or extended: a waiting ask to unblock now closes at the earlier of
+ * the household's timeout and the end of what it is about, its pause or its Block button rule.
  */
-export async function followPause(groupId: string, end: Date | null): Promise<void> {
+export async function followPause(groupId: string): Promise<void> {
   const now = new Date();
   const waiting = await prisma().ask.findMany({ where: { groupId, about: "pause", ...open(now) } });
   if (!waiting.length) return;
-  const { askTimeoutMinutes } = await loadHousehold();
+  const { askTimeoutMinutes, timezone } = await loadHousehold();
+  const group = await prisma().group.findUnique({ where: { id: groupId }, include: groupInclude });
+  const end = group ? unblockAskEnd(group, now, timezone) : undefined;
   for (const ask of waiting) {
     const timeout = new Date(ask.createdAt.getTime() + askTimeoutMinutes * 60_000);
-    const endsWithBlock = end !== null && end <= timeout;
+    const endsWithBlock = end !== null && end !== undefined && end <= timeout;
     await prisma().ask.updateMany({ where: { id: ask.id, ...open(now) }, data: { expiresAt: endsWithBlock ? end : timeout, endsWithBlock } });
   }
 }

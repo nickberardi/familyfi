@@ -66,7 +66,7 @@ export async function liftGroupInternet(
       });
       await tx.ruleGroup.updateMany({ where: { ...lifts, pauseActive: true, pauseKind: RuleLiftKind.allow }, data: CLEARED });
     });
-    await followPause(groupId, end);
+    await followPause(groupId);
   } else if (action === "resume") {
     const resumed = await prisma().rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
     if (resumed.count) await answerAsks(session, groupId, { pause: true });
@@ -75,7 +75,7 @@ export async function liftGroupInternet(
     if (!block.expiresAt) throw new ApiError(409, "indefinite", "An indefinite pause has no expiry to extend.");
     const extended = extendSuspensionUntil(block.expiresAt, now, body.minutes! * 60_000);
     await prisma().rule.update({ where: { id: block.id }, data: { expiresAt: extended } });
-    await followPause(groupId, extended);
+    await followPause(groupId);
   } else if (action === "allow") {
     const requested = until(body.until);
     // A rule already paused, or paused for this group, is not blocking it. One this group is
