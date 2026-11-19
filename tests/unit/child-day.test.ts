@@ -763,8 +763,8 @@ describe("a length of the child's own", () => {
     expect(askLengthAllowed(4)).toBe(false);
     expect(askLengthAllowed(241)).toBe(false);
     expect(askLengthAllowed(30.5)).toBe(false);
-    expect(ASK_LENGTH_REFUSAL).toBe("You can ask for 15 minutes to 4 hours.");
-    expect(ASK_OWN_LENGTH).toBe("Another length");
+    expect(ASK_LENGTH_REFUSAL).toBe("You can ask for 5 minutes to 4 hours.");
+    expect(ASK_OWN_LENGTH).toBe("Another length…");
   });
 
   it("keeps the limits the HTTP contract states", () => {

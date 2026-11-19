@@ -162,8 +162,8 @@ export const ASK_MINUTES = { min: 5, max: 240 } as const;
 /** A length of the child's own is picked in steps this long. */
 export const ASK_LENGTH_STEP = 15;
 
-/** The choice beside the presets that opens a length of the child's own. */
-export const ASK_OWN_LENGTH = "Another length";
+/** The choice beside the presets that opens a length of the child's own; it opens a list, so it ends in an ellipsis. */
+export const ASK_OWN_LENGTH = "Another length…";
 
 /** Whether FamilyFi takes this many minutes as an ask. */
 export function askLengthAllowed(minutes: number): boolean {
@@ -179,8 +179,8 @@ export function askLengthChoices(): { value: AskLength; label: string }[] {
   return choices;
 }
 
-/** What the child is told when a length is out of range, naming the choices it can pick: "You can ask for 15 minutes to 4 hours." */
-export const ASK_LENGTH_REFUSAL = `You can ask for ${minutesText(ASK_LENGTH_STEP)} to ${minutesText(ASK_MINUTES.max)}.`;
+/** What the child's app says of a length FamilyFi would not take: "You can ask for 5 minutes to 4 hours." */
+export const ASK_LENGTH_REFUSAL = `You can ask for ${minutesText(ASK_MINUTES.min)} to ${minutesText(ASK_MINUTES.max)}.`;
 
 /** A child can ask again this long after a no, when FamilyFi does not say (`againAt`). */
 export const ASK_AGAIN_AFTER = 30;
