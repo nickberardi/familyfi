@@ -109,6 +109,7 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
           group={groups.find((group) => group.id === sheet.group.id) ?? sheet.group}
           target={sheet.target}
           timezone={timezone}
+          onOpen={(target) => setSheet({ group: sheet.group, target })}
           onClose={() => setSheet(null)}
         />
       ) : null}

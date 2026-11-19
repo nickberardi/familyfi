@@ -136,7 +136,7 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
         <GroupDevicesCard group={group} members={members} />
         {group.kind === "family" && !demo ? <GroupChildPhones group={group} /> : null}
       </div>
-      {sheet ? <PauseSheet group={group} target={sheet} timezone={timezone} onClose={() => setSheet(null)} /> : null}
+      {sheet ? <PauseSheet group={group} target={sheet} timezone={timezone} onOpen={setSheet} onClose={() => setSheet(null)} /> : null}
       {editing ? (
         <GroupEditSheet
           key={group.id}

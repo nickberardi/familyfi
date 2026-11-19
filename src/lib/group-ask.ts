@@ -1,6 +1,6 @@
 import { minutesText } from "./alert-copy";
 import { formatClock } from "./display";
-import { rulesToUnblock } from "./group-actions";
+import { groupHeaderActions, rulesToUnblock, type GroupRun } from "./group-actions";
 import { askSheetCustomOption, type CustomPause, type PauseSheetPicker } from "./pause-sheet";
 import { activeWindowsEnd, ruleInternetWindows, type Rule } from "./rules";
 import type { Group, GroupAsk } from "./types";
@@ -18,10 +18,13 @@ import type { Group, GroupAsk } from "./types";
 /**
  * What a choice on the answer sheet does: `asked` gives what the child asked for; `for` and `until`
  * lift the rule for another time (resolved at the tap, so a sheet left open never sends an end
- * already passed); `decline` is Not now. A yes to unblock says when what it lifts blocks again
- * (`ends`: "until 9:00 PM", or "until you resume" when one has no end), for the notice.
+ * already passed); `decline` is Not now. `unblock` is the group card's own Unblock button
+ * (`groupHeaderActions`), run as if the parent tapped it (`answerAsk`).
  */
-export type AskSheetRequest = { kind: "asked"; ends?: string } | { kind: "for"; minutes: number } | { kind: "until"; until: string } | { kind: "decline" };
+export type AskSheetRequest =
+  | { kind: "asked" }
+  | { kind: "unblock"; run: GroupRun; ruleId?: string; name?: string }
+  | { kind: "for"; minutes: number } | { kind: "until"; until: string } | { kind: "decline" };
 
 export type AskSheetOption = { label: string; note: string; request: AskSheetRequest };
 
@@ -88,9 +91,11 @@ export function askSheetBody(ask: GroupAsk, rules: Rule[], timezone: string, now
 }
 
 /**
- * The answer sheet's quick choices. To unblock: Unblock, the group's own Unblock (`answerAsk`),
- * which ends its pause and lifts the rules blocking it now, its Block button rule among them, as the
- * card's Unblock does; with the group (`group`), its note says what it lifts. To time off a rule:
+ * The answer sheet's quick choices. To unblock: Unblock, the group card's own Unblock button, which
+ * does what a tap on it does: ends a pause that alone blocks at once, or opens its sheet, which asks
+ * how long, for the Block button rule alone ("Unblock Video for TV?") or for everything blocking the
+ * group; nothing while the card's button is not Unblock. Its note says what it lifts. Without the
+ * group (`group`) it is the group's `resume` on `internet` with the ask's id. To time off a rule:
  * what the child asked for, and the rest of the window when that is longer, each never past the
  * window's end, as the server caps it; nothing while the rule's window is not on, since then there is
  * nothing to lift. Not now comes last (`askSheetChoices`).
@@ -100,18 +105,17 @@ export function askSheetOptions(
   rules: Rule[],
   timezone: string,
   now: Date,
-  group?: Pick<Group, "id" | "blockButtonRuleId" | "suspension">,
+  group?: Group,
 ): AskSheetOption[] {
   if (ask.about === "pause") {
-    const blocking = group ? rulesToUnblock(group, rules, timezone, now) : [];
-    const what = listNames(blocking.map((rule) => rule.name));
-    const paused = !group || group.suspension.active;
-    if (!blocking.length) return [{ label: "Unblock", note: "ends the block now", request: { kind: "asked" } }];
-    // The group's Unblock lifts these until the last of them ends, or until a parent resumes when one never does.
-    const end = blocking.some((rule) => rule.until === null) ? null : new Date(Math.max(...blocking.map((rule) => Date.parse(rule.until!))));
-    const lifts = `lifts ${what}${end ? ` until ${formatClock(end, timezone)}` : ", no end time"}`;
-    const note = paused ? `ends the block and ${lifts}` : lifts;
-    return [{ label: "Unblock", note, request: { kind: "asked", ends: end ? `until ${formatClock(end, timezone)}` : "until you resume" } }];
+    if (!group) return [{ label: "Unblock", note: "ends the block now", request: { kind: "asked" } }];
+    const { action } = groupHeaderActions(group, rules, timezone, now);
+    if (action.label !== "Unblock") return [];
+    const request: AskSheetRequest = { kind: "unblock", run: action.run, ...(action.ruleId ? { ruleId: action.ruleId, name: action.name ?? "" } : {}) };
+    if (action.run === "unblockNow") return [{ label: "Unblock", note: "ends the block now", request }];
+    const what = action.run === "pauseRule" ? (action.name ?? "") : listNames(rulesToUnblock(group, rules, timezone, now).map((rule) => rule.name));
+    const lifts = group.suspension.active ? `ends the block and lifts ${what}` : `lifts ${what}`;
+    return [{ label: "Unblock", note: `${lifts}, for as long as you choose`, request }];
   }
   const rule = ruleOf(ask, rules);
   const end = rule ? activeWindowsEnd(ruleInternetWindows(rule), now, timezone) : undefined;
@@ -163,7 +167,7 @@ export function askSheetChoices(
   timezone: string,
   now: Date,
   waitMinutes?: number,
-  group?: Pick<Group, "id" | "blockButtonRuleId" | "suspension">,
+  group?: Group,
 ): AskSheetChoice[] {
   const options = askSheetOptions(ask, rules, timezone, now, group);
   const custom: PauseSheetPicker[] =

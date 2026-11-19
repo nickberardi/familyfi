@@ -20,7 +20,6 @@ import type { Group, GroupAsk } from "@/lib/types";
 import { registerPush } from "@/server/alerts/registrations";
 import { ASKS_PER_HOUR, closeLapsedAsks } from "@/server/asks";
 import { liftGroupRule } from "@/server/group-internet";
-import { unblockGroup } from "@/server/group-unblock";
 import { prisma } from "@/server/db";
 import { resetDatabase } from "../helpers/db";
 import { request, type SessionAuth } from "../helpers/http";
@@ -218,7 +217,7 @@ describe("asking for more time", () => {
     expect((await readGroup(admin, emma.id)).ask).toMatchObject({ id: windowAsk.id, state: "yes" });
   });
 
-  it("asks to unblock a Thing its Block button rule blocks, and the Thing's unblock with its id lifts that rule and says yes", async () => {
+  it("asks to unblock a Thing its Block button rule blocks, and what the card's Unblock sends says yes", async () => {
     const tv = await prisma().group.create({ data: { kind: GroupKind.things, name: "TV", kidsCanAsk: true } });
     const video = await prisma().rule.create({ data: { name: "Video", kind: RuleKind.category, mode: RuleMode.always, targetIds: [4], groups: { create: { groupId: tv.id } } } });
     // Nothing blocks TV yet that its Unblock is for: always-on Video is how TV is set up.
@@ -229,18 +228,22 @@ describe("asking for more time", () => {
     expect(waiting).toMatchObject({ about: "pause", state: "waiting", from: { groupId: emma.id, name: "Emma" } });
     // Video has no end, so the ask waits for the household's timeout.
     expect(Date.parse(waiting.expiresAt!) - Date.parse(waiting.at)).toBe(60 * MINUTE);
-    // Only a parent's own unblock answers it, and only an unblock takes its id.
-    await expect(unblockGroup({ ...(await adminSession()), device: { clientType: "app-watch", scope: "app:rulesOnly" } }, "unblock", tv.id, { askId: waiting.id })).rejects.toMatchObject({
-      status: 403,
-    });
-    await expect(unblockGroup(await adminSession(), "end", tv.id, { askId: waiting.id })).rejects.toMatchObject({ status: 400 });
-
-    const yes = await unblockRoute(post(`/api/v1/groups/${tv.id}/unblock`, admin, { askId: waiting.id }), groupParams(tv.id));
+    // The yes is what the card's Unblock sends here ("Unblock Video for TV?"): Video paused for TV.
+    const yes = await verb(pauseRoute, "pause", admin, tv.id, video.id, { until: new Date(Date.now() + 30 * MINUTE).toISOString() });
     expect(yes.status).toBe(200);
-    expect(((await yes.json()) as { group: Group }).group.ask).toMatchObject({ id: waiting.id, state: "yes", by: { name: "Household admin" } });
-    expect(await prisma().ruleGroup.findUniqueOrThrow({ where: { ruleId_groupId: { ruleId: video.id, groupId: tv.id } } })).toMatchObject({ pauseActive: true, pauseKind: "allow" });
-    const again = await unblockRoute(post(`/api/v1/groups/${tv.id}/unblock`, admin, { askId: waiting.id }), groupParams(tv.id));
-    expect(await errorCode(again)).toBe("ask_closed");
+    expect((await readGroup(admin, tv.id)).ask).toMatchObject({ id: waiting.id, state: "yes", by: { name: "Household admin" } });
+  });
+
+  it("asks a family group to be unpaused only while it is paused, whatever its Block button default", async () => {
+    const gaming = await prisma().rule.create({ data: { name: "Gaming", kind: RuleKind.category, mode: RuleMode.always, targetIds: [5], groups: { create: { groupId: emma.id } } } });
+    await prisma().group.update({ where: { id: emma.id }, data: { blockButtonRuleId: gaming.id } });
+    expect(await errorCode(await ask(child, emma.id, { about: "pause" }))).toBe("not_blocked");
+    await verb(pauseRoute, "pause", admin, emma.id, "internet", { until: new Date(Date.now() + 10 * MINUTE).toISOString() });
+    const waiting = await askOf(await ask(child, emma.id, { about: "pause" }));
+    // It ends with the pause, not with Gaming, which never ends.
+    expect(Date.parse(waiting.expiresAt!) - Date.parse(waiting.at)).toBeLessThanOrEqual(10 * MINUTE);
+    expect((await verb(resumeRoute, "resume", admin, emma.id, "internet")).status).toBe(200);
+    expect((await readGroup(admin, emma.id)).ask).toMatchObject({ id: waiting.id, state: "yes" });
   });
 
   it("keeps an ask to unblock a Thing waiting while its Block button rule blocks, and answers it when that rule is lifted any way", async () => {
@@ -269,11 +272,11 @@ describe("asking for more time", () => {
     expect((await prisma().ask.findUniqueOrThrow({ where: { id: again.id } })).state).toBe("yes");
   });
 
-  it("answers an ask to be unpaused with the group's unblock, which lifts a window blocking it too", async () => {
+  it("answers an ask to be unpaused with the group's unblock, the card's Unblock while a window blocks it too", async () => {
     const homework = await windowRule(emma.id);
     await verb(pauseRoute, "pause", admin, emma.id, "internet");
     const waiting = await askOf(await ask(child, emma.id, { about: "pause" }));
-    const yes = await unblockRoute(post(`/api/v1/groups/${emma.id}/unblock`, admin, { askId: waiting.id }), groupParams(emma.id));
+    const yes = await unblockRoute(post(`/api/v1/groups/${emma.id}/unblock`, admin, {}), groupParams(emma.id));
     expect(yes.status).toBe(200);
     const group = ((await yes.json()) as { group: Group }).group;
     expect(group.suspension.active).toBe(false);

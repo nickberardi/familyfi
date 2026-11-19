@@ -75,6 +75,8 @@ async function withWaitingAsk(page: Page, group: Group, about: { about: "pause" 
 test("a child's ask shows on their card and page, and Not now answers it", async ({ page }) => {
   await signIn(page);
   const group = await cassie(page);
+  // Cassie is paused, so her card's button, and the yes, is Unblock.
+  expect((await page.request.post(`/api/v1/groups/${group.id}/rules/internet/pause`, { headers: await csrf(page), data: {} })).ok()).toBe(true);
   const declined = await withWaitingAsk(page, group);
 
   await page.goto("/family");
@@ -88,7 +90,7 @@ test("a child's ask shows on their card and page, and Not now answers it", async
   const sheet = page.getByRole("dialog", { name: "Cassie asked to be unpaused" });
   await expect(sheet).toBeVisible();
   await expect(sheet).toContainText(/Asked at \d{1,2}:\d\d [AP]M\. It closes at \d{1,2}:\d\d [AP]M if no one answers\./);
-  await expect(sheet.getByRole("button", { name: /^Unpause/ })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: /^Unblock/ })).toBeVisible();
   await shot(page, "ask-sheet");
   await expectAccessible(page, "the answer sheet", "[role=dialog]");
 
@@ -96,6 +98,34 @@ test("a child's ask shows on their card and page, and Not now answers it", async
   await expect(sheet).toHaveCount(0);
   expect(declined).toEqual(["POST"]);
   await expect(page.getByTestId(`group-ask-${group.id}`)).toHaveCount(0);
+  expect((await page.request.post(`/api/v1/groups/${group.id}/rules/internet/resume`, { headers: await csrf(page) })).ok()).toBe(true);
+});
+
+test("a child's ask to unblock opens the card's own Unblock sheet when there is a time to choose", async ({ page }) => {
+  await signIn(page);
+  const group = await cassie(page);
+  // Paused, with a rule of her own blocking her now: the card's Unblock asks how long.
+  const headers = await csrf(page);
+  const rule = await page.request.post("/api/v1/rules", {
+    headers,
+    data: { name: "Browser homework", kind: "internet", groupIds: [group.id], mode: "always" },
+  });
+  expect(rule.ok()).toBe(true);
+  const ruleId = ((await rule.json()) as { rule: { id: string } }).rule.id;
+  expect((await page.request.post(`/api/v1/groups/${group.id}/rules/internet/pause`, { headers, data: {} })).ok()).toBe(true);
+  try {
+    await withWaitingAsk(page, group);
+    await page.goto(`/family/${group.id}`);
+    await page.getByTestId(`group-ask-${group.id}`).click();
+    const ask = page.getByRole("dialog", { name: "Cassie asked to be unpaused" });
+    await ask.getByRole("button", { name: /^Unblock/ }).click();
+    await expect(ask).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Unblock Cassie?" })).toBeVisible();
+    await shot(page, "ask-unblock-sheet");
+  } finally {
+    await page.request.post(`/api/v1/groups/${group.id}/rules/internet/resume`, { headers });
+    await page.request.delete(`/api/v1/rules/${ruleId}`, { headers });
+  }
 });
 
 test("Settings sets how long an ask waits and how soon a child can ask again", { tag: "@desktop" }, async ({ page }) => {

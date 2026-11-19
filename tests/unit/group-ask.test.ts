@@ -94,21 +94,26 @@ describe("a child's ask, as a parent answers it", () => {
     expect(sent[1]!.init).toEqual({ method: "POST", body: { askId: "a1", until: "2026-11-17T12:00:00.000Z" } });
   });
 
-  it("unblocks with the group's own unblock and the ask's id, as its card's Unblock does", async () => {
-    const { sent, mutate } = recorder({ groups: [emma(pauseAsk)], devices: [] });
-    const [unblock] = askSheetChoices(pauseAsk, [], TZ, NOW, 30, emma(pauseAsk));
-    expect(unblock).toMatchObject({ label: "Unblock" });
-    await answerAsk(mutate, emma(pauseAsk), pauseAsk, unblock as never, undefined, NOW);
-    expect(sent[0]).toMatchObject({ path: "/api/v1/groups/g1/unblock", init: { method: "POST", body: { askId: "a2" } } });
-    expect(sent[0]!.options.feedback?.notice).toBe("Emma unblocked.");
+  it("runs the card's own Unblock: a pause that alone blocks ends at once, and the ask closes on the server", async () => {
+    const paused = { ...emma(pauseAsk), suspension: { active: true, until: null, by: null } } as Group;
+    const { sent, mutate } = recorder({ groups: [paused], devices: [] });
+    const [unblock] = askSheetChoices(pauseAsk, [], TZ, NOW, 30, paused);
+    expect(unblock).toMatchObject({ label: "Unblock", note: "ends the block now", request: { kind: "unblock", run: "unblockNow" } });
+    await answerAsk(mutate, paused, pauseAsk, unblock as never, undefined, NOW);
+    expect(sent[0]).toMatchObject({ path: "/api/v1/groups/g1/unblock", init: { method: "POST", body: {} } });
   });
 
-  it("says when what the yes lifts blocks again, as the card's Unblock does", async () => {
-    const { sent, mutate } = recorder({ groups: [emma(pauseAsk)], devices: [] });
-    const [unblock] = askSheetChoices(pauseAsk, [bedtime], TZ, NOW, 30, emma(pauseAsk));
-    expect(unblock).toMatchObject({ label: "Unblock", note: "lifts Bedtime until 7:00 AM" });
-    await answerAsk(mutate, emma(pauseAsk), pauseAsk, unblock as never, undefined, NOW);
-    expect(sent[0]!.options.feedback?.notice).toBe("Emma unblocked until 7:00 AM.");
+  it("opens the card's own Unblock sheet when the Unblock asks how long, sending nothing itself", async () => {
+    const paused = { ...emma(pauseAsk), suspension: { active: true, until: null, by: null } } as Group;
+    const { sent, mutate } = recorder({ groups: [paused], devices: [] });
+    const [unblock] = askSheetChoices(pauseAsk, [bedtime], TZ, NOW, 30, paused);
+    expect(unblock).toMatchObject({ label: "Unblock", note: "ends the block and lifts Bedtime, for as long as you choose" });
+    const opened: unknown[] = [];
+    await answerAsk(mutate, paused, pauseAsk, unblock as never, undefined, NOW, (target) => opened.push(target));
+    expect(opened).toEqual([{ kind: "unblock", mode: "pause" }]);
+    expect(sent).toEqual([]);
+    // Nothing to unblock: the card's button is Block, so only Not now is offered.
+    expect(askSheetChoices(pauseAsk, [], TZ, NOW, 30, emma(pauseAsk)).map((choice) => choice.label)).toEqual(["Not now"]);
   });
 
   it("says Not now with the ask's decline", async () => {

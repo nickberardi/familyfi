@@ -1,11 +1,10 @@
-import { AskState, RuleMode, type Ask } from "@prisma/client";
+import { AskState, GroupKind, RuleMode, type Ask } from "@prisma/client";
 import { z } from "zod";
 import { ASK_MINUTES } from "@/lib/child-day";
 import { recordAsk } from "./alerts/producers";
 import type { SignedInSession } from "./auth";
 import { groupForChild, requireChildReads } from "./child-day";
 import { prisma } from "./db";
-import { isFullApp } from "./device-scope";
 import { groupInclude, type GroupWithRules, lifted, publicGroup, sessionActor } from "./groups";
 import { loadHousehold } from "./household";
 import { ApiError } from "./http";
@@ -16,9 +15,11 @@ import { unblockTargets } from "./unblock-targets";
  * Asking for more time (FamilyFi Me). A child's phone files an ask on its own group, or on a Things
  * group shared with children, to unblock it (while it is paused, or a Thing's Block button rule
  * blocks it) or to lift one rule's window for a number of minutes. A parent answers no with
- * decline, or yes with the verb that lifts it: the group's `unblock` for an ask to unblock, the
- * rule's `allow` for the group for a window, each with the ask's `askId`. Any write that lifts what
- * a waiting ask is about answers it yes too, however the parent gave it (`answerAsks`).
+ * decline, or yes with what lifts it: for an ask to unblock, whatever the group's own Unblock
+ * button sends (its unblock, or the Block button rule lifted for it), for a window the rule's
+ * `allow` for the group with the ask's `askId`. Any write that lifts what a waiting ask is about
+ * answers it yes, however the parent gave it (`answerAsks`); `resume` on `internet` with `askId`
+ * still answers an ask to unblock that only a pause is behind.
  */
 
 /** At most this many asks an hour from one child about one group. */
@@ -40,12 +41,13 @@ function open(now: Date) {
 }
 
 /**
- * When what an ask to unblock is about ends on its own: the later of the group's pause and its
- * Block button rule's window, null when either has no end, undefined when neither blocks it now.
+ * When what an ask to unblock is about ends on its own: the later of the group's pause and, on a
+ * Thing, its Block button rule's window (a child's own phone shows only its pause, `groupDayOf`);
+ * null when either has no end, undefined when neither blocks it now.
  */
 function unblockAskEnd(group: GroupWithRules, now: Date, timezone: string): Date | null | undefined {
   const { block, blockedByPause, buttonRuleId, candidates, ends } = unblockTargets(group, now, timezone);
-  const button = candidates.find(({ rule, ...link }) => rule.id === buttonRuleId && !lifted(link, now));
+  const button = group.kind === GroupKind.things ? candidates.find(({ rule, ...link }) => rule.id === buttonRuleId && !lifted(link, now)) : undefined;
   const buttonEnd = button ? ends.get(button.rule.id) : undefined;
   if (!blockedByPause && buttonEnd === undefined) return undefined;
   const lasts = [...(blockedByPause ? [block!.expiresAt] : []), ...(buttonEnd !== undefined ? [buttonEnd] : [])];
@@ -155,19 +157,6 @@ export async function declineAsk(session: SignedInSession, groupId: string, askI
   if (!closed.count) throw askClosed();
   const fresh = await prisma().group.findUniqueOrThrow({ where: { id: groupId }, include: groupInclude });
   return { group: publicGroup(fresh, household.timezone, now) };
-}
-
-/** Who is answering, with what decides whether they may answer an ask by its id. */
-export type AnsweringSession = Parameters<typeof sessionActor>[0] & {
-  account?: { displayName: string; kind?: string; isAdmin?: boolean } | null;
-  device?: { clientType: string; scope: string } | null;
-};
-
-/** A parent answers by the ask's id, as only a parent says no: never a Watch, the app's controls or an agent. */
-export function requireParentAnswer<S extends AnsweringSession>(session: S): S {
-  const administrator = (!session.device || isFullApp(session.device)) && (session.account?.kind === "recovery" || session.account?.isAdmin === true);
-  if (!administrator) throw new ApiError(403, "administrator_required", "A FamilyFi administrator answers a child's ask.");
-  return session;
 }
 
 function askClosed() {

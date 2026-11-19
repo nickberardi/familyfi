@@ -32300,7 +32300,8 @@
           "label": "Unblock",
           "note": "ends the block now",
           "request": {
-            "kind": "asked"
+            "kind": "unblock",
+            "run": "unblockNow"
           }
         }
       ]
@@ -32376,10 +32377,10 @@
       "expected": [
         {
           "label": "Unblock",
-          "note": "ends the block and lifts Bedtime until 7:00 AM",
+          "note": "ends the block and lifts Bedtime, for as long as you choose",
           "request": {
-            "kind": "asked",
-            "ends": "until 7:00 AM"
+            "kind": "unblock",
+            "run": "unblock"
           }
         }
       ]
@@ -32440,10 +32441,12 @@
       "expected": [
         {
           "label": "Unblock",
-          "note": "lifts Video, no end time",
+          "note": "lifts Video, for as long as you choose",
           "request": {
-            "kind": "asked",
-            "ends": "until you resume"
+            "kind": "unblock",
+            "run": "pauseRule",
+            "ruleId": "r3",
+            "name": "Video"
           }
         }
       ]
@@ -33163,7 +33166,8 @@
           "label": "Unblock",
           "note": "ends the block now",
           "request": {
-            "kind": "asked"
+            "kind": "unblock",
+            "run": "unblockNow"
           }
         },
         {
@@ -33247,10 +33251,10 @@
       "expected": [
         {
           "label": "Unblock",
-          "note": "ends the block and lifts Bedtime until 7:00 AM",
+          "note": "ends the block and lifts Bedtime, for as long as you choose",
           "request": {
-            "kind": "asked",
-            "ends": "until 7:00 AM"
+            "kind": "unblock",
+            "run": "unblock"
           }
         },
         {
@@ -33319,10 +33323,12 @@
       "expected": [
         {
           "label": "Unblock",
-          "note": "lifts Video, no end time",
+          "note": "lifts Video, for as long as you choose",
           "request": {
-            "kind": "asked",
-            "ends": "until you resume"
+            "kind": "unblock",
+            "run": "pauseRule",
+            "ruleId": "r3",
+            "name": "Video"
           }
         },
         {
