@@ -50,12 +50,12 @@ export const PAIR_COPY = {
 } as const;
 
 /**
- * Where to get the FamilyFi app, shown as each store's own badge. Until the apps are listed, the
- * App Store badge opens TestFlight, and the Google Play badge opens brief steps for joining its
- * closed beta (`PLAY_BETA`); a store with no link yet shows its badge unlinked, marked as coming soon.
+ * Where to get the FamilyFi app, shown as each store's own badge. The App Store badge opens the
+ * app's App Store listing; until the app is listed on Google Play, its badge opens brief steps for
+ * joining its closed beta (`PLAY_BETA`). A store with no link yet shows its badge unlinked, marked as coming soon.
  */
 export const APP_STORES = [
-  { id: "apple", label: "Download on the App Store", badge: "/stores/app-store.svg", badgeWidth: 120, url: "https://testflight.apple.com/join/5nuDQjJq" },
+  { id: "apple", label: "Download on the App Store", badge: "/stores/app-store.svg", badgeWidth: 120, url: "https://apps.apple.com/app/id6819889209" },
   { id: "google", label: "Get it on Google Play", badge: "/stores/google-play.svg", badgeWidth: 135, url: "https://getfamilyfi.com/android/", steps: true },
 ] as const satisfies readonly AppStore[];
 
