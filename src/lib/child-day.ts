@@ -179,8 +179,8 @@ export function askLengthChoices(): { value: AskLength; label: string }[] {
   return choices;
 }
 
-/** What the child is told when a length is out of range: "You can ask for 5 minutes to 4 hours." */
-export const ASK_LENGTH_REFUSAL = `You can ask for ${minutesText(ASK_MINUTES.min)} to ${minutesText(ASK_MINUTES.max)}.`;
+/** What the child is told when a length is out of range, naming the choices it can pick: "You can ask for 15 minutes to 4 hours." */
+export const ASK_LENGTH_REFUSAL = `You can ask for ${minutesText(ASK_LENGTH_STEP)} to ${minutesText(ASK_MINUTES.max)}.`;
 
 /** A child can ask again this long after a no, when FamilyFi does not say (`againAt`). */
 export const ASK_AGAIN_AFTER = 30;

@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import YAML from "yaml";
 import { bandTimes, timelineLegend } from "@/lib/day-timeline";
 
 import {
@@ -760,7 +763,15 @@ describe("a length of the child's own", () => {
     expect(askLengthAllowed(4)).toBe(false);
     expect(askLengthAllowed(241)).toBe(false);
     expect(askLengthAllowed(30.5)).toBe(false);
-    expect(ASK_LENGTH_REFUSAL).toBe("You can ask for 5 minutes to 4 hours.");
+    expect(ASK_LENGTH_REFUSAL).toBe("You can ask for 15 minutes to 4 hours.");
     expect(ASK_OWN_LENGTH).toBe("Another length");
+  });
+
+  it("keeps the limits the HTTP contract states", () => {
+    type Spec = { paths: Record<string, { post: { requestBody: { content: { "application/json": { schema: { oneOf: { properties: { minutes?: { minimum: number; maximum: number } } }[] } } } } } }> };
+    const spec = YAML.parse(readFileSync(path.resolve(__dirname, "../../openapi/familyfi.v1.yaml"), "utf8")) as Spec;
+    const bodies = spec.paths["/api/v1/groups/{id}/asks"].post.requestBody.content["application/json"].schema.oneOf;
+    const minutes = bodies.map((body) => body.properties.minutes).find(Boolean);
+    expect(minutes).toEqual({ type: "integer", minimum: ASK_MINUTES.min, maximum: ASK_MINUTES.max });
   });
 });
