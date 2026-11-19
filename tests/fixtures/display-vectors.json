@@ -31808,7 +31808,7 @@
         "rules": [],
         "now": "2026-11-17T03:30:00Z"
       },
-      "expected": "Cassie asked to unpause it"
+      "expected": "Cassie asked to unblock it"
     },
     {
       "fn": "groupAskLine",
@@ -32022,7 +32022,7 @@
         },
         "rules": []
       },
-      "expected": "Cassie asked to unpause TV"
+      "expected": "Cassie asked to unblock TV"
     },
     {
       "fn": "askSheetBody",

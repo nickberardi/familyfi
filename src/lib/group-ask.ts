@@ -39,10 +39,10 @@ function ruleOf<R extends Pick<Rule, "id">>(ask: GroupAsk, rules: R[]): R | unde
 
 /**
  * What the child asked for: "to be unpaused", "for 30 minutes off Bedtime". On a shared Thing (`thing`
- * its name, or "it" on its own card): "to unpause TV".
+ * its name, or "it" on its own card): "to unblock TV".
  */
 function askedFor(ask: GroupAsk, rules: Pick<Rule, "id" | "name">[], thing?: string): string {
-  if (ask.about === "pause") return thing ? `to unpause ${thing}` : "to be unpaused";
+  if (ask.about === "pause") return thing ? `to unblock ${thing}` : "to be unpaused";
   const name = ruleOf(ask, rules)?.name;
   const length = ask.minutes ? minutesText(ask.minutes) : null;
   // Time off the rule's block, never "of" it, as the alert says.
@@ -54,7 +54,7 @@ function askedFor(ask: GroupAsk, rules: Pick<Rule, "id" | "name">[], thing?: str
 /**
  * The line on the group's card and page while an ask waits, which opens the answer sheet: "Asked
  * to be unpaused", "Asked for 30 minutes off Bedtime". On a shared Thing it names the child who
- * asked: "Cassie asked to unpause it". Null with nothing waiting.
+ * asked: "Cassie asked to unblock it". Null with nothing waiting.
  */
 export function groupAskLine(group: Pick<Group, "ask">, rules: Pick<Rule, "id" | "name">[], now: Date): string | null {
   const ask = waitingAsk(group, now);
@@ -62,7 +62,7 @@ export function groupAskLine(group: Pick<Group, "ask">, rules: Pick<Rule, "id" |
   return ask.from ? `${ask.from.name} asked ${askedFor(ask, rules, "it")}` : `Asked ${askedFor(ask, rules)}`;
 }
 
-/** The answer sheet's title: "Sam asked to be unpaused"; on a shared Thing "Cassie asked to unpause TV". */
+/** The answer sheet's title: "Sam asked to be unpaused"; on a shared Thing "Cassie asked to unblock TV". */
 export function askSheetTitle(group: Pick<Group, "name">, ask: GroupAsk, rules: Pick<Rule, "id" | "name">[]): string {
   return ask.from ? `${ask.from.name} asked ${askedFor(ask, rules, group.name)}` : `${group.name} asked ${askedFor(ask, rules)}`;
 }
