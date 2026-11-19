@@ -15,7 +15,7 @@
   <a href="https://getfamilyfi.com">getfamilyfi.com</a>
 </p>
 
-Bedtime, homework hours, and the new tablet nobody has claimed yet. FamilyFi lets you set the rules the way your family talks about them, then has your UniFi gateway keep them. Pause the internet for anyone with one tap, from a browser at home or the FamilyFi app on iPhone, iPad, Apple Watch and Android.
+Bedtime, homework hours, and the new tablet nobody has claimed yet. FamilyFi lets you set the rules the way your family talks about them, then has your UniFi gateway keep them. Pause the internet for anyone with one tap, from a browser at home or the FamilyFi app on iPhone, iPad, Mac, Apple Watch and Android. Your children can see their own rules, and ask you for more time, with FamilyFi Me on their iPhone or iPad.
 
 ![FamilyFi on the web, iPhone and Apple Watch](docs/images/familyfi-apps.png)
 
@@ -25,6 +25,8 @@ Bedtime, homework hours, and the new tablet nobody has claimed yet. FamilyFi let
 - **Set rules with schedules.** Turn off all internet, or just video, social media, gaming, certain apps or certain websites. Do it always, or only at times like *Bedtime* or *Homework* on school days until six.
 - **Pause and allow.** Pause the internet for dinner, for an hour or until you resume it. Or let someone back online for a while during a scheduled block. You can always see who paused it and until when.
 - **Catch new devices.** New phones and tablets show up as unassigned. Turn on quarantine and they stay offline until you say whose they are, so a birthday present doesn't skip every rule in the house.
+- **Let them ask.** With [FamilyFi Me](https://github.com/nickberardi/familyfi/wiki/FamilyFi-Me) on a child's iPhone or iPad, they see what's blocked and until when, and ask you for more time. You answer with a tap. Turn on Screen Time there and their pauses and internet rules block the phone's apps away from home too.
+- **Hear about it.** The FamilyFi app can alert you to a new device, a gateway FamilyFi can't reach, or a child's ask. Each alert is locked so only your phone can read it.
 - **Check on things.** Checkup points out anything that needs a look, such as a phone using a private Wi-Fi address that could slip out of its rules.
 
 ![The Family page: each person's status, rules and devices at a glance](docs/images/web-family.png)
@@ -38,7 +40,7 @@ FamilyFi runs on a small computer in your home and connects to your UniFi consol
 - **Your gateway keeps the rules.** Schedules live on the gateway itself, so bedtime still starts on time while FamilyFi restarts or updates.
 - **Your own settings stay yours.** FamilyFi only changes the rules it creates. Anything you set up yourself in UniFi is never changed, turned off, deleted or reordered.
 - **Everything is kept at home.** There is no FamilyFi cloud account, and nothing about your household is sent to us. Your information is stored on your own computer, and your UniFi key is stored encrypted.
-- **Only parents sign in.** Only the adults you make admins can sign in. Children and teens never get a FamilyFi login.
+- **Only parents sign in.** Only the adults you make admins can sign in. Children and teens never get a FamilyFi login; FamilyFi Me on their phone shows their own rules and changes nothing.
 
 ## What you need
 
@@ -83,9 +85,9 @@ Next, open **Devices** and put each device in the right group. The [first-time s
 
 ## Get the app
 
-The FamilyFi app is in beta on iPhone, iPad and Apple Watch through [TestFlight](https://testflight.apple.com/join/5nuDQjJq), and on Android through the [Google Play beta](https://getfamilyfi.com/android/).
+Get the FamilyFi app for iPhone, iPad, Mac and Apple Watch on the [App Store](APP_STORE_FAMILYFI_URL), and for Android and Wear OS through the [Google Play beta](https://getfamilyfi.com/android/). For your child's iPhone or iPad, get [FamilyFi Me](APP_STORE_ME_URL).
 
-To connect it, open **Pair Device** in FamilyFi and scan the code with the app. Your Apple Watch pairs through your iPhone, with nothing to scan. To use the app away from home, choose how your phone reaches home under **Pair Device › Remote access**. The [phone and Watch guide](https://github.com/nickberardi/familyfi/wiki/Phone-and-Watch-app) explains each choice. Nobody can sign in with a password from outside your home: only phones you paired can get in.
+To connect it, open **Pair Device** in FamilyFi and scan the code with the app. Your Apple Watch pairs through your iPhone, with nothing to scan. To use the app away from home, choose how your phone reaches home under **Pair Device › Remote access**. The [phone and Watch guide](https://github.com/nickberardi/familyfi/wiki/Phone-and-Watch-app) explains each choice. Nobody can sign in with a password from outside your home: only phones you paired can get in. To set up a child's phone, choose **Pair FamilyFi Me**; the [FamilyFi Me guide](https://github.com/nickberardi/familyfi/wiki/FamilyFi-Me) walks through it.
 
 ## Updates and backups
 
@@ -99,7 +101,8 @@ The [user guide](https://github.com/nickberardi/familyfi/wiki) covers everything
 - [Family, Things and devices](https://github.com/nickberardi/familyfi/wiki/Family-Things-and-devices), including quarantine for new devices
 - [Rules, schedules, pause and allow](https://github.com/nickberardi/familyfi/wiki/Rules-schedules-pause-and-allow)
 - [Checkup](https://github.com/nickberardi/familyfi/wiki/Checkup) and [category reports](https://github.com/nickberardi/familyfi/wiki/Category-reports)
-- [Phone and Watch app](https://github.com/nickberardi/familyfi/wiki/Phone-and-Watch-app), and reaching home when you're out
+- [Phone and Watch app](https://github.com/nickberardi/familyfi/wiki/Phone-and-Watch-app), alerts, Siri, and reaching home when you're out
+- [FamilyFi Me](https://github.com/nickberardi/familyfi/wiki/FamilyFi-Me), for your child's iPhone or iPad
 - [Updates and backups](https://github.com/nickberardi/familyfi/wiki/Updates-and-backups)
 - [Troubleshooting and FAQ](https://github.com/nickberardi/familyfi/wiki/Troubleshooting-and-FAQ)
 
