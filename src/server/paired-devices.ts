@@ -45,8 +45,8 @@ function publicPairedDevice(device: Listed) {
     clientType: device.clientType,
     scope: device.scope,
     actsAs: device.account ? { username: device.account.username, displayName: device.account.displayName } : null,
-    // A child's phone (FamilyFi Me) signs in for its family group instead of an account.
-    ...(device.clientType === "me" ? { group: device.group ? { id: device.group.id, name: device.group.name } : null } : {}),
+    // A child's phone (FamilyFi Me) signs in for a person, their family group, instead of an account.
+    ...(device.clientType === "me" ? { person: device.group ? { id: device.group.id, name: device.group.name } : null } : {}),
     // What it last said of its Screen Time permission, once it has (an iPhone or iPad; Android never says).
     ...(device.clientType === "me" && isMeProtection(device.protection)
       ? { protection: device.protection, protectionAt: device.protectionAt?.toISOString() ?? null }

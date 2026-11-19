@@ -240,7 +240,7 @@ describe("pair device", () => {
 
 describe("FamilyFi Me on a child's phone", () => {
   const child = (over: Partial<PairedPhone> = {}) =>
-    phone({ id: "m1", displayName: "Emma's phone", clientType: "me", scope: "me:askOnly", actsAs: null, group: { id: "g1", name: "Emma" }, ...over });
+    phone({ id: "m1", displayName: "Emma's phone", clientType: "me", scope: "me:askOnly", actsAs: null, person: { id: "g1", name: "Emma" }, ...over });
 
   it("is tagged for its family member, never as an account", () => {
     const { tags } = phoneLines(child(), new Date("2026-09-15T12:00:00Z"));
@@ -269,7 +269,7 @@ describe("FamilyFi Me on a child's phone", () => {
   });
 
   it("lists a family member's own phones that are still paired", () => {
-    const phones = [child(), child({ id: "m2", revokedAt: "2026-09-10T12:00:00Z" }), child({ id: "m3", group: { id: "g2", name: "Max" } }), phone()];
+    const phones = [child(), child({ id: "m2", revokedAt: "2026-09-10T12:00:00Z" }), child({ id: "m3", person: { id: "g2", name: "Max" } }), phone()];
     expect(childPhonesOf(phones, "g1").map((item) => item.id)).toEqual(["m1"]);
   });
 
@@ -299,13 +299,13 @@ describe("FamilyFi Me on a child's phone", () => {
     expect(revokeConfirm(child()).message).toBe("FamilyFi Me on it signs out now and can't show Emma's rules or ask for more time until it is paired again.");
   });
 
-  it("invites with its family group and no account", async () => {
+  it("invites for its person (their family group) and no account", async () => {
     const sent: { path: string; init?: { method?: string; body?: unknown } }[] = [];
     const request = (async (path: string, init?: { method?: string; body?: unknown }) => {
       sent.push({ path, init });
       return {};
     }) as never;
-    await inviteChildPhone(request, { endpointId: "r1", displayName: "Emma's phone", groupId: "g1" });
-    expect(sent).toEqual([{ path: "/api/v1/paired/invites", init: { method: "POST", body: { clientType: "me", endpointId: "r1", displayName: "Emma's phone", groupId: "g1" } } }]);
+    await inviteChildPhone(request, { endpointId: "r1", displayName: "Emma's phone", personId: "g1" });
+    expect(sent).toEqual([{ path: "/api/v1/paired/invites", init: { method: "POST", body: { clientType: "me", endpointId: "r1", displayName: "Emma's phone", personId: "g1" } } }]);
   });
 });

@@ -97,7 +97,7 @@ export async function pairChildPhone(admin: SessionAuth, groupId: string): Promi
       method: "POST",
       auth: admin,
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ clientType: "me", displayName: "Child's iPhone", endpointId: (await homeRoute()).id, groupId }),
+      body: JSON.stringify({ clientType: "me", displayName: "Child's iPhone", endpointId: (await homeRoute()).id, personId: groupId }),
     }),
   );
   if (created.status !== 201) throw new Error(`Child invite failed: ${created.status}`);

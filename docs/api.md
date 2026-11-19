@@ -61,7 +61,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A write-only `serviceToken` puts an `own` `cloudflare` route behind Cloudflare Access (a different token replaces it); `edgeAuth: none` turns Access off; any other route is 409 `access_unsupported`. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off. Any update clears the route's reachability evidence |
 | POST | `/api/v1/connection/endpoints/{id}/check` | Checks from home whether a route the household runs answers as this FamilyFi: it requests the route's `/api/v1/connection/identity` with the route's own trust and Access token and compares `instanceId`. Stores and returns `reachability`; a `quick` or `domain` route is 409 `managed_route` |
 | GET/PUT | `/api/v1/connection/tunnel` | Remote access: publish one route — `off`, `quick`, or `named` with a `hostname` (FamilyFi's Cloudflare tunnel on your domain) or an `endpointId` (a route you run). Every other route is turned off. A published route you run always reports `status: running`; `reachability` says whether it works: `reachedAt`, the last request the remote-access port answered through it (written at most once a minute), and FamilyFi's own last check (`checkedAt`, `result`, `message`), run once on publish and on request. Publishing again clears it. Clients never show such a route as on without that evidence |
-| POST | `/api/v1/paired/invites` | Invite a device to join. An administrator invites a phone, tablet or Mac (`clientType: app`; its route, the administrator it signs in as; five minutes) a child's phone (`clientType: me`; its route and family group; five minutes), or an agent (`clientType: agent`, `scope`; fifteen minutes, home network only) and gets a single-use `code`. With `?claim=true`, a signed-in paired app invites and claims its Watch, or its own sign-in for Siri and shortcuts (`clientType: app-controls`), in one call |
+| POST | `/api/v1/paired/invites` | Invite a device to join. An administrator invites a phone, tablet or Mac (`clientType: app`; its route, the administrator it signs in as; five minutes) a child's phone (`clientType: me`; its route and `personId`; five minutes), or an agent (`clientType: agent`, `scope`; fifteen minutes, home network only) and gets a single-use `code`. With `?claim=true`, a signed-in paired app invites and claims its Watch, or its own sign-in for Siri and shortcuts (`clientType: app-controls`), in one call |
 | GET/PUT | `/api/v1/connection/home` | Administrator reads or sets the home network address: where FamilyFi is inside the home (an http or https origin, 400 `invalid_home_url` otherwise; `null` clears it), apart from the route remote access publishes. Both answer `current`, the address this request reached and whether it is `private`, which stands in while none is saved. Agents pair there |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/paired/invites/{id}` | Administrator reads an invite's status (`pending`, `claimed`, `expired`) or cancels it early |
@@ -274,13 +274,14 @@ The app pairs as `app`, whether it runs on a phone, a tablet or a Mac.
 ### FamilyFi Me on a child's phone
 
 FamilyFi Me pairs as `me` with `me:askOnly`. An administrator, in a browser or the app, invites it
-like a phone, over a route for five minutes, but names the family group it is for
-(`{ clientType: "me", displayName, endpointId, groupId }`; 400 `family_group_required` for a group
-of things) instead of an account. Its code carries what a phone's does: the route, its pin, and a
+like a phone, over a route for five minutes, but names the person it is for
+(`{ clientType: "me", displayName, endpointId, personId }`, `personId` being the person's family
+group id; 400 `family_group_required` for a group of things) instead of an account. Its code carries what a phone's does: the route, its pin, and a
 Cloudflare Access token where the route has one, so it reaches the household away from home. It
-signs in for that group and never as an account: its session's `kind` is `group`, its `groupId`
-that group's id, its `displayName` the group's name and its `username` names the device, and a
-paired-device listing shows its `group` with `actsAs` null. It has no parent device, since it belongs to its group: re-pairing or
+signs in for that person and never as an account: its session's `kind` is `person` (not to be
+confused with `personal`, an administrator's own account), its `personId` the person's family group
+id, its `displayName` the person's name and its `username` names the device, and a paired-device
+listing shows its `person` with `actsAs` null. It has no parent device, since it belongs to its group: re-pairing or
 revoking the phone that invited it leaves it alone.
 
 It reads its own group with `GET /groups/{id}` (any other group is 404 for it, except a [shared Thing](#shared-things)), the rules that cover it with `GET /rules`, and the time zone with `GET /auth/session`. `groupDayOf` (`src/lib/child-day.ts`) builds its day from them, which tells the group's own pause and allowance, the windows of its
@@ -409,7 +410,10 @@ phone, tablet or Mac always pairs as `app`, and a Watch and an app's Siri and sh
 The API names them the same way everywhere: `clientType`, and `scope` as its whole value
 (`agent:full`). API 2.0.0 removed the older words (`client` with `phone`, `app` or `watch`, and
 scopes without their group) from requests and responses, so `x-min-app` and `x-min-server` rose to
-2.0.0 with it: an app built before it is told to update.
+2.0.0 with it: an app built before it is told to update. API 2.1.0 renamed a child's phone's
+sign-in for the person it is for (session `kind: person` with `personId`, the invite's `personId`, a
+listed child's phone's `person`), so `x-min-app`, `x-min-server` and `x-min-me` rose to 2.1.0 by
+hand: oasdiff does not call renamed optional fields breaking, but every 2.0.x app reads the old ones.
 
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may
 accept a pin change only in a manifest signed by the already trusted key; any other identity
@@ -443,7 +447,7 @@ An app and a server on different contract versions can each send something the o
 - **`x-min-app-watch`**: the oldest watch app API version this server still serves. The watches read only a few routes, so most breaking changes never reach them; until CI can tell which do, it is set by hand (0.30.0).
 - **`x-min-me`**: the oldest FamilyFi Me API version this server still serves, set by hand like `x-min-app-watch` (it started at 2.0.0).
 
-Any of them may rise on purpose and none ever falls or passes `info.version`. `scripts/ci/check-openapi-floors.mjs` (`make test-api-floors`) enforces the rule against the base branch, in CI's first job, `contract`, before the long jobs start. Their first values came from replaying the rule over the document's history: 0.34 and 0.36 broke old apps, and 0.36 added required response fields, so both started at 0.36.0; 2.0.0 removed the older client words and raised both to 2.0.0. `x-min-app-watch` started at 0.30.0, set by hand.
+Any of them may rise on purpose and none ever falls or passes `info.version`. `scripts/ci/check-openapi-floors.mjs` (`make test-api-floors`) enforces the rule against the base branch, in CI's first job, `contract`, before the long jobs start. Their first values came from replaying the rule over the document's history: 0.34 and 0.36 broke old apps, and 0.36 added required response fields, so both started at 0.36.0; 2.0.0 removed the older client words and raised both to 2.0.0; 2.1.0 renamed FamilyFi Me's sign-in for a person and raised both, and `x-min-me`, to 2.1.0 by hand. `x-min-app-watch` started at 0.30.0, set by hand.
 
 `GET /api/v1/health` reports `apiVersion` (this document's `info.version`), `minAppApiVersion` (`x-min-app`) and `minWatchApiVersion` (`x-min-app-watch`) to anyone, in every answer. Those two are deprecated and will be removed in a future version; new clients name their type and read `minApiVersion` instead, and they stay only so apps built before 2.0.0 are still told to update. A client that names its client type, `GET /api/v1/health?clientType=me`, also gets `minApiVersion`, its own floor from the server's table (`MIN_API_VERSION_BY_CLIENT` in `src/lib/api-compat.ts`): `x-min-app` for `app` and `agent`, `x-min-app-watch` for `app-watch` and `app-controls`, `x-min-me` for `me`. A client type the server does not know, or a server before 2.0.0, sends none, and the client falls back to the two fields above. A client that can meet a server of another version, the companion app, compares them before it reads the household (`src/lib/api-compat.ts`, and the household store's `checkCompatibility`):
 

@@ -420,11 +420,11 @@ describe("a companion session", () => {
     expect(storage.keys()).toEqual([]);
     await settle(() => home.calls.some((call) => call.method === "DELETE"));
     // A child's sign-in for its group is kept.
-    const family = household({ claimSession: { username: "device:dev-1", displayName: "Emma", kind: "group", groupId: "g1", expiresAt: "2030-01-01T00:00:00Z" } });
+    const family = household({ claimSession: { username: "device:dev-1", displayName: "Emma", kind: "person", personId: "g1", expiresAt: "2030-01-01T00:00:00Z" } });
     const phone = createCompanionSession({ transport: family.transport, storage: memory(), deviceName: () => "A phone", client: "me" });
     await phone.verify(encodePairingCode({ version: 1, url: LAN.url, code: "cm1.token-1", fingerprint: family.fingerprint, pin: LAN.spkiSha256!, clientType: "me" }));
     await phone.trust();
-    expect(phone.getState()).toMatchObject({ status: "signedIn", session: { session: { kind: "group", groupId: "g1" } } });
+    expect(phone.getState()).toMatchObject({ status: "signedIn", session: { session: { kind: "person", personId: "g1" } } });
     // The app's session, without a client, refuses the child's code.
     const app = createCompanionSession({ transport: home.transport, storage: memory(), deviceName: () => "A phone" });
     await expect(app.verify(meCode)).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.app);

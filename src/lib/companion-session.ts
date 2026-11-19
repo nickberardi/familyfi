@@ -297,10 +297,10 @@ export function createCompanionSession(deps: {
       if (!state.pending) return;
       const claimed = await claimHousehold(transport, state.pending, deviceName());
       // The code's client type is unsigned text, so what the claim signed the device in as decides:
-      // FamilyFi Me keeps only a child's sign-in for a group, and the app never keeps one. Any other
+      // FamilyFi Me keeps only a child's sign-in for a person, and the app never keeps one. Any other
       // is revoked at once and never stored.
-      const forGroup = claimed.session.session.kind === "group" && Boolean(claimed.session.session.groupId);
-      if (forGroup !== (client === "me")) {
+      const forPerson = claimed.session.session.kind === "person" && Boolean(claimed.session.session.personId);
+      if (forPerson !== (client === "me")) {
         set({ pending: null });
         void revokeOnServer(claimed.profile, claimed.edgeCredentials, claimed.session);
         throw new PairingCodeError(PAIRING_CODE_OTHER_CLIENT[client]);

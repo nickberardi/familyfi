@@ -156,7 +156,7 @@ describe("Cloudflare Access service tokens", () => {
     const auth = await adminAuth();
     const id = await protectedRoute(auth);
     const group = await prisma().group.create({ data: { kind: "family", name: "Emma" } });
-    const { payload, claimed, bearer } = await pairPhone(auth, id, "Emma's iPhone", { clientType: "me", groupId: group.id });
+    const { payload, claimed, bearer } = await pairPhone(auth, id, "Emma's iPhone", { clientType: "me", personId: group.id });
     expect(payload).toMatchObject({ clientType: "me", access: TOKEN });
     expect((await verifiedPayload(claimed.manifest)).edgeCredentials).toEqual([{ endpointId: id, version: 1, ...TOKEN }]);
     expect((await manifestFor(bearer)).payload.edgeCredentials).toEqual([{ endpointId: id, version: 1, ...TOKEN }]);

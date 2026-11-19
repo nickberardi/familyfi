@@ -114,7 +114,7 @@ export function usePairing({
     try {
       if (pending.current) await request(`/api/v1/paired/invites/${encodeURIComponent(pending.current)}`, { method: "DELETE" }).catch(() => undefined);
       const { invite } = child
-        ? await inviteChildPhone<{ invite: IssuedPairing }>(request, { endpointId: route.id, displayName: name.trim(), groupId })
+        ? await inviteChildPhone<{ invite: IssuedPairing }>(request, { endpointId: route.id, displayName: name.trim(), personId: groupId })
         : await invitePhone<{ invite: IssuedPairing }>(request, { endpointId: route.id, displayName: name.trim(), accountId, ...(replacing ? { replacesDeviceId: replacing.id } : {}) });
       pending.current = invite.id;
       setIssued(invite);
