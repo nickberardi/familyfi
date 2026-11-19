@@ -118,13 +118,21 @@ export async function verifyHousehold(transport: Transport, text: string, client
   // become an administrator's app on a child's phone, nor the app a child's phone. A code from before
   // API 2.0.0 names none, and only the app's existed then.
   const admits = code.clientType ?? "app";
-  if (admits !== client) throw new PairingCodeError(PAIRING_CODE_OTHER_CLIENT[client]);
   const request = codeRequest(transport, code);
+  const compatible = async () => {
+    const health = await request<HealthVersions>(`/api/v1/health?clientType=${client}`).catch(() => null);
+    const compatibility = health ? apiCompatibility(health) : null;
+    if (compatibility && compatibility.status !== "ok") throw new ApiMismatchError(compatibility);
+  };
+  if (admits !== client) {
+    // A code that names no client type comes from a server older than any FamilyFi Me reads, which
+    // has no Pair FamilyFi Me to send the parent to: say the server needs an update instead.
+    if (code.clientType == null) await compatible();
+    throw new PairingCodeError(PAIRING_CODE_OTHER_CLIENT[client]);
+  }
   const identity = await request<ConnectionIdentity>("/api/v1/connection/identity");
   verifyIdentity(identity, code.keyFingerprint);
-  const health = await request<HealthVersions>(`/api/v1/health?clientType=${client}`).catch(() => null);
-  const compatibility = health ? apiCompatibility(health) : null;
-  if (compatibility && compatibility.status !== "ok") throw new ApiMismatchError(compatibility);
+  await compatible();
   return { code, identity };
 }
 

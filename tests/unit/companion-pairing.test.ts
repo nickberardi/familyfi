@@ -194,7 +194,6 @@ describe("pairing a phone", () => {
       encodePairingCode({ version: 1, url: LAN.url, code: "cm1.token-1", fingerprint: home.fingerprint, pin: LAN.spkiSha256!, ...(clientType ? { clientType } : {}) });
     // FamilyFi Me never spends the app's code, nor one from before codes named their client.
     await expect(verifyHousehold(home.transport, meCode("app"), "me")).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.me);
-    await expect(verifyHousehold(home.transport, meCode(), "me")).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.me);
     // The app never spends a child's phone's code, or an agent's.
     await expect(verifyHousehold(home.transport, meCode("me"))).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.app);
     await expect(verifyHousehold(home.transport, meCode("agent"))).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.app);
@@ -220,6 +219,20 @@ describe("pairing a phone", () => {
       settings: false,
     });
     expect(older.calls.some((call) => call.method === "POST")).toBe(false);
+  });
+
+  it("tells FamilyFi Me that a server from before codes named their client needs an update", async () => {
+    // A 1.4 server's code names no client type, and that server has no Pair FamilyFi Me.
+    const older = household({ health: { version: "1.4.0", apiVersion: "1.4.0", minAppApiVersion: "0.36.0" } });
+    const code = encodePairingCode({ version: 1, url: LAN.url, code: "cm1.token-1", fingerprint: older.fingerprint, pin: LAN.spkiSha256! });
+    await expect(verifyHousehold(older.transport, code, "me")).rejects.toThrow(API_COMPAT_COPY.pairServer);
+    expect(older.calls.map((call) => new URL(call.url).pathname)).toEqual(["/api/v1/health"]);
+    // A server that can be read, or whose health can't be, still names the code as the app's.
+    const current = household();
+    await expect(verifyHousehold(current.transport, code, "me")).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.me);
+    const quiet = household({ health: null });
+    await expect(verifyHousehold(quiet.transport, code, "me")).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.me);
+    expect([...older.calls, ...current.calls, ...quiet.calls].some((call) => call.method === "POST")).toBe(false);
   });
 
   it("pairs when the health read fails, which decides nothing", async () => {
@@ -402,14 +415,15 @@ describe("a companion session", () => {
     };
   };
 
-  it("as FamilyFi Me, spends only a FamilyFi Me code, refusing the app's before reaching the household", async () => {
+  it("as FamilyFi Me, spends only a FamilyFi Me code, refusing the app's after reading no more than its health", async () => {
     const home = household();
     const storage = memory();
     const child = createCompanionSession({ transport: home.transport, storage, deviceName: () => "A phone", client: "me" });
     await child.load();
     await expect(child.verify(home.code)).rejects.toThrow(PAIRING_CODE_OTHER_CLIENT.me);
     expect(child.getState().pending).toBeNull();
-    expect(home.calls).toEqual([]);
+    // A code naming no client asks the server's health first, in case it is too old for FamilyFi Me.
+    expect(home.calls.map((call) => `${call.method} ${new URL(call.url).pathname}`)).toEqual(["GET /api/v1/health"]);
     const meCode = encodePairingCode({ version: 1, url: LAN.url, code: "cm1.token-1", fingerprint: home.fingerprint, pin: LAN.spkiSha256!, clientType: "me" });
     await child.verify(meCode);
     expect(child.getState().pending?.code.clientType).toBe("me");
