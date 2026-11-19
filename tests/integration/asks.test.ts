@@ -228,6 +228,9 @@ describe("asking for more time", () => {
     expect(waiting).toMatchObject({ about: "pause", state: "waiting", from: { groupId: emma.id, name: "Emma" } });
     // Video has no end, so the ask waits for the household's timeout.
     expect(Date.parse(waiting.expiresAt!) - Date.parse(waiting.at)).toBe(60 * MINUTE);
+    // Resume ends a pause alone, so it never answers this ask by its id while Video blocks TV.
+    expect(await errorCode(await verb(resumeRoute, "resume", admin, tv.id, "internet", { askId: waiting.id }))).toBe("still_blocked");
+    expect((await prisma().ask.findUniqueOrThrow({ where: { id: waiting.id } })).state).toBe("waiting");
     // The yes is what the card's Unblock sends here ("Unblock Video for TV?"): Video paused for TV.
     const yes = await verb(pauseRoute, "pause", admin, tv.id, video.id, { until: new Date(Date.now() + 30 * MINUTE).toISOString() });
     expect(yes.status).toBe(200);
