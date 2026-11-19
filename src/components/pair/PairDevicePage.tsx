@@ -1,0 +1,111 @@
+"use client";
+
+import { useState } from "react";
+import { AppStoresCard } from "@/components/pair/AppStoresCard";
+import { ConnectAgentSheet } from "@/components/agents/ConnectAgentSheet";
+import { PageHeader } from "@/components/PageHeader";
+import { HomeAccessCard } from "@/components/pair/HomeAccessCard";
+import { PairPhoneSheet } from "@/components/pair/PairPhoneSheet";
+import { RemoteAccessCard } from "@/components/pair/RemoteAccessCard";
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/pair/SheetFrame";
+import { askConfirm } from "@/components/ui/ConfirmHost";
+import { request } from "@/lib/api";
+import { PAIR_COPY, type AppStore, removeAllConfirm, removeConfirm, removePhone, removeRevokedPhones, revokeConfirm, revokePhone } from "@/lib/pair-device";
+import type { PairedPhone } from "@/lib/types";
+import { Alert } from "@/ui/Alert";
+import { PairedDevicesCard } from "@/ui/PairedDevices";
+import { usePairDevice } from "@/ui/use-pair-device";
+
+const CARD = "overflow-hidden rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]";
+const TITLE = PAIR_COPY.title;
+const SUB = PAIR_COPY.sub;
+
+/** System → Pair Device. `stores` comes from the server, which knows the release track it runs. */
+export function PairDevicePage({ stores }: { stores: readonly AppStore[] }) {
+  const { tunnel, setTunnel, routes, phones, remote, forbidden, error, load, run, published, canPair, pairedThrough } = usePairDevice(request);
+  const [pairing, setPairing] = useState<"app" | "me" | null>(null);
+  const [replacing, setReplacing] = useState<PairedPhone | null>(null);
+  const [connecting, setConnecting] = useState(false);
+
+  if (forbidden) {
+    return (
+      <>
+        <PageHeader title={TITLE} sub={SUB} />
+        <div className="p-4 md:p-6">
+          <div className={`${CARD} px-[18px] py-4 text-[14px]`}>{PAIR_COPY.adminOnly}</div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <PageHeader
+        title={TITLE}
+        sub={SUB}
+        secondary={
+          <div className="flex basis-full justify-end gap-2 md:basis-auto">
+            <button type="button" className={SECONDARY_BUTTON} onClick={() => setConnecting(true)}>
+              {PAIR_COPY.connectAgent}
+            </button>
+            {/* Phones pair through the published route, so there is nothing to pair through while remote access is Off. */}
+            <button type="button" className={PRIMARY_BUTTON} disabled={!canPair} title={canPair ? undefined : PAIR_COPY.remoteFirstPhones} onClick={() => setPairing("app")}>
+              {PAIR_COPY.pairPhone}
+            </button>
+          </div>
+        }
+      />
+      <div className="flex flex-col gap-4 p-4 md:p-6">
+        {error ? (
+          <Alert tone="danger" role="alert">
+            {error}
+          </Alert>
+        ) : null}
+
+        <AppStoresCard stores={stores} />
+
+        <HomeAccessCard />
+
+        <RemoteAccessCard tunnel={tunnel} routes={routes} phones={remote} pairedThrough={pairedThrough} onTunnel={setTunnel} onChange={load} />
+
+        <PairedDevicesCard
+          phones={phones}
+          canPair={canPair}
+          onRevoke={async (phone) => {
+            if (!(await askConfirm({ ...revokeConfirm(phone), destructive: true }))) return;
+            void run(() => revokePhone(request, phone));
+          }}
+          onRepair={(phone) => {
+            setReplacing(phone);
+            setPairing("app");
+          }}
+          onRemove={async (phone) => {
+            if (!(await askConfirm({ ...removeConfirm(phone), destructive: true }))) return;
+            void run(() => removePhone(request, phone));
+          }}
+          onRemoveAllRevoked={async (count) => {
+            if (!(await askConfirm({ ...removeAllConfirm(count), destructive: true }))) return;
+            void run(() => removeRevokedPhones(request));
+          }}
+          onPairMe={() => setPairing("me")}
+        />
+      </div>
+
+      {connecting ? <ConnectAgentSheet onClose={() => setConnecting(false)} onConnected={() => void load()} /> : null}
+
+      {pairing && published ? (
+        <PairPhoneSheet
+          route={published}
+          replacing={replacing}
+          {...(pairing === "me" ? { child: {} } : {})}
+          onClose={() => {
+            setPairing(null);
+            setReplacing(null);
+            void load();
+          }}
+          onPaired={() => void load()}
+        />
+      ) : null}
+    </>
+  );
+}

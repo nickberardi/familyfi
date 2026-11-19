@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   APP_STORES,
+  APP_STORE_URL,
+  TESTFLIGHT_URL,
+  appStoresFor,
   CHILD_PHONES_COPY,
   PAIR_COPY,
   PLAY_BETA,
@@ -48,12 +51,27 @@ const phone = (over: Partial<PairedPhone> = {}): PairedPhone => ({
 
 describe("pair device", () => {
   it("shows both store badges, linking only to a store that has a link", () => {
-    expect(APP_STORES.map((store) => store.label)).toEqual(["Download on the App Store", "Get it on Google Play"]);
-    expect(APP_STORES.every((store) => store.url === null || store.url.startsWith("https://"))).toBe(true);
+    for (const track of ["latest", "next", { major: "2", minor: "0" }] as const) {
+      const stores = appStoresFor(track);
+      expect(stores.map((store) => store.label)).toEqual(["Download on the App Store", "Get it on Google Play"]);
+      expect(stores.every((store) => store.url === null || store.url.startsWith("https://"))).toBe(true);
+    }
+  });
+
+  it("opens TestFlight on the next track, where pre-releases go, and the App Store listing on every other", () => {
+    const apple = (track: Parameters<typeof appStoresFor>[0]) => appStoresFor(track).find((store) => store.id === "apple")?.url;
+    expect(apple("next")).toBe(TESTFLIGHT_URL);
+    expect(apple("latest")).toBe(APP_STORE_URL);
+    expect(apple({ major: "2", minor: "0" })).toBe(APP_STORE_URL);
+  });
+
+  it("keeps the pre-release links for familyfi-mobile's version gate, each a plain string", () => {
+    const url: string = APP_STORES.find((store) => store.id === "apple")!.url;
+    expect(url).toBe(TESTFLIGHT_URL);
   });
 
   it("opens Google Play's closed beta steps, each linked over HTTPS", () => {
-    expect(APP_STORES.filter((store) => "steps" in store && store.steps).map((store) => store.id)).toEqual(["google"]);
+    expect(appStoresFor("latest").filter((store) => "steps" in store && store.steps).map((store) => store.id)).toEqual(["google"]);
     expect(PLAY_BETA.steps.map((step) => step.text)).toEqual(["Sign in to the Google account you use on your Android phone", "Join the beta group", "Become a tester", "Install FamilyFi from Google Play"]);
     expect(PLAY_BETA.steps.every((step) => step.url.startsWith("https://"))).toBe(true);
   });

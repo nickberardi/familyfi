@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 import { Icon } from "@/components/ui/Icon";
-import { APP_STORES, APP_STORE_SOON, PAIR_COPY, PLAY_BETA, type AppStore } from "@/lib/pair-device";
+import { APP_STORE_SOON, PAIR_COPY, PLAY_BETA, type AppStore } from "@/lib/pair-device";
 
 const BADGE_HEIGHT = 40;
 
@@ -69,7 +69,7 @@ function StepsBadge({ store }: { store: AppStore }) {
 }
 
 /** Where to get the FamilyFi app before pairing a phone: each store's badge, linked once the store has a link. */
-export function AppStoresCard() {
+export function AppStoresCard({ stores }: { stores: readonly AppStore[] }) {
   return (
     <section data-testid="app-stores" className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
       <div className="flex flex-wrap items-center gap-3 px-[18px] py-[15px]">
@@ -78,7 +78,7 @@ export function AppStoresCard() {
           <div className="mt-0.5 text-[14px] text-[var(--ff-ink-2)]">{PAIR_COPY.getAppSub}</div>
         </div>
         <div className="flex flex-wrap items-start gap-3">
-          {APP_STORES.map((store: AppStore) =>
+          {stores.map((store) =>
             store.steps ? (
               <StepsBadge key={store.id} store={store} />
             ) : store.url ? (
