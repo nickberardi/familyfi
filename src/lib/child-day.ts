@@ -1,3 +1,4 @@
+import { minutesText } from "@/lib/alert-copy";
 import { zonedFormat } from "@/lib/clock";
 import type { TimelineBand } from "@/lib/day-timeline";
 import { daysLabel, formatHhmm } from "@/lib/display";
@@ -154,6 +155,32 @@ export const ASK_LENGTHS: { value: `${AskLength}`; label: string }[] = [
   { value: "30", label: "30 minutes" },
   { value: "60", label: "1 hour" },
 ];
+
+/** The fewest and most minutes a child can ask for; FamilyFi refuses any other length. */
+export const ASK_MINUTES = { min: 5, max: 240 } as const;
+
+/** A length of the child's own is picked in steps this long. */
+export const ASK_LENGTH_STEP = 15;
+
+/** The choice beside the presets that opens a length of the child's own. */
+export const ASK_OWN_LENGTH = "Another length";
+
+/** Whether FamilyFi takes this many minutes as an ask. */
+export function askLengthAllowed(minutes: number): boolean {
+  return Number.isInteger(minutes) && minutes >= ASK_MINUTES.min && minutes <= ASK_MINUTES.max;
+}
+
+/** The lengths of the child's own to pick from: every step up to the most, "15 minutes" to "4 hours". */
+export function askLengthChoices(): { value: AskLength; label: string }[] {
+  const choices: { value: AskLength; label: string }[] = [];
+  for (let minutes = ASK_LENGTH_STEP; minutes <= ASK_MINUTES.max; minutes += ASK_LENGTH_STEP) {
+    if (askLengthAllowed(minutes)) choices.push({ value: minutes, label: minutesText(minutes) });
+  }
+  return choices;
+}
+
+/** What the child is told when a length is out of range: "You can ask for 5 minutes to 4 hours." */
+export const ASK_LENGTH_REFUSAL = `You can ask for ${minutesText(ASK_MINUTES.min)} to ${minutesText(ASK_MINUTES.max)}.`;
 
 /** A child can ask again this long after a no, when FamilyFi does not say (`againAt`). */
 export const ASK_AGAIN_AFTER = 30;
