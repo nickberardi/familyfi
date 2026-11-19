@@ -17,7 +17,7 @@
     "test:integration": "vitest run --config tests/vitest.integration.config.ts",
     "test:coverage": "vitest run --config tests/vitest.coverage.config.ts --coverage",
     "test:browser": "playwright test --config tests/playwright.config.ts",
-    "test:mutation": "node scripts/ci/stryker-vitest-names.mjs && stryker run tests/stryker.config.mjs",
+    "test:mutation": "stryker run tests/stryker.config.mjs",
     "test-api": "node scripts/ci/check-openapi.mjs",
     "db-upgrade": "node scripts/runtime/with-env.mjs node scripts/ci/check-migration-upgrade.mjs",
     "db-drift": "node scripts/runtime/with-env.mjs prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code",

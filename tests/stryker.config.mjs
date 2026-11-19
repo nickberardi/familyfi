@@ -26,7 +26,8 @@ const config = {
   jsonReporter: { fileName: "reports/mutation/mutation.json" },
   thresholds: { high: 80, low: 60, break: null },
   tempDirName: ".stryker-tmp",
-  ignorePatterns: [".next", "coverage", "reports", "test-results", "designs", ".stryker-tmp"],
+  // .claude/skills is a symlink to .agents/skills, which Stryker 10.1 cannot copy into its sandbox.
+  ignorePatterns: [".next", "coverage", "reports", "test-results", "designs", ".stryker-tmp", ".claude/skills"],
 };
 
 export default config;
