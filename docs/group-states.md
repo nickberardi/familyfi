@@ -193,7 +193,7 @@ button, which still read Block, Unblock or Resume. Tapping it opens the answer s
 
 | Asked about | Choices, in order |
 | --- | --- |
-| A pause | **Unpause** (the group's `resume` on `internet` with `askId`), **Not now** |
+| A pause | **Unpause** (the group's `resume` on `internet` with `askId`); on a shared Thing **Unblock**, "ends the block now", the same `resume`; **Not now** |
 | A rule's window that is on | **Allow 30 minutes** (the rule's `allow` for the group with `askId`, as the child asked), **Until Bedtime ends** when that is longer, **For…** and **Until…**, **Not now** |
 | A rule's window no longer on | **Not now** |
 

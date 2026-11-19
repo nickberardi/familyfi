@@ -102,6 +102,17 @@ describe("a child's ask, as a parent answers it", () => {
     expect(sent[0]!.options.feedback?.notice).toBe("Emma unpaused.");
   });
 
+  it("unblocks a shared Thing in the Thing's own words, as its card does", async () => {
+    const thingAsk: GroupAsk = { ...pauseAsk, from: { groupId: "g1", name: "Cassie" } };
+    const tv = { ...emma(thingAsk), id: "g2", kind: "things", name: "TV", familyRole: null } as unknown as Group;
+    const [unblock] = askSheetChoices(thingAsk, [], TZ, NOW, 30);
+    expect(unblock).toEqual({ label: "Unblock", note: "ends the block now", request: { kind: "asked" } });
+    const { sent, mutate } = recorder({ groups: [tv], devices: [] });
+    await answerAsk(mutate, tv, thingAsk, unblock as never, undefined, NOW);
+    expect(sent[0]).toMatchObject({ path: "/api/v1/groups/g2/rules/internet/resume", init: { method: "POST", body: { askId: "a2" } } });
+    expect(sent[0]!.options.feedback?.notice).toBe("TV unblocked.");
+  });
+
   it("says Not now with the ask's decline", async () => {
     const { sent, mutate, shown } = recorder({ groups: [emma(pauseAsk)], devices: [] });
     const notNow = askSheetChoices(pauseAsk, [], TZ, NOW, 30).at(-1)!;

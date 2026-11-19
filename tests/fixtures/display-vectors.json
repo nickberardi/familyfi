@@ -32269,6 +32269,35 @@
     },
     {
       "fn": "askSheetOptions",
+      "name": "to unblock a shared Thing",
+      "input": {
+        "ask": {
+          "id": "a2",
+          "about": "pause",
+          "state": "waiting",
+          "at": "2026-11-17T03:25:00Z",
+          "expiresAt": "2026-11-17T04:25:00Z",
+          "from": {
+            "groupId": "g1",
+            "name": "Cassie"
+          }
+        },
+        "rules": [],
+        "timeZone": "America/New_York",
+        "now": "2026-11-17T03:30:00Z"
+      },
+      "expected": [
+        {
+          "label": "Unblock",
+          "note": "ends the block now",
+          "request": {
+            "kind": "asked"
+          }
+        }
+      ]
+    },
+    {
+      "fn": "askSheetOptions",
       "name": "less than the rest of the window",
       "input": {
         "ask": {
@@ -32935,6 +32964,43 @@
         {
           "label": "Unpause",
           "note": "ends the pause now",
+          "request": {
+            "kind": "asked"
+          }
+        },
+        {
+          "label": "Not now",
+          "note": "they can ask again at 11:00 PM",
+          "request": {
+            "kind": "decline"
+          }
+        }
+      ]
+    },
+    {
+      "fn": "askSheetChoices",
+      "name": "to unblock a shared Thing",
+      "input": {
+        "ask": {
+          "id": "a2",
+          "about": "pause",
+          "state": "waiting",
+          "at": "2026-11-17T03:25:00Z",
+          "expiresAt": "2026-11-17T04:25:00Z",
+          "from": {
+            "groupId": "g1",
+            "name": "Cassie"
+          }
+        },
+        "rules": [],
+        "timeZone": "America/New_York",
+        "now": "2026-11-17T03:30:00Z",
+        "waitMinutes": 30
+      },
+      "expected": [
+        {
+          "label": "Unblock",
+          "note": "ends the block now",
           "request": {
             "kind": "asked"
           }
