@@ -25,7 +25,7 @@ Bedtime, homework hours, and the new tablet nobody has claimed yet. FamilyFi let
 - **Set rules with schedules.** Turn off all internet, or just video, social media, gaming, certain apps or certain websites. Do it always, or only at times like *Bedtime* or *Homework* on school days until six.
 - **Pause and allow.** Pause the internet for dinner, for an hour or until you resume it. Or let someone back online for a while during a scheduled block. You can always see who paused it and until when.
 - **Catch new devices.** New phones and tablets show up as unassigned. Turn on quarantine and they stay offline until you say whose they are, so a birthday present doesn't skip every rule in the house.
-- **Let them ask.** With [FamilyFi Me](https://github.com/nickberardi/familyfi/wiki/FamilyFi-Me) on a child's iPhone or iPad, they see what's blocked and until when, and ask you for more time. You answer with a tap. Turn on Screen Time there and their pauses and internet rules block the phone's apps away from home too.
+- **Let them ask.** With [FamilyFi Me](https://github.com/nickberardi/familyfi/wiki/FamilyFi-Me) on a child's iPhone or iPad, they see what's blocked and until when, and ask you for more time. You answer with a tap. Turn on Screen Time there and their internet rules block the phone's apps away from home too; a pause or a yes you give while they're out reaches the phone the next time they open FamilyFi Me.
 - **Hear about it.** The FamilyFi app can alert you to a new device, a gateway FamilyFi can't reach, or a child's ask. Each alert is locked so only your phone can read it.
 - **Check on things.** Checkup points out anything that needs a look, such as a phone using a private Wi-Fi address that could slip out of its rules.
 
