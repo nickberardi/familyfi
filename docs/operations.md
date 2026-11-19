@@ -37,8 +37,9 @@ docker compose run --rm --no-deps -T --entrypoint /app/scripts/runtime/restore-d
 ## Remote access and pairing
 
 **System → Pair Device** has four sections. **Get the FamilyFi app** shows the App Store and
-Google Play badges; each links to the store once `APP_STORES` in `src/lib/pair-device.ts` has its
-link, and until then reads "Coming soon". Google Play's badge instead opens the closed beta's
+Google Play badges; each links to the store once `appStoresFor` in `src/lib/pair-device.ts` gives it a
+link, and until then reads "Coming soon". The App Store badge opens TestFlight on a server whose
+`FAMILYFI_UPDATE_TAG` is `next`, since that track runs pre-releases, and the App Store listing on every other track. Google Play's badge instead opens the closed beta's
 steps (`PLAY_BETA`) in a modal, linking to the full instructions at getfamilyfi.com/android/. **Home access** is always on: it is the address
 FamilyFi has inside the home, where AI agents pair and connect. It shows the address you saved,
 else the address you opened FamilyFi at when that is a private IP or `.local` name, else a warning

@@ -5,6 +5,7 @@ import type { ApiRequest } from "./api-client";
 import { relativeSweep } from "./sync-copy";
 import { transportLabel } from "./connection-routes";
 import type { Account, ConnectionRoute, Group, PairedPhone, PairingState, RemoteAccess } from "./types";
+import type { UpdateTrack } from "./update-track";
 
 /**
  * Pair Device, as every client shows it: which paired devices (phones, Watches and agents) are
@@ -49,15 +50,28 @@ export const PAIR_COPY = {
   getAppSub: "Install it on each device before you pair it.",
 } as const;
 
+/** FamilyFi's App Store listing, and its TestFlight beta, where pre-releases go first. */
+export const APP_STORE_URL = "https://apps.apple.com/app/id6819889209";
+export const TESTFLIGHT_URL = "https://testflight.apple.com/join/5nuDQjJq";
+
 /**
- * Where to get the FamilyFi app, shown as each store's own badge. The App Store badge opens the
- * app's App Store listing; until the app is listed on Google Play, its badge opens brief steps for
- * joining its closed beta (`PLAY_BETA`). A store with no link yet shows its badge unlinked, marked as coming soon.
+ * Where to get the FamilyFi app, shown as each store's own badge. A server on the `next` track runs
+ * pre-releases, so its App Store badge opens TestFlight, where the app's pre-releases are; every other
+ * track opens the App Store listing. Google Play's badge opens brief steps for joining its closed beta
+ * (`PLAY_BETA`); a store with no link yet shows its badge unlinked, marked as coming soon.
  */
-export const APP_STORES = [
-  { id: "apple", label: "Download on the App Store", badge: "/stores/app-store.svg", badgeWidth: 120, url: "https://apps.apple.com/app/id6819889209" },
-  { id: "google", label: "Get it on Google Play", badge: "/stores/google-play.svg", badgeWidth: 135, url: "https://getfamilyfi.com/android/", steps: true },
-] as const satisfies readonly AppStore[];
+export function appStoresFor(track: UpdateTrack) {
+  return [
+    { id: "apple", label: "Download on the App Store", badge: "/stores/app-store.svg", badgeWidth: 120, url: track === "next" ? TESTFLIGHT_URL : APP_STORE_URL },
+    { id: "google", label: "Get it on Google Play", badge: "/stores/google-play.svg", badgeWidth: 135, url: "https://getfamilyfi.com/android/", steps: true },
+  ] as const satisfies readonly AppStore[];
+}
+
+/**
+ * The pre-release links, as Pair Device showed them before it read the track: familyfi-mobile's version gate
+ * opens the App Store badge's link to update the app, and chooses for itself when to open the listing instead.
+ */
+export const APP_STORES = appStoresFor("next");
 
 /**
  * `badgeWidth` is the badge drawn 40 points tall, the height both are shown at. A store with
