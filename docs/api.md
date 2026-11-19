@@ -409,11 +409,10 @@ phone, tablet or Mac always pairs as `app`, and a Watch and an app's Siri and sh
 
 The API names them the same way everywhere: `clientType`, and `scope` as its whole value
 (`agent:full`). API 2.0.0 removed the older words (`client` with `phone`, `app` or `watch`, and
-scopes without their group) from requests and responses, so `x-min-app` and `x-min-server` rose to
-2.0.0 with it: an app built before it is told to update. API 2.1.0 renamed a child's phone's
-sign-in for the person it is for (session `kind: person` with `personId`, the invite's `personId`, a
-listed child's phone's `person`), so `x-min-app`, `x-min-server` and `x-min-me` rose to 2.1.0 by
-hand: oasdiff does not call renamed optional fields breaking, but every 2.0.x app reads the old ones.
+scopes without their group) from requests and responses, and named a child's phone's sign-in for the
+person it is for (session `kind: person` with `personId`, the invite's `personId`, a listed child's
+phone's `person`), so `x-min-app`, `x-min-server` and `x-min-me` rose to 2.0.0 with it: an app
+built before it is told to update.
 
 The server signs endpoint manifests using its persisted Ed25519 instance key. A phone may
 accept a pin change only in a manifest signed by the already trusted key; any other identity
@@ -447,7 +446,7 @@ An app and a server on different contract versions can each send something the o
 - **`x-min-app-watch`**: the oldest watch app API version this server still serves. The watches read only a few routes, so most breaking changes never reach them; until CI can tell which do, it is set by hand (0.30.0).
 - **`x-min-me`**: the oldest FamilyFi Me API version this server still serves, set by hand like `x-min-app-watch` (it started at 2.0.0).
 
-Any of them may rise on purpose and none ever falls or passes `info.version`. `scripts/ci/check-openapi-floors.mjs` (`make test-api-floors`) enforces the rule against the base branch, in CI's first job, `contract`, before the long jobs start. Their first values came from replaying the rule over the document's history: 0.34 and 0.36 broke old apps, and 0.36 added required response fields, so both started at 0.36.0; 2.0.0 removed the older client words and raised both to 2.0.0; 2.1.0 renamed FamilyFi Me's sign-in for a person and raised both, and `x-min-me`, to 2.1.0 by hand. `x-min-app-watch` started at 0.30.0, set by hand.
+Any of them may rise on purpose and none ever falls or passes `info.version`. `scripts/ci/check-openapi-floors.mjs` (`make test-api-floors`) enforces the rule against the base branch, in CI's first job, `contract`, before the long jobs start. Their first values came from replaying the rule over the document's history: 0.34 and 0.36 broke old apps, and 0.36 added required response fields, so both started at 0.36.0; 2.0.0 removed the older client words and named FamilyFi Me's sign-in for a person, and raised both, and `x-min-me` by hand, to 2.0.0. `x-min-app-watch` started at 0.30.0, set by hand.
 
 `GET /api/v1/health` reports `apiVersion` (this document's `info.version`), `minAppApiVersion` (`x-min-app`) and `minWatchApiVersion` (`x-min-app-watch`) to anyone, in every answer. Those two are deprecated and will be removed in a future version; new clients name their type and read `minApiVersion` instead, and they stay only so apps built before 2.0.0 are still told to update. A client that names its client type, `GET /api/v1/health?clientType=me`, also gets `minApiVersion`, its own floor from the server's table (`MIN_API_VERSION_BY_CLIENT` in `src/lib/api-compat.ts`): `x-min-app` for `app` and `agent`, `x-min-app-watch` for `app-watch` and `app-controls`, `x-min-me` for `me`. A client type the server does not know, or a server before 2.0.0, sends none, and the client falls back to the two fields above. A client that can meet a server of another version, the companion app, compares them before it reads the household (`src/lib/api-compat.ts`, and the household store's `checkCompatibility`):
 
