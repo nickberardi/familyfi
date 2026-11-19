@@ -167,6 +167,10 @@ function sampleText(table, column, row) {
   if (/url$/i.test(name)) return `https://192.0.2.1/upgrade/${table}/${name}/${row}`;
   if (/hostname$/i.test(name)) return `upgrade-${row}.${table.toLowerCase()}.example`;
   if (name === "domain") return `upgrade-${row}.example.com`;
+  // A paired device's and an invite's client type and scope hold one of a fixed list (their CHECK
+  // constraints, from v2.0.0; before it they were enums).
+  if (/^(PairedDevice|Pairing)$/.test(table) && name === "clientType") return ["app", "agent", "me"][row % 3];
+  if (/^(PairedDevice|Pairing)$/.test(table) && name === "scope") return ["app:full", "agent:readOnly", "me:askOnly"][row % 3];
   if (/^schedule(Start|End)$|Time$/.test(name)) return ["21:00", "07:00", "19:30"][row % 3];
   if (name === "timezone") return ["America/New_York", "Europe/London", "Pacific/Kiritimati"][row % 3];
   if (/LastFour$/.test(name)) return `${1000 + row}`;
