@@ -87,25 +87,26 @@ export function askSheetBody(ask: GroupAsk, rules: Rule[], timezone: string, now
 }
 
 /**
- * The answer sheet's quick choices. To unpause: Unpause, which ends the pause. On a shared Thing
- * (`group`, the Thing) it is Unblock, "ends the block now", as its card says, when ending the pause
- * leaves it unblocked; while an internet rule or its Block button rule blocks it too, so its card
- * still reads Blocked, Unpause, saying what still blocks it. To time off a rule:
+ * The answer sheet's quick choices. To unblock: Unblock, the group's own Unblock (`answerAsk`),
+ * which ends its pause and lifts the rules blocking it now, its Block button rule among them, as the
+ * card's Unblock does; with the group (`group`), its note says what it lifts. To time off a rule:
  * what the child asked for, and the rest of the window when that is longer, each never past the
  * window's end, as the server caps it; nothing while the rule's window is not on, since then there is
  * nothing to lift. Not now comes last (`askSheetChoices`).
  */
-export function askSheetOptions(ask: GroupAsk, rules: Rule[], timezone: string, now: Date, group?: Pick<Group, "id" | "blockButtonRuleId">): AskSheetOption[] {
+export function askSheetOptions(
+  ask: GroupAsk,
+  rules: Rule[],
+  timezone: string,
+  now: Date,
+  group?: Pick<Group, "id" | "blockButtonRuleId" | "suspension">,
+): AskSheetOption[] {
   if (ask.about === "pause") {
-    // A shared Thing's ask names the child who asked, and the Thing reads Blocked, as the child says.
-    // What keeps its card Blocked once the pause ends: an internet rule's window, or its Block button
-    // rule, named as one rule (its window, or the Block button rule's own name).
-    const blocking = ask.from && group ? rulesToUnblock(group, rules, timezone, now) : [];
-    // An internet rule first, as the card's line names it.
-    const still = blocking.find((rule) => rule.kind === "internet") ?? blocking.find((rule) => rule.ruleId === group?.blockButtonRuleId);
-    if (ask.from && group && !still) return [{ label: "Unblock", note: "ends the block now", request: { kind: "asked" } }];
-    const name = still && (still.kind === "internet" ? still.name : (rules.find((rule) => rule.id === still.ruleId)?.name ?? still.name));
-    return [{ label: "Unpause", note: still ? `ends the pause; ${name} still blocks it` : "ends the pause now", request: { kind: "asked" } }];
+    const blocking = group ? rulesToUnblock(group, rules, timezone, now) : [];
+    const what = listNames(blocking.map((rule) => rule.name));
+    const paused = !group || group.suspension.active;
+    const note = !blocking.length ? "ends the block now" : paused ? `ends the block and lifts ${what}` : `lifts ${what}`;
+    return [{ label: "Unblock", note, request: { kind: "asked" } }];
   }
   const rule = ruleOf(ask, rules);
   const end = rule ? activeWindowsEnd(ruleInternetWindows(rule), now, timezone) : undefined;
@@ -157,7 +158,7 @@ export function askSheetChoices(
   timezone: string,
   now: Date,
   waitMinutes?: number,
-  group?: Pick<Group, "id" | "blockButtonRuleId">,
+  group?: Pick<Group, "id" | "blockButtonRuleId" | "suspension">,
 ): AskSheetChoice[] {
   const options = askSheetOptions(ask, rules, timezone, now, group);
   const custom: PauseSheetPicker[] =
@@ -168,4 +169,10 @@ export function askSheetChoices(
         ]
       : [];
   return [...options, ...custom, askDeclineOption(timezone, now, waitMinutes)];
+}
+
+/** "Video", "Video and Gaming", "Bedtime, Video and Gaming", as the unblock sheet lists them. */
+function listNames(items: string[]): string {
+  const unique = [...new Set(items)];
+  return unique.length <= 1 ? (unique[0] ?? "") : `${unique.slice(0, -1).join(", ")} and ${unique.at(-1)}`;
 }

@@ -126,8 +126,8 @@ export function applyRulePause(mutate: Mutate, rule: Pick<Rule, "id" | "name">, 
 }
 
 /**
- * A parent's answer to a child's ask (`askSheetChoices`). Yes to unpause is the group's `resume` on
- * `internet`; yes to time off a rule is the rule's `allow` for the group, as the child asked or until
+ * A parent's answer to a child's ask (`askSheetChoices`). Yes to unblock is the group's `unblock`,
+ * as its card's Unblock; yes to time off a rule is the rule's `allow` for the group, as the child asked or until
  * a time of the parent's own (`now` is the tap). Each carries the ask's `askId`, so the ask closes as
  * yes, by this parent; Not now is the ask's `decline`. The ask leaves the card at once.
  */
@@ -144,11 +144,12 @@ export function answerAsk(mutate: Mutate, group: Group, ask: GroupAsk, option: A
       feedback: { notice: `You said not now to ${ask.from?.name ?? group.name}.` },
     });
   }
+  // A yes to unblock is the group's own Unblock, lifting what its card's Unblock would.
   if (ask.about === "pause") {
-    return mutate((send) => send(`${internetRulePath(group)}/resume`, { method: "POST", body: { askId: ask.id } }), {
+    return mutate((send) => send(`/api/v1/groups/${group.id}/unblock`, { method: "POST", body: { askId: ask.id } }), {
       groupId: group.id,
       optimistic: answered("yes"),
-      feedback: { notice: option.label === "Unblock" ? `${group.name} unblocked.` : `${group.name} unpaused.` },
+      feedback: { notice: `${group.name} unblocked.` },
     });
   }
   const until =

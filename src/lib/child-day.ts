@@ -2,6 +2,7 @@ import { minutesText } from "@/lib/alert-copy";
 import { zonedFormat } from "@/lib/clock";
 import type { TimelineBand } from "@/lib/day-timeline";
 import { daysLabel, formatHhmm } from "@/lib/display";
+import { rulesToUnblock } from "@/lib/group-actions";
 import { groupLift, rulePaused, type Rule, type RulePause } from "@/lib/rules";
 import type { Actor, Group, GroupAsk } from "@/lib/types";
 import {
@@ -361,7 +362,12 @@ export type GroupDay = {
  * FamilyFi names no person for the recovery account to a child's phone, so a `by` it sends as null
  * stays unnamed.
  */
-export function groupDayOf(group: Pick<Group, "id" | "name" | "suspension" | "allowance" | "ask">, rules: Rule[], timezone: string, now: Date): GroupDay {
+export function groupDayOf(
+  group: Pick<Group, "id" | "name" | "suspension" | "allowance" | "ask"> & Partial<Pick<Group, "kind" | "blockButtonRuleId">>,
+  rules: Rule[],
+  timezone: string,
+  now: Date,
+): GroupDay {
   const name = (by: Actor) => by?.name ?? null;
   // How long a rule is lifted for this group, for everyone or for it alone: the later end, null when
   // it has none; undefined when it is not lifted.
@@ -376,7 +382,7 @@ export function groupDayOf(group: Pick<Group, "id" | "name" | "suspension" | "al
   return {
     group: { id: group.id, name: group.name },
     timezone,
-    pause: group.suspension.active ? { by: name(group.suspension.by), until: group.suspension.until } : null,
+    pause: group.suspension.active ? { by: name(group.suspension.by), until: group.suspension.until } : buttonBlock(),
     allowance: group.allowance.active ? { by: name(group.allowance.by), until: group.allowance.until } : null,
     windows: own
       .filter((rule) => rule.kind === "internet" && rule.mode === "scheduled")
@@ -387,6 +393,16 @@ export function groupDayOf(group: Pick<Group, "id" | "name" | "suspension" | "al
     alwaysOn: own.filter((rule) => rule.mode === "always").map((rule) => ({ ruleId: rule.id, name: rule.name, kind: rule.kind, allowed: allowedOf(liftOf(rule) ?? undefined) })),
     ask: group.ask ? { ...group.ask, by: name(group.ask.by ?? null) } : null,
   };
+
+  // A Thing whose Block button rule (Video on TV) blocks it now reads Blocked, as its card does, and
+  // the child can ask to unblock it, which a parent answers with the Thing's Unblock. It is told as
+  // the Thing's block, with no one's name, until the rule stops blocking. A child's own phone is
+  // told only its pause: Screen Time mirrors that as every app.
+  function buttonBlock(): GroupDay["pause"] {
+    if (group.kind !== "things" || !group.blockButtonRuleId) return null;
+    const button = rulesToUnblock({ id: group.id, blockButtonRuleId: group.blockButtonRuleId }, rules, timezone, now).find((rule) => rule.ruleId === group.blockButtonRuleId);
+    return button ? { by: null, until: button.until } : null;
+  }
 }
 
 function minutesOfHhmm(value: string): Clock {

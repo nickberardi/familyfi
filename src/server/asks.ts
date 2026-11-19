@@ -5,16 +5,18 @@ import { recordAsk } from "./alerts/producers";
 import type { SignedInSession } from "./auth";
 import { groupForChild, requireChildReads } from "./child-day";
 import { prisma } from "./db";
-import { blockRuleOf, groupInclude, lifted, publicGroup, sessionActor } from "./groups";
+import { isFullApp } from "./device-scope";
+import { groupInclude, lifted, publicGroup, sessionActor } from "./groups";
 import { loadHousehold } from "./household";
 import { ApiError } from "./http";
 import { activeWindowsEnd, builtInRule, ruleInternetWindows } from "./rules";
+import { unblockTargets } from "./unblock-targets";
 
 /*
  * Asking for more time (FamilyFi Me). A child's phone files an ask on its own group, or on a Things
- * group shared with children, to end the group's pause or to lift one rule's window for a number of
- * minutes. A parent answers no with
- * decline, or yes with the verb that lifts it: the group's `resume` on `internet` for a pause, the
+ * group shared with children, to unblock it (while it is paused, or a Thing's Block button rule
+ * blocks it) or to lift one rule's window for a number of minutes. A parent answers no with
+ * decline, or yes with the verb that lifts it: the group's `unblock` for an ask to unblock, the
  * rule's `allow` for the group for a window, each with the ask's `askId`. Any write that lifts what
  * a waiting ask is about answers it yes too, however the parent gave it (`answerAsks`).
  */
@@ -64,11 +66,16 @@ export async function fileAsk(session: SignedInSession, groupId: string, input: 
   let blockEnd: Date | null;
   let ruleName: string | undefined;
   if (input.about === "pause") {
-    const block = blockRuleOf(group);
-    if (!block?.enabled || (block.expiresAt !== null && block.expiresAt <= now)) {
+    // An ask to unblock is the group's Unblock: it may be asked while the group is paused, or while
+    // its Block button rule blocks it (Video on TV), and it ends with the last of them.
+    const { block, blockedByPause, buttonRuleId, candidates, ends } = unblockTargets(group, now, household.timezone);
+    const button = candidates.find(({ rule, ...link }) => rule.id === buttonRuleId && !lifted(link, now));
+    const buttonEnd = button ? ends.get(button.rule.id) : undefined;
+    if (!blockedByPause && buttonEnd === undefined) {
       throw new ApiError(409, "not_blocked", thing ? `${thing} isn't blocked right now.` : "You aren't paused right now.");
     }
-    blockEnd = block.expiresAt;
+    const lasts = [...(blockedByPause ? [block!.expiresAt] : []), ...(buttonEnd !== undefined ? [buttonEnd] : [])];
+    blockEnd = lasts.some((end) => end === null) ? null : new Date(Math.max(...lasts.map((end) => end!.getTime())));
   } else {
     const link = group.rules.find((item) => item.ruleId === input.ruleId && item.rule.systemGroupId === null && !builtInRule(item.rule));
     if (!link) throw new ApiError(404, "not_found", thing ? `That rule doesn't cover ${thing}.` : "That rule isn't one of yours.");
@@ -140,6 +147,19 @@ export async function declineAsk(session: SignedInSession, groupId: string, askI
   if (!closed.count) throw askClosed();
   const fresh = await prisma().group.findUniqueOrThrow({ where: { id: groupId }, include: groupInclude });
   return { group: publicGroup(fresh, household.timezone, now) };
+}
+
+/** Who is answering, with what decides whether they may answer an ask by its id. */
+export type AnsweringSession = Parameters<typeof sessionActor>[0] & {
+  account?: { displayName: string; kind?: string; isAdmin?: boolean } | null;
+  device?: { clientType: string; scope: string } | null;
+};
+
+/** A parent answers by the ask's id, as only a parent says no: never a Watch, the app's controls or an agent. */
+export function requireParentAnswer<S extends AnsweringSession>(session: S): S {
+  const administrator = (!session.device || isFullApp(session.device)) && (session.account?.kind === "recovery" || session.account?.isAdmin === true);
+  if (!administrator) throw new ApiError(403, "administrator_required", "A FamilyFi administrator answers a child's ask.");
+  return session;
 }
 
 function askClosed() {

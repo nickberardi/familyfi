@@ -1,7 +1,6 @@
 import { RuleKind, RuleLiftKind, RuleMode, RuleScope } from "@prisma/client";
 import { extendSuspensionUntil } from "@/lib/schedule";
-import { answerAsks, claimAsk, followPause, releaseAsk } from "./asks";
-import { isFullApp } from "./device-scope";
+import { answerAsks, claimAsk, followPause, releaseAsk, requireParentAnswer, type AnsweringSession } from "./asks";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
 import { blockRuleOf, groupInclude, internetLinks, lifted, publicGroup, sessionActor } from "./groups";
@@ -132,12 +131,6 @@ export async function liftGroupRule(
   return liftRule(session, action, target, body);
 }
 
-/** Who is lifting, with what decides whether they may answer an ask by its id. */
-type AnsweringSession = Parameters<typeof liftRule>[0] & {
-  account?: { displayName: string; kind?: string; isAdmin?: boolean } | null;
-  device?: { clientType: string; scope: string } | null;
-};
-
 /**
  * A parent's yes to a child's ask, given with its id. The ask is taken first, so a second parent
  * answering it gets 409 `ask_closed`, and put back if the lift fails. A window's yes lasts the
@@ -147,10 +140,7 @@ async function liftForAsk(session: AnsweringSession, action: LiftAction, target:
   const internet = target.ruleId === INTERNET_RULE_ID;
   const about = action === "resume" && internet ? "pause" : action === "allow" && !internet ? "rule" : null;
   if (!about) throw new ApiError(400, "invalid_request", "askId answers an ask with the group's resume on internet, or allow on the rule it asks about.");
-  // A parent answers by the ask's id, as only a parent says no: never a Watch, the app's controls or an agent.
-  const administrator = (!session.device || isFullApp(session.device)) && (session.account?.kind === "recovery" || session.account?.isAdmin === true);
-  if (!administrator) throw new ApiError(403, "administrator_required", "A FamilyFi administrator answers a child's ask.");
-  const ask = await claimAsk(session, body.askId!, { groupId: target.groupId, about, ruleId: target.ruleId });
+  const ask = await claimAsk(requireParentAnswer(session), body.askId!, { groupId: target.groupId, about, ruleId: target.ruleId });
   try {
     const rest: LiftBody = { ...body, askId: undefined };
     if (about === "pause") return await liftGroupInternet(session, action, target.groupId, rest);

@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import YAML from "yaml";
 import { bandTimes, timelineLegend } from "@/lib/day-timeline";
+import type { Rule } from "@/lib/rules";
 
 import {
   ASK_LENGTH_REFUSAL,
@@ -679,6 +680,36 @@ describe("a child's day on the household's clock", () => {
     // An ask sent at 10:09:36 PM was sent at 10:09, as the phone's clock said then, never 10:10.
     const early = meDaySubject(me({ ask: { id: "a3", about: "pause", state: "waiting", at: "2026-11-17T03:09:36Z", expiresAt: again, by: null } }), MONDAY_NIGHT);
     expect(early.subject.ask).toEqual({ state: "waiting", at: 22 * 60 + 9 });
+  });
+
+  it("tells a Thing its Block button rule blocks as blocked, so the child can ask to unblock it", () => {
+    const video = {
+      id: "r3",
+      name: "Video",
+      kind: "category",
+      scope: "group",
+      groupIds: ["t1"],
+      enabled: true,
+      builtIn: null,
+      mode: "always",
+      windows: [],
+      targetIds: [],
+      pause: { active: false, until: null, kind: "pause", by: null },
+      groupPauses: [],
+    } as unknown as Rule;
+    const tv = { id: "t1", name: "TV", kind: "things" as const, blockButtonRuleId: "r3", suspension: { active: false, until: null, by: null }, allowance: { active: false, until: null, by: null } };
+    const day = groupDayOf(tv, [video], ZONE, MONDAY_NIGHT);
+    expect(day.pause).toEqual({ by: null, until: null });
+    const { subject, now, clock: on } = meDaySubject(day, MONDAY_NIGHT);
+    const story = tellDay(subject, now, THING_VOICE, on);
+    expect(topAnswer(story)).toMatchObject({ title: "Blocked", sentence: "It is blocked." });
+    expect(story.items[0]?.ask?.label).toBe("Ask to unblock");
+    // Unblocked for TV, or not its Block button rule: nothing to tell.
+    const lifted = { ...video, groupPauses: [{ groupId: "t1", pause: { active: true, until: "2026-11-17T05:00:00Z", kind: "allow", by: null } }] } as unknown as Rule;
+    expect(groupDayOf(tv, [lifted], ZONE, MONDAY_NIGHT).pause).toBeNull();
+    expect(groupDayOf({ ...tv, blockButtonRuleId: undefined }, [video], ZONE, MONDAY_NIGHT).pause).toBeNull();
+    // A child's own phone is told only its pause.
+    expect(groupDayOf({ ...tv, kind: "family" as const }, [video], ZONE, MONDAY_NIGHT).pause).toBeNull();
   });
 
   it("tells a yes as the group's pause and lifts stand now, not as it was asked", () => {
