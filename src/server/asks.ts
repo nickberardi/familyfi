@@ -1,5 +1,6 @@
 import { AskState, RuleMode, type Ask } from "@prisma/client";
 import { z } from "zod";
+import { ASK_MINUTES } from "@/lib/child-day";
 import { recordAsk } from "./alerts/producers";
 import type { SignedInSession } from "./auth";
 import { groupForChild, requireChildReads } from "./child-day";
@@ -18,8 +19,6 @@ import { activeWindowsEnd, builtInRule, ruleInternetWindows } from "./rules";
  * a waiting ask is about answers it yes too, however the parent gave it (`answerAsks`).
  */
 
-/** The fewest and most minutes a child can ask for. */
-export const ASK_MINUTES = { min: 5, max: 240 } as const;
 /** At most this many asks an hour from one child about one group. */
 export const ASKS_PER_HOUR = 6;
 const HOUR_MS = 60 * 60_000;

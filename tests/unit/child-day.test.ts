@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { bandTimes, timelineLegend } from "@/lib/day-timeline";
 
 import {
+  ASK_LENGTH_REFUSAL,
+  ASK_LENGTH_STEP,
+  ASK_MINUTES,
+  ASK_OWN_LENGTH,
   INTERNET_VOICE,
+  askLengthAllowed,
+  askLengthChoices,
   PHONE_VOICE,
   THING_VOICE,
   clock,
@@ -736,5 +742,25 @@ describe("a child's day on the household's clock", () => {
     expect(story.items[0].title).toBe("Paused");
     expect(story.bands.find((band) => band.kind === "pause")?.source).toBe("Paused");
     expect(topAnswer(story).sentence).toBe("Your apps are paused.");
+  });
+});
+
+describe("a length of the child's own", () => {
+  it("offers every quarter hour up to four hours, worded as the parent reads it", () => {
+    const choices = askLengthChoices();
+    expect(choices[0]).toEqual({ value: 15, label: "15 minutes" });
+    expect(choices.find((choice) => choice.value === 90)?.label).toBe("1 hour 30 minutes");
+    expect(choices.at(-1)).toEqual({ value: 240, label: "4 hours" });
+    expect(choices.every((choice) => choice.value % ASK_LENGTH_STEP === 0 && askLengthAllowed(choice.value))).toBe(true);
+  });
+
+  it("takes only what FamilyFi takes, and says so plainly otherwise", () => {
+    expect(askLengthAllowed(ASK_MINUTES.min)).toBe(true);
+    expect(askLengthAllowed(ASK_MINUTES.max)).toBe(true);
+    expect(askLengthAllowed(4)).toBe(false);
+    expect(askLengthAllowed(241)).toBe(false);
+    expect(askLengthAllowed(30.5)).toBe(false);
+    expect(ASK_LENGTH_REFUSAL).toBe("You can ask for 5 minutes to 4 hours.");
+    expect(ASK_OWN_LENGTH).toBe("Another length");
   });
 });
