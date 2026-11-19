@@ -94,43 +94,13 @@ describe("a child's ask, as a parent answers it", () => {
     expect(sent[1]!.init).toEqual({ method: "POST", body: { askId: "a1", until: "2026-11-17T12:00:00.000Z" } });
   });
 
-  it("unpauses with the group's resume and the ask's id", async () => {
+  it("unblocks with the group's own unblock and the ask's id, as its card's Unblock does", async () => {
     const { sent, mutate } = recorder({ groups: [emma(pauseAsk)], devices: [] });
-    const [unpause] = askSheetChoices(pauseAsk, [], TZ, NOW, 30);
-    await answerAsk(mutate, emma(pauseAsk), pauseAsk, unpause as never, undefined, NOW);
-    expect(sent[0]).toMatchObject({ path: "/api/v1/groups/g1/rules/internet/resume", init: { method: "POST", body: { askId: "a2" } } });
-    expect(sent[0]!.options.feedback?.notice).toBe("Emma unpaused.");
-  });
-
-  it("unblocks a shared Thing in the Thing's own words, as its card does", async () => {
-    const thingAsk: GroupAsk = { ...pauseAsk, from: { groupId: "g1", name: "Cassie" } };
-    const tv = { ...emma(thingAsk), id: "g2", kind: "things", name: "TV", familyRole: null } as unknown as Group;
-    const [unblock] = askSheetChoices(thingAsk, [], TZ, NOW, 30, tv);
-    expect(unblock).toEqual({ label: "Unblock", note: "ends the block now", request: { kind: "asked" } });
-    const { sent, mutate } = recorder({ groups: [tv], devices: [] });
-    await answerAsk(mutate, tv, thingAsk, unblock as never, undefined, NOW);
-    expect(sent[0]).toMatchObject({ path: "/api/v1/groups/g2/rules/internet/resume", init: { method: "POST", body: { askId: "a2" } } });
-    expect(sent[0]!.options.feedback?.notice).toBe("TV unblocked.");
-  });
-
-  it("says Unpause on a shared Thing that a rule blocks too, since ending the pause leaves it blocked", async () => {
-    const thingAsk: GroupAsk = { ...pauseAsk, from: { groupId: "g1", name: "Cassie" } };
-    const tv = { ...emma(thingAsk), id: "g2", kind: "things", name: "TV", familyRole: null } as unknown as Group;
-    const tvBedtime = { ...bedtime, groupIds: ["g2"] } as Rule;
-    const [unpause] = askSheetChoices(thingAsk, [tvBedtime], TZ, NOW, 30, tv);
-    expect(unpause).toEqual({ label: "Unpause", note: "ends the pause; Bedtime still blocks it", request: { kind: "asked" } });
-    const { sent, mutate } = recorder({ groups: [tv], devices: [] });
-    await answerAsk(mutate, tv, thingAsk, unpause as never, undefined, NOW);
-    expect(sent[0]!.options.feedback?.notice).toBe("TV unpaused.");
-  });
-
-  it("says Unblock on a shared Thing that only a scheduled category rule blocks, since its card reads Online", () => {
-    const thingAsk: GroupAsk = { ...pauseAsk, from: { groupId: "g1", name: "Cassie" } };
-    const tv = { ...emma(thingAsk), id: "g2", kind: "things", name: "TV", familyRole: null, blockButtonRuleId: null } as unknown as Group;
-    const gaming = { ...bedtime, id: "r2", name: "Games", kind: "category", targetIds: [], groupIds: ["g2"] } as unknown as Rule;
-    expect(askSheetChoices(thingAsk, [gaming], TZ, NOW, 30, tv)[0]).toMatchObject({ label: "Unblock" });
-    const games = askSheetChoices(thingAsk, [gaming], TZ, NOW, 30, { ...tv, blockButtonRuleId: "r2" } as Group)[0];
-    expect(games).toMatchObject({ label: "Unpause", note: "ends the pause; Games still blocks it" });
+    const [unblock] = askSheetChoices(pauseAsk, [], TZ, NOW, 30, emma(pauseAsk));
+    expect(unblock).toMatchObject({ label: "Unblock" });
+    await answerAsk(mutate, emma(pauseAsk), pauseAsk, unblock as never, undefined, NOW);
+    expect(sent[0]).toMatchObject({ path: "/api/v1/groups/g1/unblock", init: { method: "POST", body: { askId: "a2" } } });
+    expect(sent[0]!.options.feedback?.notice).toBe("Emma unblocked.");
   });
 
   it("says Not now with the ask's decline", async () => {

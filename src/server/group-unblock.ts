@@ -1,14 +1,14 @@
 import { RuleLiftKind } from "@prisma/client";
-import { standingRule } from "@/lib/group-actions";
 import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { extendSuspensionUntil } from "@/lib/schedule";
-import { answerAsks } from "./asks";
+import { answerAsks, claimAsk, releaseAsk, requireParentAnswer, type AnsweringSession } from "./asks";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
-import { blockButtonRuleOf, blockRuleOf, groupInclude, lifted, publicGroup, sessionActor } from "./groups";
+import { groupInclude, lifted, publicGroup, sessionActor } from "./groups";
 import { ApiError } from "./http";
 import { CLEARED, readLiftBody, type LiftBody } from "./rule-lifts";
-import { activeWindowsEnd, isLockDnsRule, presentRules, ruleInclude, ruleInternetWindows } from "./rules";
+import { presentRules, ruleInclude } from "./rules";
+import { unblockTargets } from "./unblock-targets";
 import { currentHouseholdId } from "./household-context";
 
 export type UnblockAction = "unblock" | "end" | "extend";
@@ -24,7 +24,7 @@ const BLOCK_CLEARED = { enabled: false, expiresAt: null, blockedByAccountId: nul
  * `body` is what `readUnblockBody` read.
  */
 export async function unblockGroup(
-  session: Parameters<typeof sessionActor>[0],
+  session: AnsweringSession,
   action: UnblockAction,
   groupId: string,
   body: LiftBody,
@@ -33,29 +33,19 @@ export async function unblockGroup(
   if (!existing) throw new ApiError(404, "not_found", "Group not found.");
   const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
   const now = new Date();
-  // Lock DNS blocks only the ways around the gateway's DNS, and Block countries is protection, never
-  // a block on the group: an unblock leaves both on.
-  const links = existing.rules.filter(({ rule }) => rule.systemGroupId === null && !isLockDnsRule(rule) && rule.id !== COUNTRIES_RULE_ID);
+  const { links, blockedByPause, candidates, ends } = unblockTargets(existing, now, household.timezone);
   const allowances = links.filter((link) => link.pauseKind === RuleLiftKind.allow && lifted(link, now));
 
+  if (body.askId && action !== "unblock") throw new ApiError(400, "invalid_request", "askId answers an ask with the group's unblock.");
   if (action === "unblock") {
     const requested = body.until ? new Date(body.until) : null;
     if (requested && requested.getTime() <= now.getTime()) throw new ApiError(400, "invalid_request", "until must be in the future.");
-    const block = blockRuleOf(existing);
-    const blockedByPause = Boolean(block?.enabled && (block.expiresAt === null || now < block.expiresAt));
-    // A rule paused for everyone, or paused for this group, is not blocking it. One this group is
-    // already allowed is included, so an unblock can be given a new time. An always-on category,
-    // app or website rule is how the group is set up, not a block on it: an unblock leaves it on,
-    // unless it is the group's Block button rule, which its Unblock is for.
-    const buttonRuleId = blockButtonRuleOf(existing)?.id;
-    const candidates = links.filter(
-      ({ rule, ...link }) =>
-        rule.enabled && (!standingRule(rule) || rule.id === buttonRuleId) && !lifted(rule, now) && !(lifted(link, now) && link.pauseKind !== RuleLiftKind.allow),
-    );
-    const ends = new Map(candidates.map(({ rule }) => [rule.id, activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone)] as const));
     // By default only the rules blocking now, each until its own windows end; given a time, every rule.
     const targets = candidates.filter(({ rule }) => body.until !== undefined || ends.get(rule.id) !== undefined);
     if (targets.length === 0 && !blockedByPause) throw new ApiError(409, "not_blocked", "Nothing is blocking this group now.");
+    // With `askId` this is a parent's yes to a child's ask to unblock: the ask is taken first, so a
+    // second parent answering it gets 409 `ask_closed`, and put back if the unblock fails.
+    const ask = body.askId ? await claimAsk(requireParentAnswer(session), body.askId, { groupId, about: "pause" }) : null;
     const actor = sessionActor(session);
     await prisma().$transaction(async (tx) => {
       for (const { rule } of targets) {
@@ -71,9 +61,13 @@ export async function unblockGroup(
         });
       }
       await tx.rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
+    }).catch(async (error: unknown) => {
+      if (ask) await releaseAsk(ask.id);
+      throw error;
     });
-    // Whatever a child asked about that this unblock lifted is answered yes.
-    await answerAsks(session, groupId, { pause: blockedByPause, ruleIds: targets.map(({ rule }) => rule.id) });
+    // Whatever a child asked about that this unblock lifted is answered yes: an ask to unblock is
+    // the group's Unblock, whatever it lifted, and an ask for time off a rule it lifted.
+    await answerAsks(session, groupId, { pause: blockedByPause || targets.length > 0, ruleIds: targets.map(({ rule }) => rule.id) });
   } else if (action === "end") {
     await prisma().ruleGroup.updateMany({
       where: { groupId, rule: { systemGroupId: null }, ruleId: { notIn: [LOCK_DNS_RULE_ID, COUNTRIES_RULE_ID] }, pauseActive: true, pauseKind: RuleLiftKind.allow },

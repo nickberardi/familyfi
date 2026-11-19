@@ -32259,8 +32259,8 @@
       },
       "expected": [
         {
-          "label": "Unpause",
-          "note": "ends the pause now",
+          "label": "Unblock",
+          "note": "ends the block now",
           "request": {
             "kind": "asked"
           }
@@ -32269,7 +32269,7 @@
     },
     {
       "fn": "askSheetOptions",
-      "name": "to unblock a shared Thing",
+      "name": "to unblock a paused Thing",
       "input": {
         "ask": {
           "id": "a2",
@@ -32287,7 +32287,12 @@
         "now": "2026-11-17T03:30:00Z",
         "group": {
           "id": "g2",
-          "blockButtonRuleId": null
+          "blockButtonRuleId": null,
+          "suspension": {
+            "active": true,
+            "until": null,
+            "by": null
+          }
         }
       },
       "expected": [
@@ -32302,7 +32307,7 @@
     },
     {
       "fn": "askSheetOptions",
-      "name": "to unblock a shared Thing a rule blocks too",
+      "name": "to unblock a paused Thing a window blocks too",
       "input": {
         "ask": {
           "id": "a2",
@@ -32360,13 +32365,18 @@
         "now": "2026-11-17T03:30:00Z",
         "group": {
           "id": "g2",
-          "blockButtonRuleId": null
+          "blockButtonRuleId": null,
+          "suspension": {
+            "active": true,
+            "until": null,
+            "by": null
+          }
         }
       },
       "expected": [
         {
-          "label": "Unpause",
-          "note": "ends the pause; Bedtime still blocks it",
+          "label": "Unblock",
+          "note": "ends the block and lifts Bedtime",
           "request": {
             "kind": "asked"
           }
@@ -32375,7 +32385,7 @@
     },
     {
       "fn": "askSheetOptions",
-      "name": "to unblock a shared Thing only a category rule blocks too",
+      "name": "to unblock a Thing its Block button rule blocks",
       "input": {
         "ask": {
           "id": "a2",
@@ -32390,8 +32400,8 @@
         },
         "rules": [
           {
-            "id": "r2",
-            "name": "Games",
+            "id": "r3",
+            "name": "Video",
             "kind": "category",
             "scope": "group",
             "groupIds": [
@@ -32408,23 +32418,8 @@
               "by": null
             },
             "groupPauses": [],
-            "mode": "scheduled",
-            "windows": [
-              {
-                "name": "",
-                "days": [
-                  0,
-                  1,
-                  2,
-                  3,
-                  4,
-                  5,
-                  6
-                ],
-                "start": "21:00",
-                "end": "07:00"
-              }
-            ],
+            "mode": "always",
+            "windows": [],
             "useGeneratedName": false,
             "policyNames": []
           }
@@ -32433,13 +32428,18 @@
         "now": "2026-11-17T03:30:00Z",
         "group": {
           "id": "g2",
-          "blockButtonRuleId": null
+          "blockButtonRuleId": "r3",
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          }
         }
       },
       "expected": [
         {
           "label": "Unblock",
-          "note": "ends the block now",
+          "note": "lifts Video",
           "request": {
             "kind": "asked"
           }
@@ -33112,8 +33112,8 @@
       },
       "expected": [
         {
-          "label": "Unpause",
-          "note": "ends the pause now",
+          "label": "Unblock",
+          "note": "ends the block now",
           "request": {
             "kind": "asked"
           }
@@ -33129,7 +33129,7 @@
     },
     {
       "fn": "askSheetChoices",
-      "name": "to unblock a shared Thing",
+      "name": "to unblock a paused Thing",
       "input": {
         "ask": {
           "id": "a2",
@@ -33148,7 +33148,12 @@
         "waitMinutes": 30,
         "group": {
           "id": "g2",
-          "blockButtonRuleId": null
+          "blockButtonRuleId": null,
+          "suspension": {
+            "active": true,
+            "until": null,
+            "by": null
+          }
         }
       },
       "expected": [
@@ -33170,7 +33175,7 @@
     },
     {
       "fn": "askSheetChoices",
-      "name": "to unblock a shared Thing a rule blocks too",
+      "name": "to unblock a paused Thing a window blocks too",
       "input": {
         "ask": {
           "id": "a2",
@@ -33229,13 +33234,18 @@
         "waitMinutes": 30,
         "group": {
           "id": "g2",
-          "blockButtonRuleId": null
+          "blockButtonRuleId": null,
+          "suspension": {
+            "active": true,
+            "until": null,
+            "by": null
+          }
         }
       },
       "expected": [
         {
-          "label": "Unpause",
-          "note": "ends the pause; Bedtime still blocks it",
+          "label": "Unblock",
+          "note": "ends the block and lifts Bedtime",
           "request": {
             "kind": "asked"
           }
@@ -33251,7 +33261,7 @@
     },
     {
       "fn": "askSheetChoices",
-      "name": "to unblock a shared Thing only a category rule blocks too",
+      "name": "to unblock a Thing its Block button rule blocks",
       "input": {
         "ask": {
           "id": "a2",
@@ -33266,8 +33276,8 @@
         },
         "rules": [
           {
-            "id": "r2",
-            "name": "Games",
+            "id": "r3",
+            "name": "Video",
             "kind": "category",
             "scope": "group",
             "groupIds": [
@@ -33284,23 +33294,8 @@
               "by": null
             },
             "groupPauses": [],
-            "mode": "scheduled",
-            "windows": [
-              {
-                "name": "",
-                "days": [
-                  0,
-                  1,
-                  2,
-                  3,
-                  4,
-                  5,
-                  6
-                ],
-                "start": "21:00",
-                "end": "07:00"
-              }
-            ],
+            "mode": "always",
+            "windows": [],
             "useGeneratedName": false,
             "policyNames": []
           }
@@ -33310,13 +33305,18 @@
         "waitMinutes": 30,
         "group": {
           "id": "g2",
-          "blockButtonRuleId": null
+          "blockButtonRuleId": "r3",
+          "suspension": {
+            "active": false,
+            "until": null,
+            "by": null
+          }
         }
       },
       "expected": [
         {
           "label": "Unblock",
-          "note": "ends the block now",
+          "note": "lifts Video",
           "request": {
             "kind": "asked"
           }
