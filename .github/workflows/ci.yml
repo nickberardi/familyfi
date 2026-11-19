@@ -17,8 +17,11 @@ jobs:
   # Whether a pull request changes anything but documentation. One that changes only prose needs no
   # build, tests or database (docs/testing.md, "Documentation only"), so the jobs below skip, and a job
   # skipped by its `if` reports success to a required check. A file a test reads stays code: AGENTS.md
-  # (tests/unit/invariants.test.ts) and .claude/agents/ (tests/unit/reviewer-agents.test.ts), and so
-  # does openapi/agent-guide.md, which a route serves. A release (workflow_call) runs everything.
+  # (tests/unit/invariants.test.ts), .claude/agents/ (tests/unit/reviewer-agents.test.ts) and
+  # tests/ (tests/unit/repository-hygiene.test.ts), and so does openapi/agent-guide.md, which a route
+  # serves. A changed file holding a private key runs everything, so that hygiene test still catches it.
+  # A release (workflow_call), and a run where this job cannot decide or fails, runs everything.
+  # tests/unit/ci-scripts.test.ts keeps the allowlist away from the files tests read.
   changes:
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 5
@@ -29,6 +32,7 @@ jobs:
         with:
           # The pull request's merge commit and its first parent, the base branch.
           fetch-depth: 2
+      - uses: ./.github/actions/runner-cleanup
       - id: diff
         env:
           EVENT: ${{ github.event_name }}
@@ -37,9 +41,11 @@ jobs:
           if [[ "$EVENT" != pull_request ]] || ! git rev-parse --verify --quiet HEAD^1 >/dev/null; then
             echo "code=true" >>"$GITHUB_OUTPUT"; exit 0
           fi
-          files="$(git diff --name-only HEAD^1 HEAD)"
-          docs='^(docs/.*|(README|CONTRIBUTING|SECURITY|CLAUDE)\.md|scripts/README\.md|tests/fixtures/unifi/README\.md|\.github/PULL_REQUEST_TEMPLATE\.md|\.agents/skills/.*\.md)$'
-          if [[ -n "$files" ]] && ! grep -vqE "$docs" <<<"$files"; then
+          # Both sides of a rename: moving code into docs/ is still a code change.
+          files="$(git diff --no-renames --name-only HEAD^1 HEAD)"
+          docs='^(docs/.*|(README|CONTRIBUTING|SECURITY|CLAUDE)\.md|scripts/README\.md|\.github/PULL_REQUEST_TEMPLATE\.md|\.agents/skills/.*\.md)$'
+          if [[ -n "$files" ]] && ! grep -vqE "$docs" <<<"$files" &&
+            ! git diff --no-renames HEAD^1 HEAD | grep -qE '^\+.*-----BEGIN [A-Z ]*PRIVATE KEY-----'; then
             echo "code=false" >>"$GITHUB_OUTPUT"
             echo "Only documentation changed, so the build and tests were skipped." >>"$GITHUB_STEP_SUMMARY"
           else
@@ -51,7 +57,7 @@ jobs:
   # here and never starts the half-hour jobs (docs/api.md, "Versioning the contract").
   contract:
     needs: changes
-    if: ${{ needs.changes.outputs.code == 'true' }}
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 10
     steps:
@@ -90,8 +96,7 @@ jobs:
 
   # Each job calls scripts/test.py, which starts and removes its own PostgreSQL containers.
   verify:
-    needs: [changes, contract]
-    if: ${{ needs.changes.outputs.code == 'true' }}
+    needs: contract
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
@@ -157,8 +162,7 @@ jobs:
   # Also the static checks and the UTC+14 unit replay, which keep verify, the longer job, shorter:
   # verify's coverage run takes about seven minutes, this job's browser run about five.
   browser:
-    needs: [changes, contract]
-    if: ${{ needs.changes.outputs.code == 'true' }}
+    needs: contract
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
