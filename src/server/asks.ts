@@ -226,14 +226,19 @@ export async function answerAsks(
   const { timezone } = await loadHousehold();
   for (const id of new Set(waiting.map((ask) => ask.groupId))) {
     const group = await prisma().group.findUnique({ where: { id }, include: groupInclude });
-    if (group && unblockAskEnd(group, now, timezone) !== undefined) continue;
+    // Something it is about still blocks: the ask waits, closing when that does.
+    if (group && unblockAskEnd(group, now, timezone) !== undefined) {
+      await followPause(id);
+      continue;
+    }
     await prisma().ask.updateMany({ where: { groupId: id, about: "pause", ...open(now) }, data: yes });
   }
 }
 
 /**
- * A group's pause was set again or extended: a waiting ask to unblock now closes at the earlier of
- * the household's timeout and the end of what it is about, its pause or its Block button rule.
+ * A group's pause was set again or extended, or part of what blocks it was lifted: a waiting ask to
+ * unblock now closes at the earlier of the household's timeout and the end of what it is about, its
+ * pause or its Block button rule.
  */
 export async function followPause(groupId: string): Promise<void> {
   const now = new Date();

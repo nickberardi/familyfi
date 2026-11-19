@@ -275,6 +275,29 @@ describe("asking for more time", () => {
     expect((await prisma().ask.findUniqueOrThrow({ where: { id: again.id } })).state).toBe("yes");
   });
 
+  it("re-times an ask to unblock a Thing when a resume leaves only its Block button rule, which ends sooner", async () => {
+    const tv = await prisma().group.create({ data: { kind: GroupKind.things, name: "TV", kidsCanAsk: true } });
+    const now = Date.now();
+    const video = await prisma().rule.create({
+      data: {
+        name: "Video",
+        kind: RuleKind.category,
+        mode: RuleMode.scheduled,
+        targetIds: [4],
+        groups: { create: { groupId: tv.id } },
+        windows: { create: [{ position: 0, name: "", days: [0, 1, 2, 3, 4, 5, 6], start: hhmm(new Date(now - 60 * MINUTE)), end: hhmm(new Date(now + 5 * MINUTE)) }] },
+      },
+    });
+    await prisma().group.update({ where: { id: tv.id }, data: { blockButtonRuleId: video.id } });
+    await verb(pauseRoute, "pause", admin, tv.id, "internet");
+    const waiting = await askOf(await ask(child, tv.id, { about: "pause" }));
+    expect(Date.parse(waiting.expiresAt!) - Date.parse(waiting.at)).toBe(60 * MINUTE);
+    expect((await verb(resumeRoute, "resume", admin, tv.id, "internet")).status).toBe(200);
+    const after = await prisma().ask.findUniqueOrThrow({ where: { id: waiting.id } });
+    expect(after).toMatchObject({ state: "waiting", endsWithBlock: true });
+    expect(after.expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(5 * MINUTE);
+  });
+
   it("answers an ask to be unpaused with the group's unblock, the card's Unblock while a window blocks it too", async () => {
     const homework = await windowRule(emma.id);
     await verb(pauseRoute, "pause", admin, emma.id, "internet");
