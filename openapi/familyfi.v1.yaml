@@ -1147,8 +1147,8 @@ paths:
       summary: Say not this time to a child's ask
       description: |
         A parent's Not now to the group's waiting ask: it closes as `no`, and the child can ask again
-        after the household's `askWaitMinutes`. A yes is not here: it is the verb that lifts what the
-        ask is about, with its `askId` (see `GroupAsk`). 409 `ask_closed` when the ask is no longer
+        after the household's `askWaitMinutes`. A yes is not here: it is the write that lifts what
+        the ask is about (see `GroupAsk`). 409 `ask_closed` when the ask is no longer
         waiting; 404 when the group has no such ask.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
