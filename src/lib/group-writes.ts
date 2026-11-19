@@ -148,7 +148,7 @@ export function answerAsk(mutate: Mutate, group: Group, ask: GroupAsk, option: A
     return mutate((send) => send(`${internetRulePath(group)}/resume`, { method: "POST", body: { askId: ask.id } }), {
       groupId: group.id,
       optimistic: answered("yes"),
-      feedback: { notice: ask.from ? `${group.name} unblocked.` : `${group.name} unpaused.` },
+      feedback: { notice: option.label === "Unblock" ? `${group.name} unblocked.` : `${group.name} unpaused.` },
     });
   }
   const until =
