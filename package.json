@@ -80,7 +80,8 @@
       "mysql2": "3.24.4",
       "@vitest/mocker": "^4.1.11",
       "source-map-js": "^1.2.2",
-      "fast-uri": "^3.1.8"
+      "fast-uri": "^3.1.8",
+      "effect": "^3.22.1"
     },
     "onlyBuiltDependencies": [
       "@prisma/client",
