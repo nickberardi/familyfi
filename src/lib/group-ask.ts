@@ -89,7 +89,8 @@ export function askSheetBody(ask: GroupAsk, rules: Rule[], timezone: string, now
 /**
  * The answer sheet's quick choices. To unpause: Unpause, which ends the pause. On a shared Thing
  * (`group`, the Thing) it is Unblock, "ends the block now", as its card says, when ending the pause
- * leaves it unblocked; while a rule blocks it too, Unpause, saying what still blocks it. To time off a rule:
+ * leaves it unblocked; while an internet rule or its Block button rule blocks it too, so its card
+ * still reads Blocked, Unpause, saying what still blocks it. To time off a rule:
  * what the child asked for, and the rest of the window when that is longer, each never past the
  * window's end, as the server caps it; nothing while the rule's window is not on, since then there is
  * nothing to lift. Not now comes last (`askSheetChoices`).
@@ -97,9 +98,12 @@ export function askSheetBody(ask: GroupAsk, rules: Rule[], timezone: string, now
 export function askSheetOptions(ask: GroupAsk, rules: Rule[], timezone: string, now: Date, group?: Pick<Group, "id" | "blockButtonRuleId">): AskSheetOption[] {
   if (ask.about === "pause") {
     // A shared Thing's ask names the child who asked, and the Thing reads Blocked, as the child says.
-    const still = ask.from && group ? rulesToUnblock(group, rules, timezone, now)[0] : undefined;
+    // What keeps its card Blocked once the pause ends: an internet rule's window, or its Block button
+    // rule, named as one rule (its window, or the Block button rule's own name).
+    const still = ask.from && group ? rulesToUnblock(group, rules, timezone, now).find((rule) => rule.kind === "internet" || rule.ruleId === group.blockButtonRuleId) : undefined;
     if (ask.from && group && !still) return [{ label: "Unblock", note: "ends the block now", request: { kind: "asked" } }];
-    return [{ label: "Unpause", note: still ? `ends the pause; ${still.name} still blocks it` : "ends the pause now", request: { kind: "asked" } }];
+    const name = still && (still.kind === "internet" ? still.name : (rules.find((rule) => rule.id === still.ruleId)?.name ?? still.name));
+    return [{ label: "Unpause", note: still ? `ends the pause; ${name} still blocks it` : "ends the pause now", request: { kind: "asked" } }];
   }
   const rule = ruleOf(ask, rules);
   const end = rule ? activeWindowsEnd(ruleInternetWindows(rule), now, timezone) : undefined;

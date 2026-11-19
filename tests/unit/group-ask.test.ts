@@ -124,6 +124,15 @@ describe("a child's ask, as a parent answers it", () => {
     expect(sent[0]!.options.feedback?.notice).toBe("TV unpaused.");
   });
 
+  it("says Unblock on a shared Thing that only a scheduled category rule blocks, since its card reads Online", () => {
+    const thingAsk: GroupAsk = { ...pauseAsk, from: { groupId: "g1", name: "Cassie" } };
+    const tv = { ...emma(thingAsk), id: "g2", kind: "things", name: "TV", familyRole: null, blockButtonRuleId: null } as unknown as Group;
+    const gaming = { ...bedtime, id: "r2", name: "Games", kind: "category", targetIds: [], groupIds: ["g2"] } as unknown as Rule;
+    expect(askSheetChoices(thingAsk, [gaming], TZ, NOW, 30, tv)[0]).toMatchObject({ label: "Unblock" });
+    const games = askSheetChoices(thingAsk, [gaming], TZ, NOW, 30, { ...tv, blockButtonRuleId: "r2" } as Group)[0];
+    expect(games).toMatchObject({ label: "Unpause", note: "ends the pause; Games still blocks it" });
+  });
+
   it("says Not now with the ask's decline", async () => {
     const { sent, mutate, shown } = recorder({ groups: [emma(pauseAsk)], devices: [] });
     const notNow = askSheetChoices(pauseAsk, [], TZ, NOW, 30).at(-1)!;
