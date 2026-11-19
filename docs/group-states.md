@@ -29,7 +29,7 @@ examples, the TV group has **Video** and **Social** blocked all day, and **Gamin
 | 8 | have Block still mean all internet when the default isn't blocking | the button never does nothing | With Video scheduled 7 to 9 PM as the default, at 3 PM the button reads **Block** and pauses all internet, as with no default. The line says when Video blocks next ("Video at 7:00 PM"). |
 | 9 | keep blocking all internet one tap away when a default is set | the default doesn't take that away | The dropdown shows **Block internet**. |
 | 10 | have a button I can always read the same way | I never have to wonder what it does | The button only ever reads **Block**, **Unblock** or **Resume**. It never names a rule. Only the sheets and the status line name one. |
-| 11 | have Siri and the Control Center / Quick Settings switch mean the internet | "Block TV" means the internet | Siri's Block and turning the switch on pause all internet. Siri's Unblock and turning the switch off send the group unblock with no time (`POST /groups/{id}/unblock`), so they lift the default too. Unlike the card's B1, this is an unblock, so the card then reads Resume. When nothing can be lifted, Siri offers to lift one all-day rule for a while. The switch is on exactly when the internet is off (the badge without a default), whatever the default does. |
+| 11 | have Siri and the Control Center / Quick Settings switch mean the internet | "Block TV" means the internet | Siri's Block and turning the switch on pause all internet. Siri's Unblock and turning the switch off send the group unblock with no time (`POST /groups/{id}/unblock`), so they lift the default too. Unlike the card's B1, this is an unblock, so the card then reads Resume when it lifted a rule (Block when it only ended a pause). When nothing can be lifted, Siri offers to lift one all-day rule for a while. The switch is on exactly when the internet is off (the badge without a default), whatever the default does. |
 
 ## 2. Design
 
@@ -193,7 +193,7 @@ button, which still read Block, Unblock or Resume. Tapping it opens the answer s
 
 | Asked about | Choices, in order |
 | --- | --- |
-| A pause, or a Thing's Block button default | **Unblock**: the group's own `unblock` with `askId` and no `until`, as Siri's (story 11): it ends the pause and lifts every rule blocking the group now, the Block button default among them, until the last ends, or until a parent resumes; the card then reads Resume. Its note says what and until when: "ends the block now", "ends the block and lifts Bedtime until 7:00 AM", "lifts Video, no end time". **Not now** |
+| A pause, or a Thing's Block button default | **Unblock**: the group's own `unblock` with `askId` and no `until`, as Siri's (story 11): it ends the pause and lifts every rule blocking the group now, the Block button default among them, until the last ends, or until a parent resumes; the card then reads Resume when it lifted a rule, and Block when it only ended a pause. Its note says what and until when: "ends the block now", "ends the block and lifts Bedtime until 7:00 AM", "lifts Video, no end time". **Not now** |
 | A rule's window that is on | **Allow 30 minutes** (the rule's `allow` for the group with `askId`, as the child asked), **Until Bedtime ends** when that is longer, **For…** and **Until…**, **Not now** |
 | A rule's window no longer on | **Not now** |
 
