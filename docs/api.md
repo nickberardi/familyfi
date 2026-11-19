@@ -313,8 +313,8 @@ turning the switch off hides it again at once.
 
 #### Asking for more time
 
-FamilyFi Me asks on its own group with `POST /groups/{id}/asks`: `{ "about": "pause" }` to unblock
-(while the group is paused, or a Thing's Block button default blocks it), or `{ "about": "rule", "ruleId", "minutes" }` (5 to 240) for time in the window of one of
+FamilyFi Me asks on its own group with `POST /groups/{id}/asks`: `{ "about": "pause" }` to be
+unblocked (while the group is paused, or a Thing's Block button default blocks it), or `{ "about": "rule", "ruleId", "minutes" }` (5 to 240) for time in the window of one of
 the group's rules that is blocking it now. Only a child's phone asks (403 `child_only`), and only on
 its own group or a shared Thing (404). On a Thing the ask's `from` names the child who asked, the
 `ask.new` alert carries the Thing's name as `t` and opens the Thing, and refusals name the Thing. The ask shows as the group's `ask` (`GroupAsk`) on `GET /groups/{id}` and
@@ -325,7 +325,7 @@ and about an always-on rule 409 `always_on`; after a no that child waits the hou
 hour from one child about one group is 429 `too_many_asks`.
 
 No route says yes: a parent answers with the verb that lifts what the ask is about, adding its
-`askId`. An ask to unblock (`pause`) is answered with the group's own `POST /groups/{id}/unblock`, which lifts what the group's Unblock does: its pause, and the rules blocking it now, its Block button default among them (`POST /groups/{id}/rules/internet/resume` with `askId` still answers it by ending the pause alone); `POST
+`askId`. An ask to unblock (`pause`) is answered by what the group card's Unblock button sends, as if the parent tapped it: `POST /groups/{id}/unblock`, or, while the Block button default alone blocks, that rule's `POST /groups/{id}/rules/{ruleId}/pause`, each for the time the parent picks on the card's own sheet. Those carry no `askId`: the ask is answered yes once nothing it is about blocks the group (`POST /groups/{id}/rules/internet/resume` with `askId` answers it by id while only a pause is behind it); `POST
 /groups/{id}/rules/{ruleId}/allow` lifts the rule for the group for the minutes asked, from now, or
 until the parent's own `until`, and never past the end of the window that is on (409 `not_in_window` once it is not). Only an administrator answers by `askId`, as only one declines (403 `administrator_required` for a Watch, the app's controls or an agent). The ask is taken
 before the write, so a second parent answering it gets 409 `ask_closed`, and is put back if the

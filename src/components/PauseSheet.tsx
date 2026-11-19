@@ -19,24 +19,29 @@ import {
 } from "@/lib/pause-sheet";
 import { ruleInternetWindows, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppData } from "./AppDataProvider";
 import { CANCEL_BUTTON, PRIMARY_BUTTON } from "@/components/ui/buttons";
 import { Modal } from "@/components/ui/Modal";
 
-/** A group card's sheet: its block, its unblock, a rule area's pause for it alone (`groupSheet`), or the answer to a child's ask. */
+/**
+ * A group card's sheet: its block, its unblock, a rule area's pause for it alone (`groupSheet`), or
+ * the answer to a child's ask, whose Unblock opens the card's own sheet in its place (`onOpen`).
+ */
 export function PauseSheet({
   group,
   target,
   timezone,
+  onOpen,
   onClose,
 }: {
   group: Group;
   target: GroupSheetTarget;
   timezone: string;
+  onOpen: (target: GroupSheetTarget) => void;
   onClose: () => void;
 }) {
-  if (target.kind === "ask") return <AskSheet group={group} timezone={timezone} onClose={onClose} />;
+  if (target.kind === "ask") return <AskSheet group={group} timezone={timezone} onOpen={onOpen} onClose={onClose} />;
   return <GroupPauseSheet group={group} target={target} timezone={timezone} onClose={onClose} />;
 }
 
@@ -79,11 +84,13 @@ function GroupPauseSheet({
  * The answer to a child's waiting ask: yes as asked, yes for a time of the parent's own, or Not now
  * (`askSheetChoices`). An ask answered or closed while the sheet is open closes it.
  */
-function AskSheet({ group, timezone, onClose }: { group: Group; timezone: string; onClose: () => void }) {
+function AskSheet({ group, timezone, onOpen, onClose }: { group: Group; timezone: string; onOpen: (target: GroupSheetTarget) => void; onClose: () => void }) {
   const { store, rules, household } = useAppData();
   const now = new Date();
   const ask = waitingAsk(group, now);
   const closed = ask === null;
+  // Unblock opens the card's own sheet once this one has closed.
+  const next = useRef<GroupSheetTarget | null>(null);
   useEffect(() => {
     if (closed) onClose();
   }, [closed, onClose]);
@@ -98,9 +105,13 @@ function AskSheet({ group, timezone, onClose }: { group: Group; timezone: string
       recent={null}
       // Resolved when it is tapped, so a sheet left open never sends an end already passed.
       custom={(choice) => askSheetCustom(choice, ask, rules, timezone, new Date())}
-      onPick={(option) => answerAsk(store.mutate, group, ask, option, ruleName).then(() => undefined)}
+      onPick={(option) =>
+        answerAsk(store.mutate, group, ask, option, ruleName, new Date(), (target) => {
+          next.current = target;
+        }).then(() => undefined)
+      }
       onCustom={() => undefined}
-      onClose={onClose}
+      onClose={() => (next.current ? onOpen(next.current) : onClose())}
     />
   );
 }

@@ -126,12 +126,22 @@ export function applyRulePause(mutate: Mutate, rule: Pick<Rule, "id" | "name">, 
 }
 
 /**
- * A parent's answer to a child's ask (`askSheetChoices`). Yes to unblock is the group's `unblock`,
- * as its card's Unblock; yes to time off a rule is the rule's `allow` for the group, as the child asked or until
- * a time of the parent's own (`now` is the tap). Each carries the ask's `askId`, so the ask closes as
- * yes, by this parent; Not now is the ask's `decline`. The ask leaves the card at once.
+ * A parent's answer to a child's ask (`askSheetChoices`). Yes to unblock is the group card's own
+ * Unblock button, run as if the parent tapped it (`runGroupCardAction`): it ends the pause at once or
+ * opens its sheet (`openSheet`), and whatever that sheet lifts answers the ask yes on the server.
+ * Yes to time off a rule is the rule's `allow` for the group, as the child asked or until a time of
+ * the parent's own (`now` is the tap), with the ask's `askId`, so the ask closes as yes, by this
+ * parent; Not now is the ask's `decline`.
  */
-export function answerAsk(mutate: Mutate, group: Group, ask: GroupAsk, option: AskSheetOption, ruleName: string | undefined, now: Date = new Date()) {
+export function answerAsk(
+  mutate: Mutate,
+  group: Group,
+  ask: GroupAsk,
+  option: AskSheetOption,
+  ruleName: string | undefined,
+  now: Date = new Date(),
+  openSheet: (target: GroupSheetTarget) => void = () => undefined,
+) {
   const answered = (state: GroupAsk["state"]) => (lists: { groups: Group[]; devices: Device[] }) => ({
     ...lists,
     groups: lists.groups.map((item) => (item.id === group.id && item.ask?.id === ask.id ? { ...item, ask: { ...ask, state, answeredAt: now.toISOString() } } : item)),
@@ -144,12 +154,15 @@ export function answerAsk(mutate: Mutate, group: Group, ask: GroupAsk, option: A
       feedback: { notice: `You said not now to ${ask.from?.name ?? group.name}.` },
     });
   }
-  // A yes to unblock is the group's own Unblock, lifting what its card's Unblock would.
+  if (request.kind === "unblock") {
+    const rule = request.ruleId ? { ruleId: request.ruleId, name: request.name ?? "" } : {};
+    return Promise.resolve(runGroupCardAction(mutate, group, { kind: "header", run: request.run, ...rule }, openSheet));
+  }
   if (ask.about === "pause") {
-    return mutate((send) => send(`/api/v1/groups/${group.id}/unblock`, { method: "POST", body: { askId: ask.id } }), {
+    return mutate((send) => send(`${internetRulePath(group)}/resume`, { method: "POST", body: { askId: ask.id } }), {
       groupId: group.id,
       optimistic: answered("yes"),
-      feedback: { notice: `${group.name} unblocked${request.kind === "asked" && request.ends ? ` ${request.ends}` : ""}.` },
+      feedback: { notice: `${group.name} unpaused.` },
     });
   }
   const until =
