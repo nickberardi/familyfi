@@ -142,11 +142,23 @@ describe("ci.yml's documentation-only skip", () => {
       "openapi/agent-guide.md", // src/app/agents.md/route.ts
       ...readdirSync(path.join(repoRoot, ".claude/agents")).map((f) => `.claude/agents/${f}`), // reviewer-agents.test.ts
       "tests/fixtures/unifi/README.md", // repository-hygiene.test.ts
+      "docs/.env", // repository-hygiene.test.ts
       "src/docs/x.md",
       "package.json",
       ".github/workflows/ci.yml",
     ];
     for (const file of readers) expect(file).not.toMatch(docs);
+  });
+
+  // A job skipped by its `if` reports success to a required check. A bare `needs` would also skip
+  // verify and browser when `changes` failed, so each names contract's result.
+  it("runs verify and browser whenever contract passed", () => {
+    const ci = read(".github/workflows/ci.yml");
+    for (const job of ["verify", "browser"]) {
+      const body = ci.match(new RegExp(`^  ${job}:\\n((?:    .*\\n|\\s*\\n)+?)    steps:`, "m"))?.[1];
+      expect(body).toContain("needs: contract");
+      expect(body).toContain("if: ${{ !cancelled() && needs.contract.result == 'success' }}");
+    }
   });
 });
 
