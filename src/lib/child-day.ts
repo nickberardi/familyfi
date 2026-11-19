@@ -150,10 +150,20 @@ export type DayStory = {
   voice: DayVoice;
 };
 
-/** The askable lengths offered during a window; the child can also pick a length of their own. */
-export const ASK_LENGTHS: { value: `${AskLength}`; label: string }[] = [
-  { value: "30", label: "30 minutes" },
-  { value: "60", label: "1 hour" },
+/**
+ * A length as one segment of the ask's switch shows it: "15m", "1h", "1h 45m", "4h".
+ * Short so three segments fit one line on the smallest phone; screen readers and lists say `minutesText`.
+ */
+export function askLengthShort(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return [hours ? `${hours}h` : "", rest ? `${rest}m` : ""].filter(Boolean).join(" ");
+}
+
+/** The askable lengths offered during a window, in full words and as a segment shows them; the child can also pick a length of their own. */
+export const ASK_LENGTHS: { value: `${AskLength}`; label: string; short: string }[] = [
+  { value: "30", label: "30 minutes", short: askLengthShort(30) },
+  { value: "60", label: "1 hour", short: askLengthShort(60) },
 ];
 
 /** The fewest and most minutes a child can ask for; FamilyFi refuses any other length. */
@@ -162,8 +172,16 @@ export const ASK_MINUTES = { min: 5, max: 240 } as const;
 /** A length of the child's own is picked in steps this long. */
 export const ASK_LENGTH_STEP = 15;
 
-/** The choice beside the presets that opens a length of the child's own; it opens a list, so it ends in an ellipsis. */
-export const ASK_OWN_LENGTH = "Another length…";
+/** The third segment, beside the presets, that opens a length of the child's own; it opens a list, so it ends in an ellipsis. */
+export const ASK_OTHER_LENGTH = "Other…";
+
+/** The title of that list. */
+export const ASK_LENGTH_TITLE = "How long";
+
+/** What a screen reader says of the third segment once the child picked a length there: "Change length, 1 hour 30 minutes chosen". */
+export function askLengthChosenLabel(minutes: number): string {
+  return `Change length, ${minutesText(minutes)} chosen`;
+}
 
 /** Whether FamilyFi takes this many minutes as an ask. */
 export function askLengthAllowed(minutes: number): boolean {
