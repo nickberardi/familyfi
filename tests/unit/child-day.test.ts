@@ -8,7 +8,11 @@ import {
   ASK_LENGTH_REFUSAL,
   ASK_LENGTH_STEP,
   ASK_MINUTES,
-  ASK_OWN_LENGTH,
+  ASK_LENGTHS,
+  ASK_LENGTH_TITLE,
+  ASK_OTHER_LENGTH,
+  askLengthChosenLabel,
+  askLengthShort,
   INTERNET_VOICE,
   askLengthAllowed,
   askLengthChoices,
@@ -764,7 +768,17 @@ describe("a length of the child's own", () => {
     expect(askLengthAllowed(241)).toBe(false);
     expect(askLengthAllowed(30.5)).toBe(false);
     expect(ASK_LENGTH_REFUSAL).toBe("You can ask for 5 minutes to 4 hours.");
-    expect(ASK_OWN_LENGTH).toBe("Another length…");
+  });
+
+  it("words the switch short enough for three parts on one line, and says the rest in full", () => {
+    expect(ASK_LENGTHS.map((length) => length.short)).toEqual(["30m", "1h"]);
+    expect(askLengthChoices().map((choice) => askLengthShort(choice.value))).toContain("1h 45m");
+    expect(askLengthShort(15)).toBe("15m");
+    expect(askLengthShort(240)).toBe("4h");
+    expect(Math.max(...askLengthChoices().map((choice) => askLengthShort(choice.value).length))).toBeLessThanOrEqual(6);
+    expect(ASK_OTHER_LENGTH).toBe("Other…");
+    expect(ASK_LENGTH_TITLE).toBe("How long");
+    expect(askLengthChosenLabel(105)).toBe("Change length, 1 hour 45 minutes chosen");
   });
 
   it("keeps the limits the HTTP contract states", () => {
