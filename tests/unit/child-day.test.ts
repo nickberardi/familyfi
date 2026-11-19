@@ -66,6 +66,15 @@ describe("a child's day", () => {
     expect(topAnswer(story).title).toBe("Not blocked until 9 PM");
   });
 
+  it("lets a window or an always-on rule tell the day after a yes ended a pause", () => {
+    const yes = { state: "yes" as const, at: 20 * 60, answeredAt: 20 * 60 + 5, by: "Mom" };
+    expect(tellDay({ windows: [BEDTIME], ask: yes }, 21 * 60 + 30, PHONE_VOICE).day.kind).toBe("window");
+    expect(tellDay({ windows: [], always: [{ label: "Grounded" }], ask: yes }, 21 * 60, PHONE_VOICE).day.kind).toBe("always");
+    const lifted = tellDay({ windows: [], always: [{ label: "Grounded", allowed: { by: "Dad", until: 22 * 60 } }], ask: yes }, 21 * 60, PHONE_VOICE);
+    expect(lifted.day.kind).not.toBe("unpaused");
+    expect(tellDay({ windows: [], ask: yes }, 21 * 60, PHONE_VOICE).day.kind).toBe("unpaused");
+  });
+
   it("names the parent who answered, not the one who paused", () => {
     const story = tellDay({ ...paused, ask: { state: "yes", at: NOW - 5, answeredAt: NOW - 2, by: "Mom" } }, NOW, PHONE_VOICE);
     expect(topAnswer(story).sentence).toMatch(/^Mom unpaused your apps\./);
@@ -678,6 +687,18 @@ describe("a child's day on the household's clock", () => {
     expect(again.subject.ask).toBeUndefined();
     expect(tellDay(again.subject, again.now, PHONE_VOICE, again.clock).day.kind).toBe("paused");
     expect(meDaySubject(me({ ask: pauseYes }), new Date("2026-11-17T03:20:00Z")).subject.ask).toMatchObject({ state: "yes", by: "Mom" });
+    // FamilyFi reports no pause once a parent ends it: the yes alone tells who unpaused.
+    const unpaused = meDaySubject(me({ ask: pauseYes }), new Date("2026-11-17T03:20:00Z"));
+    const told = tellDay(unpaused.subject, unpaused.now, PHONE_VOICE, unpaused.clock);
+    expect(told.day.kind).toBe("unpaused");
+    expect(told.items[0]?.status?.text).toBe("Mom unpaused your apps at 10:05 PM.");
+    expect(topAnswer(told).sentence).toMatch(/^Mom unpaused your apps\./);
+    // It is told for the rest of that day only: the next morning, and the next evening, are ordinary days.
+    for (const later of ["2026-11-17T13:00:00Z", "2026-11-18T02:00:00Z"]) {
+      const next = meDaySubject(me({ ask: pauseYes }), new Date(later));
+      expect(next.subject.ask).toBeUndefined();
+      expect(tellDay(next.subject, next.now, PHONE_VOICE, next.clock).day.kind).toBe("open");
+    }
   });
 
   it("names no one for a parent FamilyFi has no name for, and drops a timed-out ask once its block is over", () => {
