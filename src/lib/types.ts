@@ -98,11 +98,11 @@ export type Change = {
 export type Session = {
   username: string;
   displayName: string;
-  /** `group`: FamilyFi Me on a child's phone, signed in for its family group. A newer server may add one. */
-  kind: "recovery" | "personal" | "group" | (string & {});
+  /** `person`: FamilyFi Me on a child's phone, signed in for a person (a family group), never an account. A newer server may add one. */
+  kind: "recovery" | "personal" | "person" | (string & {});
   expiresAt: string;
-  /** `group` only: the family group a child's phone signs in for, which it reads its day from. */
-  groupId?: string;
+  /** `person` only: the person a child's phone signs in for, the id of their family group, which it reads its day from. */
+  personId?: string;
 };
 
 export type UnifiNetwork = { id: string; name: string; vlanId: number; zoneId: string | null };
@@ -285,8 +285,8 @@ export type PairedPhone = {
   scope: PairedScope;
   /** The account this device acts as. */
   actsAs: { username: string; displayName: string } | null;
-  /** A child's phone (`me`) only: the family group it signs in for; null once that group is deleted. */
-  group?: { id: string; name: string } | null;
+  /** A child's phone (`me`) only: the person it signs in for (`id` is their family group's); null once that group is deleted. */
+  person?: { id: string; name: string } | null;
   /** A child's iPhone or iPad (`me`) only, once it has said: its Screen Time permission (src/lib/me-protection.ts), and when it changed. */
   protection?: string;
   protectionAt?: string | null;

@@ -41,7 +41,7 @@ async function childGroup(name = "Emma") {
 
 /** A child's phone paired the way FamilyFi Me does it: an administrator invites it for a group, and it claims the code. */
 async function pairMe(admin: SessionAuth, groupId: string): Promise<Claim & { session: { kind: string; displayName: string } }> {
-  const created = await inviteMe(admin, { endpointId: (await homeRoute()).id, groupId });
+  const created = await inviteMe(admin, { endpointId: (await homeRoute()).id, personId: groupId });
   expect(created.status).toBe(201);
   const issued = await issuedInvite(created);
   expect(issued.payload.clientType).toBe("me");
@@ -81,30 +81,32 @@ describe("FamilyFi Me on a child's phone", () => {
     const group = await childGroup();
     const claim = await pairMe(admin, group.id);
     expect(claim.device).toMatchObject({ clientType: "me", scope: "me:askOnly", displayName: "Emma's iPhone" });
-    expect(claim.session).toMatchObject({ kind: "group", displayName: "Emma", username: `device:${claim.device.id}`, groupId: group.id });
+    expect(claim.session).toMatchObject({ kind: "person", displayName: "Emma", username: `device:${claim.device.id}`, personId: group.id });
     expect(claim.connection?.manifest.signature).toBeTruthy();
     const device = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: claim.device.id } });
     expect(device).toMatchObject({ accountId: null, groupId: group.id, parentDeviceId: null });
     const session = await currentSession(request("/api/v1/auth/session", { auth: bearer(claim.token) }));
     expect(session.status).toBe(200);
-    expect(((await session.json()) as { session: { kind: string; groupId?: string } }).session).toMatchObject({ kind: "group", groupId: group.id });
+    expect(((await session.json()) as { session: { kind: string; personId?: string } }).session).toMatchObject({ kind: "person", personId: group.id });
     await prisma().household.update({ where: { id: "default" }, data: { connectionError: "Gateway refused the key" } });
     const overview = await connection(request("/api/v1/connection", { auth: bearer(claim.token) }));
     expect(overview.status).toBe(200);
     // The manifest, never the household's last change or the gateway's error text.
     expect(await overview.json()).toMatchObject({ lastChange: null, unifi: { error: null } });
     const listed = await pairedDevice(request(`/api/v1/paired/devices/${claim.device.id}`, { auth: admin }), params(claim.device.id));
-    expect(((await listed.json()) as { device: { group: unknown; actsAs: unknown } }).device).toMatchObject({ group: { id: group.id, name: "Emma" }, actsAs: null });
+    expect(((await listed.json()) as { device: { person: unknown; actsAs: unknown } }).device).toMatchObject({ person: { id: group.id, name: "Emma" }, actsAs: null });
   });
 
   it("refuses a group of things, or one that does not exist", async () => {
     const things = await prisma().group.create({ data: { kind: GroupKind.things, name: "TVs" } });
     const endpointId = (await homeRoute()).id;
-    const refused = await inviteMe(admin, { endpointId, groupId: things.id });
+    const refused = await inviteMe(admin, { endpointId, personId: things.id });
     expect(refused.status).toBe(400);
     expect(await errorCode(refused)).toBe("family_group_required");
-    expect((await inviteMe(admin, { endpointId, groupId: "missing" })).status).toBe(404);
+    expect((await inviteMe(admin, { endpointId, personId: "missing" })).status).toBe(404);
     expect((await inviteMe(admin, { endpointId })).status).toBe(400);
+    // The 2.0.0 name is refused, not ignored: a 2.0.x app is told to update instead.
+    expect((await inviteMe(admin, { endpointId, groupId: (await childGroup()).id })).status).toBe(400);
   });
 
   it("renews with its refresh token", async () => {
@@ -112,8 +114,8 @@ describe("FamilyFi Me on a child's phone", () => {
     const claim = await pairMe(admin, emma.id);
     const renewed = await refresh(request("/api/v1/auth/refresh", { method: "POST", headers: json, body: JSON.stringify({ refreshToken: claim.refreshToken }) }));
     expect(renewed.status).toBe(200);
-    const body = (await renewed.json()) as { token: string; session: { kind: string; displayName: string; groupId?: string } };
-    expect(body.session).toMatchObject({ kind: "group", displayName: "Emma", groupId: emma.id });
+    const body = (await renewed.json()) as { token: string; session: { kind: string; displayName: string; personId?: string } };
+    expect(body.session).toMatchObject({ kind: "person", displayName: "Emma", personId: emma.id });
     expect((await meDay(bearer(body.token), emma.id)).status).toBe(200);
   });
 
@@ -303,8 +305,8 @@ describe("FamilyFi Me on a child's phone", () => {
   it("is never claimed once the phone that invited it is revoked, or its administrator is demoted", async () => {
     const group = await childGroup();
     const phone = await pairPhone(admin);
-    const fromPhone = await issuedInvite(await inviteMe(bearer(phone.token), { endpointId: (await homeRoute()).id, groupId: group.id }));
-    const fromBrowser = await issuedInvite(await inviteMe(admin, { endpointId: (await homeRoute()).id, groupId: group.id }));
+    const fromPhone = await issuedInvite(await inviteMe(bearer(phone.token), { endpointId: (await homeRoute()).id, personId: group.id }));
+    const fromBrowser = await issuedInvite(await inviteMe(admin, { endpointId: (await homeRoute()).id, personId: group.id }));
     await revokeDevice(phone.device.id);
     expect((await claimInvite(fromPhone, "iPhone")).status).toBe(403);
     await removeAccountDevices((await pairingAdmin()).id);
@@ -313,7 +315,7 @@ describe("FamilyFi Me on a child's phone", () => {
 
   it("is never claimed once the administrator who invited it is deleted", async () => {
     const group = await childGroup();
-    const issued = await issuedInvite(await inviteMe(admin, { endpointId: (await homeRoute()).id, groupId: group.id }));
+    const issued = await issuedInvite(await inviteMe(admin, { endpointId: (await homeRoute()).id, personId: group.id }));
     await deleteAccount((await pairingAdmin()).id);
     expect((await claimInvite(issued, "iPhone")).status).toBe(403);
   });
@@ -321,7 +323,7 @@ describe("FamilyFi Me on a child's phone", () => {
   it("stays paired when the phone that invited it is revoked: it belongs to its group", async () => {
     const group = await childGroup();
     const phone = await pairPhone(admin);
-    const issued = await issuedInvite(await inviteMe(bearer(phone.token), { endpointId: (await homeRoute()).id, groupId: group.id }));
+    const issued = await issuedInvite(await inviteMe(bearer(phone.token), { endpointId: (await homeRoute()).id, personId: group.id }));
     const claimed = (await (await claimInvite(issued, "iPhone")).json()) as Claim;
     await revokeDevice(phone.device.id);
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(claimed.token) }))).status).toBe(200);
@@ -329,7 +331,7 @@ describe("FamilyFi Me on a child's phone", () => {
 
   it("is never claimed once its group is gone", async () => {
     const group = await childGroup();
-    const issued = await issuedInvite(await inviteMe(admin, { endpointId: (await homeRoute()).id, groupId: group.id }));
+    const issued = await issuedInvite(await inviteMe(admin, { endpointId: (await homeRoute()).id, personId: group.id }));
     await deleteGroup(group.id);
     expect((await claimInvite(issued, "iPhone")).status).toBe(403);
   });
@@ -338,7 +340,7 @@ describe("FamilyFi Me on a child's phone", () => {
     const kept = await childGroup();
     const archive = (await exportHousehold()).archive;
     const keptPhone = await pairMe(admin, kept.id);
-    const waiting = await issuedInvite(await inviteMe(admin, { endpointId: (await homeRoute()).id, groupId: kept.id }));
+    const waiting = await issuedInvite(await inviteMe(admin, { endpointId: (await homeRoute()).id, personId: kept.id }));
     const gone = await childGroup("Sam");
     const gonePhone = await pairMe(admin, gone.id);
     await importHousehold("apply", archive, { accountId: (await pairingAdmin()).id });

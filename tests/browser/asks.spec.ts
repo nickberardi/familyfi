@@ -173,7 +173,7 @@ test("pairs FamilyFi Me for a family member from their page", { tag: "@desktop" 
     // The invite is for Cassie's group, never an account.
     const invited = page.waitForRequest((request) => request.method() === "POST" && request.url().endsWith("/api/v1/paired/invites"));
     await sheet.getByRole("button", { name: "Show pairing code" }).click();
-    expect((await invited).postDataJSON()).toEqual({ clientType: "me", endpointId: route, displayName: "Cassie's phone", groupId: group.id });
+    expect((await invited).postDataJSON()).toEqual({ clientType: "me", endpointId: route, displayName: "Cassie's phone", personId: group.id });
     const code = page.getByRole("dialog", { name: "Scan with FamilyFi Me" });
     await expect(code.getByTestId("pairing-code")).not.toBeEmpty();
     await shot(page, "pair-me-code");
@@ -239,7 +239,7 @@ test("a family member's FamilyFi Me phone is listed on their page and can be rev
     clientType: "me",
     scope: "me:askOnly",
     actsAs: null,
-    group: { id: group.id, name: group.name },
+    person: { id: group.id, name: group.name },
     parentDeviceId: null,
     enrolledAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
     lastSeenAt: new Date(Date.now() - 10 * 60_000).toISOString(),

@@ -1,20 +1,20 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 2.0.1
+  version: 2.1.0
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
-  x-min-app: 2.0.0
+  x-min-app: 2.1.0
   # The oldest server API version an app built from this document can read: raised to `version`
   # when a response gains a required field. Apps compile it in; it never leaves the app.
-  x-min-server: 2.0.0
+  x-min-server: 2.1.0
   # The oldest watch app API version this server still serves. The watches read only a few routes,
   # so this is set by hand until CI can tell which changes reach them. GET /api/v1/health reports it
   # as `minWatchApiVersion`.
   x-min-app-watch: 0.30.0
   # The oldest FamilyFi Me API version this server still serves. Set by hand, like x-min-app-watch.
   # GET /api/v1/health?clientType=me reports it as `minApiVersion`.
-  x-min-me: 2.0.0
+  x-min-me: 2.1.0
   # scripts/ci/check-openapi-floors.mjs enforces all three (docs/api.md, "Versioning the contract"):
   # none falls or passes `version`, and CI raises x-min-app and x-min-server where a change needs it.
   description: |
@@ -3535,18 +3535,18 @@ components:
         displayName: { type: string }
         kind:
           type: string
-          x-extensible-enum: [recovery, personal, group]
+          x-extensible-enum: [recovery, personal, person]
           description: |
-            `recovery` or `personal`: the account the session signs in as. `group`: FamilyFi Me on a
-            child's phone, which signs in for its family group and never as an account; its
-            `displayName` is the group's name, its `username` names the device and `groupId` is the
-            group's id. New kinds may be added.
+            `recovery` or `personal`: the account the session signs in as (`personal` is an
+            administrator's own account). `person`: FamilyFi Me on a child's phone, which signs in for
+            a person in the household, never as an account; its `displayName` is the person's name,
+            its `username` names the device and `personId` is the person's id. New kinds may be added.
         expiresAt:
           type: string
           format: date-time
-        groupId:
+        personId:
           type: string
-          description: "Sent for, and only for, `group`: the family group a child's phone signs in for, whose day it reads with `GET /groups/{id}`."
+          description: "Sent for, and only for, `person`: the person a child's phone signs in for. A person is a family group, so this is that group's id, and the phone reads its day with `GET /groups/{id}`."
     LoginResponse:
       type: object
       additionalProperties: false
@@ -3799,8 +3799,9 @@ components:
         An administrator's invite for the client type `clientType` names. A phone (`app`) needs the
         route it pairs over (`endpointId`) and may name the administrator it signs in as
         (`accountId`, default: whoever makes it), and `replacesDeviceId` to re-pair a phone. A
-        child's phone (`me`, FamilyFi Me) needs the route it pairs over (`endpointId`) and the family
-        group it signs in for (`groupId`; 400 `family_group_required` for a group of things); it acts
+        child's phone (`me`, FamilyFi Me) needs the route it pairs over (`endpointId`) and the person
+        it signs in for (`personId`, their family group's id; 400 `family_group_required` for a group
+        of things); it acts
         as no account. An agent needs a `scope` of `agent:full` or `agent:readOnly`.
       required: [clientType, displayName]
       properties:
@@ -3810,7 +3811,7 @@ components:
         accountId: { type: string }
         replacesDeviceId: { type: string, description: "Re-pair: when this invite is claimed, the phone with this id is revoked and its record removed, so it is not listed twice. 404 if it no longer exists." }
         scope: { type: string, enum: ["agent:full", "agent:readOnly"], description: An agent's scope. }
-        groupId: { type: string, description: "The family group a child's phone (`me`) signs in for." }
+        personId: { type: string, description: "The person a child's phone (`me`) signs in for: the id of their family group." }
     PairedWatchCreate:
       type: object
       additionalProperties: false
@@ -3987,9 +3988,9 @@ components:
           properties:
             username: { type: string }
             displayName: { type: string }
-        group:
+        person:
           type: [object, "null"]
-          description: "A child's phone (`me`) only: the family group it signs in for instead of an account. Null once the group is deleted, which revokes it."
+          description: "A child's phone (`me`) only: the person it signs in for instead of an account, `id` being their family group's. Null once the group is deleted, which revokes it."
           additionalProperties: false
           required: [id, name]
           properties:

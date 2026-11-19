@@ -34,11 +34,11 @@ const ARGON2 = {
 export type PublicSession = {
   username: string;
   displayName: string;
-  /** `group`: a child's phone (FamilyFi Me), signed in for its family group rather than as an account. */
-  kind: "recovery" | "personal" | "group";
+  /** `person`: a child's phone (FamilyFi Me), signed in for a person (their family group) rather than as an account. */
+  kind: "recovery" | "personal" | "person";
   expiresAt: string;
-  /** A child's phone (`group`) only: the family group it signs in for, which it reads its day from. */
-  groupId?: string;
+  /** A child's phone (`person`) only: the person it signs in for, the id of their family group, which it reads its day from. */
+  personId?: string;
 };
 
 export async function hashPassword(password: string): Promise<string> {
@@ -414,15 +414,15 @@ export type SessionView = {
 };
 
 export function toPublicSession(session: SessionView): PublicSession {
-  // A child's phone has no account: it is named for the group it signs in for.
+  // A child's phone has no account: it is named for the person (family group) it signs in for.
   if (session.device?.clientType === "me" && !session.account) {
-    const groupId = session.device.groupId ?? session.device.group?.id;
+    const personId = session.device.groupId ?? session.device.group?.id;
     return {
       username: session.username,
       displayName: session.device.group?.name ?? "",
-      kind: "group",
+      kind: "person",
       expiresAt: session.expiresAt.toISOString(),
-      ...(groupId ? { groupId } : {}),
+      ...(personId ? { personId } : {}),
     };
   }
   return {

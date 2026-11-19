@@ -118,7 +118,7 @@ export function publishedRoute(tunnel: Pick<RemoteAccess, "endpointId"> | null, 
 }
 
 /** Revoking a phone also revokes the Watches, phones and agents it paired. */
-export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "clientType" | "group">>) {
+export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "clientType" | "person">>) {
   const kind = phone.clientType ? { clientType: phone.clientType } : null;
   // Nothing pairs an app's Siri and shortcuts again: the app sets them up itself when it next opens.
   if (kind && isAppControls(kind)) {
@@ -127,7 +127,7 @@ export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<
   if (phone.clientType === "me") {
     return {
       title: `Revoke ${phone.displayName}?`,
-      message: `FamilyFi Me on it signs out now and can't show ${phone.group ? `${phone.group.name}'s` : "their"} rules or ask for more time until it is paired again.`,
+      message: `FamilyFi Me on it signs out now and can't show ${phone.person ? `${phone.person.name}'s` : "their"} rules or ask for more time until it is paired again.`,
       confirmLabel: PAIR_COPY.revoke,
     };
   }
@@ -197,7 +197,7 @@ export function phoneLines(phone: PairedPhone, now = new Date(), parentName: str
   ];
   if (phone.actsAs) tags.push({ label: phone.actsAs.displayName, name: `Acts as ${phone.actsAs.displayName}`, tone: "neutral" });
   // A child's phone signs in for its family group, never as an account.
-  if (phone.group) tags.push({ label: `For ${phone.group.name}`, name: `For ${phone.group.name}`, tone: "neutral" });
+  if (phone.person) tags.push({ label: `For ${phone.person.name}`, name: `For ${phone.person.name}`, tone: "neutral" });
   if (phone.clientType === "me" && !phone.revokedAt) tags.push(...childPhoneTags(phone, now));
   if (phone.alerts !== undefined && !phone.revokedAt) {
     const alerts = phone.alerts ? ALERTS_CARD_COPY.accessOn : ALERTS_CARD_COPY.accessOff;
@@ -339,8 +339,8 @@ export function childPhoneName(group: Pick<Group, "name"> | undefined): string {
   return group ? `${group.name}'s phone` : "Phone";
 }
 
-/** What an administrator's invite for FamilyFi Me on a child's phone carries: its family group, never an account. */
-export type ChildPhoneInvite = { endpointId: string; displayName: string; groupId: string };
+/** What an administrator's invite for FamilyFi Me on a child's phone carries: the person it is for (their family group's id), never an account. */
+export type ChildPhoneInvite = { endpointId: string; displayName: string; personId: string };
 
 /** Invites FamilyFi Me on a child's phone, for its family group. */
 export async function inviteChildPhone<T>(request: ApiRequest, invite: ChildPhoneInvite): Promise<T> {
@@ -349,7 +349,7 @@ export async function inviteChildPhone<T>(request: ApiRequest, invite: ChildPhon
 
 /** A family member's FamilyFi Me phones that are still paired, most recently seen first. */
 export function childPhonesOf(phones: readonly PairedPhone[], groupId: string): PairedPhone[] {
-  return phones.filter((phone) => phone.clientType === "me" && !phone.revokedAt && phone.group?.id === groupId);
+  return phones.filter((phone) => phone.clientType === "me" && !phone.revokedAt && phone.person?.id === groupId);
 }
 
 /** The FamilyFi Me block on a family member's page. */

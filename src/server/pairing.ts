@@ -294,7 +294,7 @@ function inviteBody(invite: { id: string; expiresAt: Date }, code: string) {
 
 type InviteInput =
   | { clientType: "app"; displayName: string; endpointId: string; accountId?: string; replacesDeviceId?: string }
-  | { clientType: "me"; displayName: string; endpointId: string; groupId: string }
+  | { clientType: "me"; displayName: string; endpointId: string; personId: string }
   | { clientType: "agent"; displayName: string; scope: ClientScope };
 
 /**
@@ -321,8 +321,8 @@ export async function inviteDevice(session: SignedInSession, input: InviteInput,
   const endpoint = await prisma().connectionEndpoint.findFirst({ where: { id: input.endpointId, householdId: currentHouseholdId(), enabled: true } });
   if (!endpoint) throw new ApiError(404, "not_found", "Connection endpoint not found.");
   if (input.clientType === "me") {
-    const group = await prisma().group.findUnique({ where: { id: input.groupId }, select: { id: true, kind: true } });
-    if (!group) throw new ApiError(404, "not_found", "Group not found.");
+    const group = await prisma().group.findUnique({ where: { id: input.personId }, select: { id: true, kind: true } });
+    if (!group) throw new ApiError(404, "not_found", "Person not found.");
     if (group.kind !== GroupKind.family) throw new ApiError(400, "family_group_required", "FamilyFi Me signs in for a person's group, not a group of things.");
     const { invite, code } = await invitePhone({ clientType: "me", endpointId: endpoint.id, displayName: input.displayName, groupId: group.id, createdByAccountId: session.accountId, madeByDeviceId: parentDeviceId });
     return inviteBody(invite, code);
