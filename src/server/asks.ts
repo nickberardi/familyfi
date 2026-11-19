@@ -54,6 +54,17 @@ function unblockAskEnd(group: GroupWithRules, now: Date, timezone: string): Date
   return lasts.some((end) => end === null) ? null : new Date(Math.max(...lasts.map((end) => end!.getTime())));
 }
 
+/**
+ * Whether a Thing's Block button rule blocks it now, besides any pause: then a resume ends the
+ * pause alone, so it never answers the group's ask to unblock by its id (`liftForAsk`).
+ */
+export function blockedBeyondPause(group: GroupWithRules, now: Date, timezone: string): boolean {
+  const { buttonRuleId, candidates, ends } = unblockTargets(group, now, timezone);
+  if (group.kind !== GroupKind.things) return false;
+  const button = candidates.find(({ rule, ...link }) => rule.id === buttonRuleId && !lifted(link, now));
+  return button !== undefined && ends.get(button.rule.id) !== undefined;
+}
+
 /** Refuses anyone but FamilyFi Me on a child's phone, which alone asks for more time. */
 export function requireChild(session: SignedInSession) {
   if (session.device?.clientType !== "me") throw new ApiError(403, "child_only", "Only FamilyFi Me on a child's phone asks for more time.");

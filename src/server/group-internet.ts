@@ -1,6 +1,6 @@
 import { RuleKind, RuleLiftKind, RuleMode, RuleScope } from "@prisma/client";
 import { extendSuspensionUntil } from "@/lib/schedule";
-import { answerAsks, claimAsk, followPause, releaseAsk } from "./asks";
+import { answerAsks, blockedBeyondPause, claimAsk, followPause, releaseAsk } from "./asks";
 import { isFullApp } from "./device-scope";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
@@ -150,6 +150,14 @@ async function liftForAsk(session: AnsweringSession, action: LiftAction, target:
   // A parent answers by the ask's id, as only a parent says no: never a Watch, the app's controls or an agent.
   const administrator = (!session.device || isFullApp(session.device)) && (session.account?.kind === "recovery" || session.account?.isAdmin === true);
   if (!administrator) throw new ApiError(403, "administrator_required", "A FamilyFi administrator answers a child's ask.");
+  if (about === "pause") {
+    // Resume ends the pause alone: while a Thing's Block button rule blocks it too, the yes is its Unblock.
+    const group = await prisma().group.findUnique({ where: { id: target.groupId }, include: groupInclude });
+    const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
+    if (group && blockedBeyondPause(group, new Date(), household.timezone)) {
+      throw new ApiError(409, "still_blocked", "Resume ends only the pause, and another rule blocks this group too. Answer with its Unblock.");
+    }
+  }
   const ask = await claimAsk(session, body.askId!, { groupId: target.groupId, about, ruleId: target.ruleId });
   try {
     const rest: LiftBody = { ...body, askId: undefined };
