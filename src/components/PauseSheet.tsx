@@ -94,7 +94,7 @@ function AskSheet({ group, timezone, onClose }: { group: Group; timezone: string
       title={askSheetTitle(group, ask, rules)}
       body={askSheetBody(ask, rules, timezone, now)}
       confirm="Allow"
-      choices={askSheetChoices(ask, rules, timezone, now, household?.askWaitMinutes)}
+      choices={askSheetChoices(ask, rules, timezone, now, household?.askWaitMinutes, group)}
       recent={null}
       // Resolved when it is tapped, so a sheet left open never sends an end already passed.
       custom={(choice) => askSheetCustom(choice, ask, rules, timezone, new Date())}

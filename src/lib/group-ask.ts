@@ -1,5 +1,6 @@
 import { minutesText } from "./alert-copy";
 import { formatClock } from "./display";
+import { rulesToUnblock } from "./group-actions";
 import { askSheetCustomOption, type CustomPause, type PauseSheetPicker } from "./pause-sheet";
 import { activeWindowsEnd, ruleInternetWindows, type Rule } from "./rules";
 import type { Group, GroupAsk } from "./types";
@@ -86,16 +87,19 @@ export function askSheetBody(ask: GroupAsk, rules: Rule[], timezone: string, now
 }
 
 /**
- * The answer sheet's quick choices. To unpause: Unpause, which ends the pause; on a shared Thing,
- * Unblock, which ends the block. To time off a rule:
+ * The answer sheet's quick choices. To unpause: Unpause, which ends the pause. On a shared Thing
+ * (`group`, the Thing) it is Unblock, "ends the block now", as its card says, when ending the pause
+ * leaves it unblocked; while a rule blocks it too, Unpause, saying what still blocks it. To time off a rule:
  * what the child asked for, and the rest of the window when that is longer, each never past the
  * window's end, as the server caps it; nothing while the rule's window is not on, since then there is
  * nothing to lift. Not now comes last (`askSheetChoices`).
  */
-export function askSheetOptions(ask: GroupAsk, rules: Rule[], timezone: string, now: Date): AskSheetOption[] {
-  // A shared Thing's ask names the child who asked; the Thing is blocked, as its card and the child say.
+export function askSheetOptions(ask: GroupAsk, rules: Rule[], timezone: string, now: Date, group?: Pick<Group, "id" | "blockButtonRuleId">): AskSheetOption[] {
   if (ask.about === "pause") {
-    return [ask.from ? { label: "Unblock", note: "ends the block now", request: { kind: "asked" } } : { label: "Unpause", note: "ends the pause now", request: { kind: "asked" } }];
+    // A shared Thing's ask names the child who asked, and the Thing reads Blocked, as the child says.
+    const still = ask.from && group ? rulesToUnblock(group, rules, timezone, now)[0] : undefined;
+    if (ask.from && group && !still) return [{ label: "Unblock", note: "ends the block now", request: { kind: "asked" } }];
+    return [{ label: "Unpause", note: still ? `ends the pause; ${still.name} still blocks it` : "ends the pause now", request: { kind: "asked" } }];
   }
   const rule = ruleOf(ask, rules);
   const end = rule ? activeWindowsEnd(ruleInternetWindows(rule), now, timezone) : undefined;
@@ -141,8 +145,15 @@ export function askDeclineOption(timezone: string, now: Date, waitMinutes: numbe
  * Every choice on the answer sheet, in order: the quick yeses, For… and Until… for a time of the
  * parent's own (only for time off a rule that is on now), and Not now last.
  */
-export function askSheetChoices(ask: GroupAsk, rules: Rule[], timezone: string, now: Date, waitMinutes?: number): AskSheetChoice[] {
-  const options = askSheetOptions(ask, rules, timezone, now);
+export function askSheetChoices(
+  ask: GroupAsk,
+  rules: Rule[],
+  timezone: string,
+  now: Date,
+  waitMinutes?: number,
+  group?: Pick<Group, "id" | "blockButtonRuleId">,
+): AskSheetChoice[] {
+  const options = askSheetOptions(ask, rules, timezone, now, group);
   const custom: PauseSheetPicker[] =
     ask.about === "rule" && options.length
       ? [
