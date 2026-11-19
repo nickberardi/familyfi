@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 2.0.0
+  version: 2.0.1
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
   x-min-app: 2.0.0
@@ -1084,7 +1084,7 @@ paths:
       description: |
         A child's ask, from FamilyFi Me on its own group or on a Things group shared with children
         (`kidsCanAsk`) (404 for any other; 403 `child_only` for anyone but a child's phone): `pause`
-        to be unpaused, or `rule` for `minutes` in the window of one of the group's rules that is
+        to be unblocked, while the group is paused or, on a Thing, its Block button default blocks it, or `rule` for `minutes` in the window of one of the group's rules that is
         blocking it now. Parents with alerts on are told (`ask.new`), and the ask shows as the group's
         `ask` until answered, with `from` naming the child on a Thing. It waits until a parent
         answers, the household's `askTimeoutMinutes` pass, or the block it asks about ends,
@@ -1899,7 +1899,7 @@ paths:
       tags: [Groups, Rules]
       summary: Resume a rule for one group
       description: |
-        Ends a pause for one group alone. 404 when the group does not have the rule. On `internet`, `askId` answers yes to the group's waiting ask to be unpaused (`GroupAsk`): an administrator alone (403 `administrator_required` for a Watch, the app's controls or an agent), 409 `ask_closed` when it is no longer waiting. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it.
+        Ends a pause for one group alone. 404 when the group does not have the rule. On `internet`, `askId` answers yes to the group's waiting ask to be unblocked (`GroupAsk`, `about: pause`) while only its pause blocks it: an administrator alone (403 `administrator_required` for a Watch, the app's controls or an agent), 409 `ask_closed` when it is no longer waiting, 409 `still_blocked` while a Thing's Block button default blocks it too (the yes is then the card's Unblock). The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -4578,15 +4578,17 @@ components:
       description: |
         The group's latest ask for more time from FamilyFi Me, filed in the last day, on the child's
         own group or on a Things group shared with children; absent when there is none. A parent shows it while `waiting`, answering no with
-        `/groups/{id}/asks/{askId}/decline` or yes with the verb that lifts what it asks about and
-        the ask's `askId`: `/groups/{id}/rules/internet/resume` for `pause`, and
-        `/groups/{id}/rules/{ruleId}/allow` for `rule`.
+        `/groups/{id}/asks/{askId}/decline` or yes with what lifts what it asks about: for `pause`,
+        what the group card's Unblock button sends (`/groups/{id}/unblock`, or the Block button
+        default's `/groups/{id}/rules/{ruleId}/pause`), which answers it once nothing it is about
+        blocks the group (`/groups/{id}/rules/internet/resume` with `askId` answers it by id while
+        only a pause is behind it); for `rule`, `/groups/{id}/rules/{ruleId}/allow` with `askId`.
       properties:
         id: { type: string }
         about:
           type: string
           x-extensible-enum: [pause, rule]
-          description: "`pause`: to be unpaused. `rule`: minutes in `ruleId`'s window, which is on now."
+          description: "`pause`: to be unblocked: the group is paused or, on a Thing, its Block button default (`Group.blockButtonRuleId`) blocks it. `rule`: minutes in `ruleId`'s window, which is on now."
         from:
           type: object
           additionalProperties: false
