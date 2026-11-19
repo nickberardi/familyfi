@@ -123,6 +123,33 @@ describe("reusable workflows", () => {
   });
 });
 
+describe("ci.yml's documentation-only skip", () => {
+  // A pull request whose every file matches `docs=` skips contract, verify and browser, so no file a
+  // test, lint, the build or a route reads may match it.
+  const pattern = read(".github/workflows/ci.yml").match(/^\s+docs='(.+)'$/m)?.[1];
+  const docs = new RegExp(pattern ?? "(?!)");
+
+  it("skips prose", () => {
+    expect(pattern).toBeDefined();
+    for (const file of ["docs/design.md", "docs/images/x.png", "README.md", "CONTRIBUTING.md", ".agents/skills/release/SKILL.md"]) {
+      expect(file).toMatch(docs);
+    }
+  });
+
+  it("never skips a file something reads", () => {
+    const readers = [
+      "AGENTS.md", // tests/unit/invariants.test.ts
+      "openapi/agent-guide.md", // src/app/agents.md/route.ts
+      ...readdirSync(path.join(repoRoot, ".claude/agents")).map((f) => `.claude/agents/${f}`), // reviewer-agents.test.ts
+      "tests/fixtures/unifi/README.md", // repository-hygiene.test.ts
+      "src/docs/x.md",
+      "package.json",
+      ".github/workflows/ci.yml",
+    ];
+    for (const file of readers) expect(file).not.toMatch(docs);
+  });
+});
+
 describe("Buildx setup", () => {
   // v0.32.0's container job lost its moby/buildkit pull to a sibling job on the same daemon:
   // "failed to lease content: NotFound: lease ... not found".
