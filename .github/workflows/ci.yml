@@ -14,9 +14,44 @@ concurrency:
   cancel-in-progress: true
     
 jobs:
+  # Whether a pull request changes anything but documentation. One that changes only prose needs no
+  # build, tests or database (docs/testing.md, "Documentation only"), so the jobs below skip, and a job
+  # skipped by its `if` reports success to a required check. A file a test reads stays code: AGENTS.md
+  # (tests/unit/invariants.test.ts) and .claude/agents/ (tests/unit/reviewer-agents.test.ts), and so
+  # does openapi/agent-guide.md, which a route serves. A release (workflow_call) runs everything.
+  changes:
+    runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The pull request's merge commit and its first parent, the base branch.
+          fetch-depth: 2
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          # Without the base commit, run everything rather than skip it.
+          if [[ "$EVENT" != pull_request ]] || ! git rev-parse --verify --quiet HEAD^1 >/dev/null; then
+            echo "code=true" >>"$GITHUB_OUTPUT"; exit 0
+          fi
+          files="$(git diff --name-only HEAD^1 HEAD)"
+          docs='^(docs/.*|(README|CONTRIBUTING|SECURITY|CLAUDE)\.md|scripts/README\.md|tests/fixtures/unifi/README\.md|\.github/PULL_REQUEST_TEMPLATE\.md|\.agents/skills/.*\.md)$'
+          if [[ -n "$files" ]] && ! grep -vqE "$docs" <<<"$files"; then
+            echo "code=false" >>"$GITHUB_OUTPUT"
+            echo "Only documentation changed, so the build and tests were skipped." >>"$GITHUB_STEP_SUMMARY"
+          else
+            echo "code=true" >>"$GITHUB_OUTPUT"
+          fi
+          echo "Changed files:"; echo "$files"
+
   # The API contract's floors, first and in minutes: a pull request that forgot to raise one fails
   # here and never starts the half-hour jobs (docs/api.md, "Versioning the contract").
   contract:
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 10
     steps:
@@ -55,7 +90,8 @@ jobs:
 
   # Each job calls scripts/test.py, which starts and removes its own PostgreSQL containers.
   verify:
-    needs: contract
+    needs: [changes, contract]
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
@@ -121,7 +157,8 @@ jobs:
   # Also the static checks and the UTC+14 unit replay, which keep verify, the longer job, shorter:
   # verify's coverage run takes about seven minutes, this job's browser run about five.
   browser:
-    needs: contract
+    needs: [changes, contract]
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ${{ vars.USE_SELF_HOSTED == 'true' && 'self-hosted' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
