@@ -243,6 +243,32 @@ describe("asking for more time", () => {
     expect(await errorCode(again)).toBe("ask_closed");
   });
 
+  it("keeps an ask to unblock a Thing waiting while its Block button rule blocks, and answers it when that rule is lifted any way", async () => {
+    const tv = await prisma().group.create({ data: { kind: GroupKind.things, name: "TV", kidsCanAsk: true } });
+    const video = await prisma().rule.create({ data: { name: "Video", kind: RuleKind.category, mode: RuleMode.always, targetIds: [4], groups: { create: { groupId: tv.id } } } });
+    await prisma().group.update({ where: { id: tv.id }, data: { blockButtonRuleId: video.id } });
+    const waiting = await askOf(await ask(child, tv.id, { about: "pause" }));
+
+    // A ten-minute pause ends before Video does, which never does: the ask still waits for the timeout.
+    await verb(pauseRoute, "pause", admin, tv.id, "internet", { until: new Date(Date.now() + 10 * MINUTE).toISOString() });
+    expect(await prisma().ask.findUniqueOrThrow({ where: { id: waiting.id } })).toMatchObject({ state: "waiting", endsWithBlock: false });
+    expect((await prisma().ask.findUniqueOrThrow({ where: { id: waiting.id } })).expiresAt.getTime() - Date.parse(waiting.at)).toBe(60 * MINUTE);
+    // Resuming the pause leaves Video blocking TV, so the ask is not answered.
+    expect((await verb(resumeRoute, "resume", admin, tv.id, "internet")).status).toBe(200);
+    expect((await prisma().ask.findUniqueOrThrow({ where: { id: waiting.id } })).state).toBe("waiting");
+
+    // Video allowed for TV alone answers it.
+    expect((await verb(allowRoute, "allow", admin, tv.id, video.id, { until: new Date(Date.now() + 30 * MINUTE).toISOString() })).status).toBe(200);
+    expect(await prisma().ask.findUniqueOrThrow({ where: { id: waiting.id } })).toMatchObject({ state: "yes", answeredByName: "Household admin" });
+
+    // So does Video paused for everyone.
+    const disallowRoute = (await import("@/app/api/v1/groups/[id]/rules/[ruleId]/disallow/route")).POST;
+    expect((await verb(disallowRoute, "disallow", admin, tv.id, video.id)).status).toBe(200);
+    const again = await askOf(await ask(child, tv.id, { about: "pause" }));
+    expect((await rulePauseRoute(post(`/api/v1/rules/${video.id}/pause`, admin, {}), groupParams(video.id))).status).toBe(200);
+    expect((await prisma().ask.findUniqueOrThrow({ where: { id: again.id } })).state).toBe("yes");
+  });
+
   it("answers an ask to be unpaused with the group's unblock, which lifts a window blocking it too", async () => {
     const homework = await windowRule(emma.id);
     await verb(pauseRoute, "pause", admin, emma.id, "internet");

@@ -193,7 +193,7 @@ button, which still read Block, Unblock or Resume. Tapping it opens the answer s
 
 | Asked about | Choices, in order |
 | --- | --- |
-| A pause, or a Thing's Block button default | **Unblock**: the group's own `unblock` with `askId`, lifting what the card's Unblock does (its note says what: "ends the block now", "ends the block and lifts Bedtime", "lifts Video"), **Not now** |
+| A pause, or a Thing's Block button default | **Unblock**: the group's own `unblock` with `askId` and no `until`, as Siri's (story 11): it ends the pause and lifts every rule blocking the group now, the Block button default among them, until the last ends, or until a parent resumes; the card then reads Resume. Its note says what and until when: "ends the block now", "ends the block and lifts Bedtime until 7:00 AM", "lifts Video, no end time". **Not now** |
 | A rule's window that is on | **Allow 30 minutes** (the rule's `allow` for the group with `askId`, as the child asked), **Until Bedtime ends** when that is longer, **For…** and **Until…**, **Not now** |
 | A rule's window no longer on | **Not now** |
 

@@ -9,7 +9,7 @@ import type { Group, GroupAsk } from "./types";
  * A child's ask for more time, as a parent sees and answers it on every client, on the child's own
  * group or on a Thing shared with children, which names the child who asked. The group's card
  * and page show a waiting ask as one line, which opens the answer sheet: yes as the child asked,
- * yes for another time, or Not now. A yes to unpause is the group's `resume` on `internet`, a yes
+ * yes for another time, or Not now. A yes to unblock is the group's own `unblock`, a yes
  * to time off a rule is the rule's `allow` for the group, each with the ask's `askId`; Not now is
  * the ask's `decline` (`answerAsk` in `group-writes.ts`). Plain data, so the Watch can port it and
  * `tests/fixtures/display-vectors.json` can pin it.
@@ -18,9 +18,10 @@ import type { Group, GroupAsk } from "./types";
 /**
  * What a choice on the answer sheet does: `asked` gives what the child asked for; `for` and `until`
  * lift the rule for another time (resolved at the tap, so a sheet left open never sends an end
- * already passed); `decline` is Not now.
+ * already passed); `decline` is Not now. A yes to unblock says when what it lifts blocks again
+ * (`ends`: "until 9:00 PM", or "until you resume" when one has no end), for the notice.
  */
-export type AskSheetRequest = { kind: "asked" } | { kind: "for"; minutes: number } | { kind: "until"; until: string } | { kind: "decline" };
+export type AskSheetRequest = { kind: "asked"; ends?: string } | { kind: "for"; minutes: number } | { kind: "until"; until: string } | { kind: "decline" };
 
 export type AskSheetOption = { label: string; note: string; request: AskSheetRequest };
 
@@ -105,8 +106,12 @@ export function askSheetOptions(
     const blocking = group ? rulesToUnblock(group, rules, timezone, now) : [];
     const what = listNames(blocking.map((rule) => rule.name));
     const paused = !group || group.suspension.active;
-    const note = !blocking.length ? "ends the block now" : paused ? `ends the block and lifts ${what}` : `lifts ${what}`;
-    return [{ label: "Unblock", note, request: { kind: "asked" } }];
+    if (!blocking.length) return [{ label: "Unblock", note: "ends the block now", request: { kind: "asked" } }];
+    // The group's Unblock lifts these until the last of them ends, or until a parent resumes when one never does.
+    const end = blocking.some((rule) => rule.until === null) ? null : new Date(Math.max(...blocking.map((rule) => Date.parse(rule.until!))));
+    const lifts = `lifts ${what}${end ? ` until ${formatClock(end, timezone)}` : ", no end time"}`;
+    const note = paused ? `ends the block and ${lifts}` : lifts;
+    return [{ label: "Unblock", note, request: { kind: "asked", ends: end ? `until ${formatClock(end, timezone)}` : "until you resume" } }];
   }
   const rule = ruleOf(ask, rules);
   const end = rule ? activeWindowsEnd(ruleInternetWindows(rule), now, timezone) : undefined;

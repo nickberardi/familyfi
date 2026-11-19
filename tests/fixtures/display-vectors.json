@@ -32376,9 +32376,10 @@
       "expected": [
         {
           "label": "Unblock",
-          "note": "ends the block and lifts Bedtime",
+          "note": "ends the block and lifts Bedtime until 7:00 AM",
           "request": {
-            "kind": "asked"
+            "kind": "asked",
+            "ends": "until 7:00 AM"
           }
         }
       ]
@@ -32439,9 +32440,10 @@
       "expected": [
         {
           "label": "Unblock",
-          "note": "lifts Video",
+          "note": "lifts Video, no end time",
           "request": {
-            "kind": "asked"
+            "kind": "asked",
+            "ends": "until you resume"
           }
         }
       ]
@@ -33245,9 +33247,10 @@
       "expected": [
         {
           "label": "Unblock",
-          "note": "ends the block and lifts Bedtime",
+          "note": "ends the block and lifts Bedtime until 7:00 AM",
           "request": {
-            "kind": "asked"
+            "kind": "asked",
+            "ends": "until 7:00 AM"
           }
         },
         {
@@ -33316,9 +33319,10 @@
       "expected": [
         {
           "label": "Unblock",
-          "note": "lifts Video",
+          "note": "lifts Video, no end time",
           "request": {
-            "kind": "asked"
+            "kind": "asked",
+            "ends": "until you resume"
           }
         },
         {

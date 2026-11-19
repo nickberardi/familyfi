@@ -103,6 +103,14 @@ describe("a child's ask, as a parent answers it", () => {
     expect(sent[0]!.options.feedback?.notice).toBe("Emma unblocked.");
   });
 
+  it("says when what the yes lifts blocks again, as the card's Unblock does", async () => {
+    const { sent, mutate } = recorder({ groups: [emma(pauseAsk)], devices: [] });
+    const [unblock] = askSheetChoices(pauseAsk, [bedtime], TZ, NOW, 30, emma(pauseAsk));
+    expect(unblock).toMatchObject({ label: "Unblock", note: "lifts Bedtime until 7:00 AM" });
+    await answerAsk(mutate, emma(pauseAsk), pauseAsk, unblock as never, undefined, NOW);
+    expect(sent[0]!.options.feedback?.notice).toBe("Emma unblocked until 7:00 AM.");
+  });
+
   it("says Not now with the ask's decline", async () => {
     const { sent, mutate, shown } = recorder({ groups: [emma(pauseAsk)], devices: [] });
     const notNow = askSheetChoices(pauseAsk, [], TZ, NOW, 30).at(-1)!;

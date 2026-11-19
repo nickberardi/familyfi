@@ -149,7 +149,7 @@ export function answerAsk(mutate: Mutate, group: Group, ask: GroupAsk, option: A
     return mutate((send) => send(`/api/v1/groups/${group.id}/unblock`, { method: "POST", body: { askId: ask.id } }), {
       groupId: group.id,
       optimistic: answered("yes"),
-      feedback: { notice: `${group.name} unblocked.` },
+      feedback: { notice: `${group.name} unblocked${request.kind === "asked" && request.ends ? ` ${request.ends}` : ""}.` },
     });
   }
   const until =
