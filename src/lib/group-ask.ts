@@ -100,7 +100,9 @@ export function askSheetOptions(ask: GroupAsk, rules: Rule[], timezone: string, 
     // A shared Thing's ask names the child who asked, and the Thing reads Blocked, as the child says.
     // What keeps its card Blocked once the pause ends: an internet rule's window, or its Block button
     // rule, named as one rule (its window, or the Block button rule's own name).
-    const still = ask.from && group ? rulesToUnblock(group, rules, timezone, now).find((rule) => rule.kind === "internet" || rule.ruleId === group.blockButtonRuleId) : undefined;
+    const blocking = ask.from && group ? rulesToUnblock(group, rules, timezone, now) : [];
+    // An internet rule first, as the card's line names it.
+    const still = blocking.find((rule) => rule.kind === "internet") ?? blocking.find((rule) => rule.ruleId === group?.blockButtonRuleId);
     if (ask.from && group && !still) return [{ label: "Unblock", note: "ends the block now", request: { kind: "asked" } }];
     const name = still && (still.kind === "internet" ? still.name : (rules.find((rule) => rule.id === still.ruleId)?.name ?? still.name));
     return [{ label: "Unpause", note: still ? `ends the pause; ${name} still blocks it` : "ends the pause now", request: { kind: "asked" } }];
