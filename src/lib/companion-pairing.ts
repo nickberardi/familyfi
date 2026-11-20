@@ -93,7 +93,7 @@ export type PairingClient = Extract<ClientType, "app" | "me">;
 /** A code made for the other client, worded for the one that read it. */
 export const PAIRING_CODE_OTHER_CLIENT: Record<PairingClient, string> = {
   app: "This code isn't for this app. In FamilyFi, open Pair Device and choose Pair a device.",
-  me: "This code isn't for FamilyFi Me. In FamilyFi, open Pair Device and choose Pair FamilyFi Me.",
+  me: "This code isn't for FamilyFi Me. In FamilyFi, open Pair FamilyFi Me and pair it there.",
 };
 
 /** A household that verified but is not yet trusted: it holds the unspent code, so it lives only in memory. */

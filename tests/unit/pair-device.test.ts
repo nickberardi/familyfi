@@ -19,6 +19,7 @@ import {
   isApp,
   isAppControls,
   mePeople,
+  pairedHereLabel,
   pairDeviceList,
   pairingAccounts,
   pairingChildGroups,
@@ -315,6 +316,14 @@ describe("FamilyFi Me on a child's phone", () => {
       ["t2", []],
       ["a1", ["m4"]],
     ]);
+  });
+
+  it("says how many devices paired through a route are on FamilyFi Me", () => {
+    expect(pairedHereLabel(0, 0)).toBe("");
+    expect(pairedHereLabel(3, 0)).toBe(" · 3 devices paired here");
+    expect(pairedHereLabel(2, 2)).toBe(" · 2 devices paired here, all on FamilyFi Me");
+    expect(pairedHereLabel(1, 1)).toBe(" · 1 device paired here, on FamilyFi Me");
+    expect(pairedHereLabel(3, 1)).toBe(" · 3 devices paired here, 1 on FamilyFi Me");
   });
 
   it("points FamilyFi Me's App Store badge at its listing, with Google Play coming", () => {

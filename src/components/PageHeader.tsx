@@ -60,8 +60,13 @@ export function PageHeader({
         <h1 className="m-0 text-[21px] leading-[1.2] font-bold tracking-tight">{title}</h1>
         {sub ? <p className="mt-0.5 text-[14px] leading-[1.25] text-[var(--ff-muted)]">{sub}</p> : null}
       </div>
-      {secondary}
-      {action}
+      {secondary || action ? (
+        // Right-aligned, so on a phone the actions wrap under the title with the primary right-most.
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {secondary}
+          {action}
+        </div>
+      ) : null}
     </header>
   );
 }

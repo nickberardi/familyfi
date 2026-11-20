@@ -20,7 +20,7 @@ import {
   transportLabel,
   type RemoteChoice,
 } from "@/lib/connection-routes";
-import { PAIR_COPY } from "@/lib/pair-device";
+import { pairedHereLabel, PAIR_COPY } from "@/lib/pair-device";
 import type { ConnectionRoute, PairedPhone, RemoteAccess, RouteReachability } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
 import { Segmented } from "@/components/ui/Segmented";
@@ -499,7 +499,7 @@ export function RemoteAccessCard({
             <span className={published.kind === "quick" ? "mt-1 block text-[var(--ff-muted)]" : "text-[var(--ff-muted)]"}>
               {published.kind === "quick" ? "" : "· "}
               {published.kind === "own" ? transportLabel(published.transport) : published.kind === "quick" ? "Quick tunnel" : "Cloudflare Tunnel"}
-              {pairedThrough(published.id) ? ` · ${pairedThrough(published.id)} device${pairedThrough(published.id) === 1 ? "" : "s"} paired here` : ""}
+              {pairedHereLabel(pairedThrough(published.id), phones.filter((phone) => phone.clientType === "me" && !phone.revokedAt && phone.pairedVia?.endpointId === published.id).length)}
             </span>
             {status.detail ? (
               <div data-testid="remote-detail" className="mt-0.5 text-[var(--ff-muted)]">

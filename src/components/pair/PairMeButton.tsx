@@ -40,7 +40,7 @@ function PairMeFlow({ onClose }: { onClose: () => void }) {
               {PAIR_COPY.cancel}
             </button>
             <Link href="/pair" className={PRIMARY_BUTTON} onClick={onClose}>
-              {PAIR_COPY.title}
+              {PAIR_COPY.openPairDevice}
             </Link>
           </>
         }

@@ -49,6 +49,8 @@ export const PAIR_COPY = {
   getApp: "Get the FamilyFi app",
   getAppSub: "Install it on each device before you pair it.",
   cancel: "Cancel",
+  /** Where a FamilyFi Me pairing goes to turn remote access on first. */
+  openPairDevice: "Open Pair Device",
 } as const;
 
 /** FamilyFi's App Store listing, and its TestFlight beta, where pre-releases go first. */
@@ -419,4 +421,15 @@ export function mePeople(groups: readonly Group[], phones: readonly PairedPhone[
   return pairingChildGroups(groups)
     .map((group) => ({ group, phones: childPhonesOf(phones, group.id) }))
     .filter(({ group, phones: own }) => own.length > 0 || group.familyRole === "child" || group.familyRole === "teen");
+}
+
+/**
+ * Remote access's count of devices paired through its route, " · 2 devices paired here", saying how
+ * many are FamilyFi Me phones, which Pair FamilyFi Me lists rather than Pair Device. Empty for none.
+ */
+export function pairedHereLabel(count: number, me: number): string {
+  if (!count) return "";
+  const devices = `${count} device${count === 1 ? "" : "s"} paired here`;
+  if (!me) return ` · ${devices}`;
+  return ` · ${devices}, ${me === count ? (count === 1 ? "on FamilyFi Me" : "all on FamilyFi Me") : `${me} on FamilyFi Me`}`;
 }
