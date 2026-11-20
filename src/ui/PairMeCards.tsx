@@ -80,7 +80,7 @@ export function MePeopleCard({
           {!canPair ? <Text style={[text(14, 21, "muted"), styles.empty]}>{CHILD_PHONES_COPY.remoteFirst}</Text> : null}
           {people.length === 0 ? <Text style={[text(14, 21, "muted"), styles.empty]}>{anyFamily ? COPY.empty : COPY.noPeople}</Text> : null}
           {people.map(({ group, phones: own }, index) => (
-            <View key={group.id} style={index > 0 || !canPair ? { borderTopWidth: 1, borderTopColor: ui.color("hairline-card") } : undefined} testID={`me-person-${group.id}`}>
+            <View key={group.id} style={index > 0 || !canPair ? { borderTopWidth: 1, borderTopColor: ui.color("hairline") } : undefined} testID={`me-person-${group.id}`}>
               <View style={[styles.person, large && styles.personStacked]}>
                 <View style={styles.personName}>
                   <View style={[styles.mark, { backgroundColor: ui.color("person-fill") }]} aria-hidden>
@@ -93,8 +93,8 @@ export function MePeopleCard({
                     {own.length === 0 ? <Text style={text(14, 21, "muted")}>{COPY.noPhone}</Text> : null}
                   </View>
                 </View>
-                <View style={styles.touch} aria-label={COPY.pairForLabel(group.name)}>
-                  <TextButton label={COPY.pairFor} token="accent" onPress={() => onPair(group)} disabled={off} testID={`me-pair-${group.id}`} />
+                <View style={styles.touch}>
+                  <TextButton label={COPY.pairFor} accessibilityLabel={COPY.pairForLabel(group.name)} token="accent" onPress={() => onPair(group)} disabled={off} testID={`me-pair-${group.id}`} />
                 </View>
               </View>
               {own.map((phone) => (
