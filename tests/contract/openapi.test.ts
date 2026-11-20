@@ -49,7 +49,7 @@ describe("openapi contract", () => {
       "Household.alertsRelay", // always sent, but servers before 1.4.0 leave it out: required would raise x-min-server
       "Household.askTimeoutMinutes", // likewise, servers before 2.0.0
       "Household.askWaitMinutes", // likewise
-      "PairedDevice.appVersion", // always sent, but servers before 2.1.0 leave it out: required would raise x-min-server
+      "PairedDevice.appVersion", // always sent, but 2.0.0 pre-release servers built before it leave it out: required would raise x-min-server
       "PairedDevice.alerts", // only for app:full devices, the only ones that register for alerts
       "PairedDevice.person", // only for a child's phone (me), which signs in for a person
       "PairedDevice.protection", // only for a child's iPhone or iPad (me) once it has told its Screen Time permission

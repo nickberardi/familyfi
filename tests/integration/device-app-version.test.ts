@@ -59,7 +59,7 @@ describe("the app version a paired device runs", () => {
     expect((await readSessionFromRequest(request("/api/v1/auth/session", { auth: bearer(claim.token) })))?.appVersion).toBe("2.1.0");
   });
 
-  it("moves the version on at refresh, and keeps it when a refresh names none", async () => {
+  it("moves the version on at refresh, and keeps it, in the tokens too, when a refresh names none", async () => {
     const claim = await pairPhone(await pairingAdminAuth(), { appVersion: "2.1.0" });
     const updated = await refreshed(claim.refreshToken, { appVersion: "2.2.0" });
     expect(deviceTokenAppVersion(updated.token)).toBe("2.2.0");
@@ -67,7 +67,8 @@ describe("the app version a paired device runs", () => {
     expect(await listedVersion(claim.device.id)).toBe("2.2.0");
 
     const silent = await refreshed(updated.refreshToken);
-    expect(deviceTokenAppVersion(silent.token)).toBeNull();
+    expect(deviceTokenAppVersion(silent.token)).toBe("2.2.0");
+    expect(deviceTokenAppVersion(silent.refreshToken)).toBe("2.2.0");
     expect(await signedIn(silent.token)).toBe(true);
     expect(await listedVersion(claim.device.id)).toBe("2.2.0");
   });
@@ -97,6 +98,10 @@ describe("the app version a paired device runs", () => {
     expect(response.status).toBe(201);
     const watch = (await response.json()) as Pair & { device: { id: string } };
     expect(deviceTokenAppVersion(watch.token)).toBe("2.1.0");
+    expect(await listedVersion(watch.device.id)).toBe("2.1.0");
+    // The Watch refreshes on its own, naming no version, and its tokens still carry its app's.
+    const renewed = await refreshed(watch.refreshToken);
+    expect(deviceTokenAppVersion(renewed.token)).toBe("2.1.0");
     expect(await listedVersion(watch.device.id)).toBe("2.1.0");
 
     const fromOld = await pairPhone(await pairingAdminAuth(), { displayName: "Old iPhone" });
