@@ -20,15 +20,15 @@ export const PAIR_COPY = {
   title: "Pair Device",
   sub: "Pair the FamilyFi app on a phone, tablet or Mac and choose how it reaches home",
   pairPhone: "Pair a device",
-  /** FamilyFi Me, the app on a child's phone. */
+  /** FamilyFi Me, the app on a person's phone that shows them their rules. */
   pairMe: "Pair FamilyFi Me",
   connectAgent: "Connect an agent",
   adminOnly: "Only a household admin can pair devices or change remote access.",
   loadFailed: "Could not load remote access.",
   actionFailed: "That didn't work.",
   paired: "Paired devices",
-  pairedSub: "Apps, Watches, agents, FamilyFi Me and what they set up; revoke any one of them",
-  noPhones: "No paired devices yet. Pair a device, pair FamilyFi Me or connect an agent to add one.",
+  pairedSub: "Apps, Watches, agents and what they set up; revoke any one of them",
+  noPhones: "No paired devices yet. Pair a device or connect an agent to add one.",
   remoteFirst: "Turn on remote access, then pair a device. Agents connect over the home network.",
   remoteFirstPhones: "Turn on remote access, then pair a device.",
   expired: "Expired. Re-pair it to sign it in again.",
@@ -48,6 +48,7 @@ export const PAIR_COPY = {
   remoteOnWeb: "Change remote access on FamilyFi’s web Pair Device page.",
   getApp: "Get the FamilyFi app",
   getAppSub: "Install it on each device before you pair it.",
+  cancel: "Cancel",
 } as const;
 
 /** FamilyFi's App Store listing, and its TestFlight beta, where pre-releases go first. */
@@ -94,6 +95,15 @@ export const PLAY_BETA = {
 } as const;
 
 export const APP_STORE_SOON = "Coming soon";
+
+/** FamilyFi Me's App Store listing. It has no public beta link, so every track opens the listing. */
+export const ME_APP_STORE_URL = "https://apps.apple.com/app/id6836159703";
+
+/** Where to get FamilyFi Me, as each store's badge: the App Store, and Google Play once it has a release. */
+export const ME_APP_STORES = [
+  { id: "apple", label: "Download FamilyFi Me on the App Store", badge: "/stores/app-store.svg", badgeWidth: 120, url: ME_APP_STORE_URL },
+  { id: "google", label: "Get FamilyFi Me on Google Play", badge: "/stores/google-play.svg", badgeWidth: 135, url: null },
+] as const satisfies readonly AppStore[];
 
 export function showAllLabel(count: number): string {
   return `Show all ${count} devices`;
@@ -242,7 +252,7 @@ export function pairingSheetCopy({
     name: child
       ? {
           title: PAIR_COPY.pairMe,
-          sub: "Makes a single-use code that pairs FamilyFi Me on a family member's phone. It shows them their own rules and lets them ask you for more time. It expires in five minutes.",
+          sub: "Makes a single-use code that pairs FamilyFi Me on a person's phone. It shows them their own rules and lets them ask you for more time. It expires in five minutes.",
         }
       : {
           title: replacing ? `Re-pair ${replacing.displayName}` : PAIR_COPY.pairPhone,
@@ -271,7 +281,7 @@ export function pairingSheetCopy({
     routeNote: child ? "The phone must reach this address while it pairs. Change it under Remote access." : "The device must reach this address while it pairs. Change it under Remote access.",
     phone: child ? "Phone name" : "Device name",
     signsInAs: "Signs in as",
-    /** A child's phone: the family member it is for. */
+    /** FamilyFi Me: the person it is for. */
     forGroup: "For",
     defaultName: "Device",
     cancel: "Cancel",
@@ -287,7 +297,7 @@ export function pairingSheetCopy({
     accountsFailed: "Could not load the administrators a device can sign in as.",
     noAccounts: "A device signs in as an adult with administrator access, never as the built-in admin. Give an adult admin access under Settings › Household, then pair this device.",
     noAccountsLink: "Open Settings",
-    noGroups: "FamilyFi Me is for a family member. Add one under Family, then pair their phone.",
+    noGroups: "FamilyFi Me is for a person in your family. Add them under Family, then pair their phone.",
     copy: "Copy",
     copied: "Copied",
   };
@@ -377,3 +387,36 @@ export const CHILD_PHONES_COPY = {
   tryAgain: "Try again",
   revoke: PAIR_COPY.revoke,
 } as const;
+
+/** Pair Device's list: every paired device except FamilyFi Me phones still paired, which Pair FamilyFi Me lists. */
+export function pairDeviceList(phones: readonly PairedPhone[]): PairedPhone[] {
+  return phones.filter((phone) => phone.clientType !== "me" || phone.revokedAt);
+}
+
+/** System › Pair FamilyFi Me: getting FamilyFi Me, each person's phones, asking for more time, and the Things it shows. */
+export const ME_PAGE_COPY = {
+  title: PAIR_COPY.pairMe,
+  sub: "FamilyFi Me shows a person their own rules and lets them ask you for more time",
+  getApp: "Get FamilyFi Me",
+  getAppSub: "Install it on their phone before you pair it.",
+  people: "People",
+  peopleSub: "Each person's FamilyFi Me phones; revoke any one of them",
+  pairFor: "Pair a device",
+  pairForLabel: (name: string) => `Pair a device for ${name}`,
+  noPhone: "No phone paired yet",
+  empty: "Nobody has FamilyFi Me yet. Pair a device for a person in your family.",
+  noPeople: "Add a person under Family, then pair their phone.",
+  shared: "Shared Things",
+  sharedSub: "Things everyone with FamilyFi Me sees and can ask you for more time on",
+  noThings: "No Things groups yet.",
+} as const;
+
+/**
+ * Who Pair FamilyFi Me lists: everyone with a FamilyFi Me phone still paired, and every child and teen
+ * still without one, in the order the pairing sheet offers them (children, teens, then adults).
+ */
+export function mePeople(groups: readonly Group[], phones: readonly PairedPhone[]): { group: Group; phones: PairedPhone[] }[] {
+  return pairingChildGroups(groups)
+    .map((group) => ({ group, phones: childPhonesOf(phones, group.id) }))
+    .filter(({ group, phones: own }) => own.length > 0 || group.familyRole === "child" || group.familyRole === "teen");
+}

@@ -13,6 +13,7 @@ import type { UpstreamCategoryRow } from "@/lib/upstream";
 import { EmptyCard } from "@/ui/EmptyCard";
 import { GroupCard } from "./GroupCard";
 import { PageHeader } from "./PageHeader";
+import { PairMeButton } from "./pair/PairMeButton";
 import { NewGroupSheet } from "./NewGroupSheet";
 import { PauseSheet } from "./PauseSheet";
 
@@ -66,7 +67,8 @@ export function useFilterCatalog({ upstream = true }: { upstream?: boolean } = {
   return catalog;
 }
 
-export function GroupGrid({ kind }: { kind: "family" | "things" }) {
+/** Family or Things; the Family page offers Pair FamilyFi Me beside New family member, except in the demo, which pairs nothing. */
+export function GroupGrid({ kind, demo = false }: { kind: "family" | "things"; demo?: boolean }) {
   const { groups, rules, household } = useAppData();
   const [sheet, setSheet] = useState<{ group: Group; target: GroupSheetTarget } | null>(null);
   const [adding, setAdding] = useState(false);
@@ -83,6 +85,7 @@ export function GroupGrid({ kind }: { kind: "family" | "things" }) {
         sub={sub}
         actionLabel={newGroupCopy(kind).title}
         onAction={() => setAdding(true)}
+        secondary={kind === "family" && !demo ? <PairMeButton /> : null}
       />
       <div className="grid grid-cols-1 items-start gap-4 p-4 md:grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] md:p-6">
         {rows.length === 0 ? (

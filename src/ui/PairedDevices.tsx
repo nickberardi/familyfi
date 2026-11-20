@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { remoteStatus, routeTrust, transportLabel } from "@/lib/connection-routes";
-import { canRepair, isApp, isAppControls, PAIR_COPY as COPY, PHONES_SHOWN, phoneLines, revokedToggleLabel, showAllLabel, splitPhones } from "@/lib/pair-device";
+import { canRepair, isApp, isAppControls, PAIR_COPY as COPY, pairDeviceList, PHONES_SHOWN, phoneLines, revokedToggleLabel, showAllLabel, splitPhones } from "@/lib/pair-device";
 import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
 
 import { Tag } from "./Tag";
@@ -18,7 +18,7 @@ function useText() {
   return (size: number, lineHeight: number, token: string) => ({ fontFamily: ui.font, fontSize: size, lineHeight, color: ui.color(token) });
 }
 
-function TextButton({ label, token, onPress, disabled, testID }: { label: string; token: string; onPress: () => void; disabled?: boolean; testID?: string }) {
+export function TextButton({ label, token, onPress, disabled, testID }: { label: string; token: string; onPress: () => void; disabled?: boolean; testID?: string }) {
   const text = useText();
   return (
     <Pressable
@@ -105,7 +105,7 @@ export function PairedPhoneRow({
 
 /**
  * The household's paired phones, Watches and agents, most recently seen first, with revoked ones folded
- * away. Any phone but this one can be re-paired, active or revoked. Each callback asks first where the
+ * away. FamilyFi Me phones still paired are Pair FamilyFi Me's (`pairDeviceList`); revoked ones stay here to remove. Any phone but this one can be re-paired, active or revoked. Each callback asks first where the
  * platform does, then makes the change.
  */
 export function PairedDevicesCard({
@@ -116,7 +116,6 @@ export function PairedDevicesCard({
   onRepair,
   onRemove,
   onRemoveAllRevoked,
-  onPairMe,
   disabled,
 }: {
   phones: PairedPhone[];
@@ -130,32 +129,20 @@ export function PairedDevicesCard({
   onRepair: (phone: PairedPhone) => void;
   onRemove: (phone: PairedPhone) => void;
   onRemoveAllRevoked: (count: number) => void;
-  /** Pair FamilyFi Me on a child's phone, in the card's head, where a client offers it. */
-  onPairMe?: () => void;
 }) {
   const ui = useUI();
   const text = useText();
   const [showAll, setShowAll] = useState(false);
   const [showRevoked, setShowRevoked] = useState(false);
-  const { active, revoked } = splitPhones(phones);
+  const { active, revoked } = splitPhones(pairDeviceList(phones));
   const nameOf = (id: string | null) => phones.find((phone) => phone.id === id)?.displayName ?? null;
   const repair = (phone: PairedPhone) => (canRepair(phone, { canPair, selfId }) ? () => onRepair(phone) : undefined);
   const rule = { borderTopWidth: 1, borderTopColor: ui.color("hairline") };
-  // At large text Pair FamilyFi Me goes under the heading, as the devices card's action does.
-  const large = useLargeText();
   return (
     <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="paired-devices">
-      <View style={[styles.head, onPairMe && !large && styles.headBeside, { borderBottomColor: ui.color("hairline-card") }]}>
-        <View style={onPairMe && !large ? styles.headText : undefined}>
-          <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.paired}</Text>
-          <Text style={text(14, 21, "ink-2")}>{COPY.pairedSub}</Text>
-        </View>
-        {onPairMe ? (
-          // A 44pt tap area around the one-line link, as ChildPhonesCard's Pair FamilyFi Me.
-          <View style={styles.touch}>
-            <TextButton label={COPY.pairMe} token="accent" onPress={onPairMe} disabled={disabled || !canPair} testID="pair-me" />
-          </View>
-        ) : null}
+      <View style={[styles.head, { borderBottomColor: ui.color("hairline-card") }]}>
+        <Text style={[text(14, 21, "ink"), styles.bold]}>{COPY.paired}</Text>
+        <Text style={text(14, 21, "ink-2")}>{COPY.pairedSub}</Text>
       </View>
       {active.length === 0 ? (
         <Text style={[text(14, 21, "muted"), styles.empty]}>
@@ -252,9 +239,6 @@ export function RemoteAccessSummary({ tunnel, published }: { tunnel: RemoteAcces
 const styles = StyleSheet.create({
   card: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
   head: { gap: 2, paddingHorizontal: 18, paddingVertical: 15, borderBottomWidth: 1 },
-  headBeside: { flexDirection: "row", alignItems: "center", gap: 12 },
-  headText: { flex: 1, gap: 2 },
-  touch: { minHeight: 44, justifyContent: "center" },
   remoteHead: { alignItems: "center", gap: 12 },
   bold: { fontWeight: "600" },
   regular: { fontWeight: "400" },

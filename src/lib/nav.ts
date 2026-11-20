@@ -38,6 +38,7 @@ export const NAV: readonly NavGroup[] = [
     items: [
       { href: "/sync", label: "Sync", icon: "arrows-clockwise" },
       { href: "/pair", label: "Pair Device", icon: "qr-code" },
+      { href: "/pair-me", label: "Pair FamilyFi Me", icon: "user-plus" },
       { href: "/settings", label: "Settings", icon: "gear" },
       { href: "/diagnostics", label: "Diagnostics", icon: "gauge" },
       { href: "/reference", label: "API", icon: "code", webOnly: true },

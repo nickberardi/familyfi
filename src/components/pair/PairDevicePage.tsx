@@ -23,7 +23,7 @@ const SUB = PAIR_COPY.sub;
 /** System → Pair Device. `stores` comes from the server, which knows the release track it runs. */
 export function PairDevicePage({ stores }: { stores: readonly AppStore[] }) {
   const { tunnel, setTunnel, routes, phones, remote, forbidden, error, load, run, published, canPair, pairedThrough } = usePairDevice(request);
-  const [pairing, setPairing] = useState<"app" | "me" | null>(null);
+  const [pairing, setPairing] = useState(false);
   const [replacing, setReplacing] = useState<PairedPhone | null>(null);
   const [connecting, setConnecting] = useState(false);
 
@@ -49,7 +49,7 @@ export function PairDevicePage({ stores }: { stores: readonly AppStore[] }) {
               {PAIR_COPY.connectAgent}
             </button>
             {/* Phones pair through the published route, so there is nothing to pair through while remote access is Off. */}
-            <button type="button" className={PRIMARY_BUTTON} disabled={!canPair} title={canPair ? undefined : PAIR_COPY.remoteFirstPhones} onClick={() => setPairing("app")}>
+            <button type="button" className={PRIMARY_BUTTON} disabled={!canPair} title={canPair ? undefined : PAIR_COPY.remoteFirstPhones} onClick={() => setPairing(true)}>
               {PAIR_COPY.pairPhone}
             </button>
           </div>
@@ -77,7 +77,7 @@ export function PairDevicePage({ stores }: { stores: readonly AppStore[] }) {
           }}
           onRepair={(phone) => {
             setReplacing(phone);
-            setPairing("app");
+            setPairing(true);
           }}
           onRemove={async (phone) => {
             if (!(await askConfirm({ ...removeConfirm(phone), destructive: true }))) return;
@@ -87,7 +87,6 @@ export function PairDevicePage({ stores }: { stores: readonly AppStore[] }) {
             if (!(await askConfirm({ ...removeAllConfirm(count), destructive: true }))) return;
             void run(() => removeRevokedPhones(request));
           }}
-          onPairMe={() => setPairing("me")}
         />
       </div>
 
@@ -97,9 +96,8 @@ export function PairDevicePage({ stores }: { stores: readonly AppStore[] }) {
         <PairPhoneSheet
           route={published}
           replacing={replacing}
-          {...(pairing === "me" ? { child: {} } : {})}
           onClose={() => {
-            setPairing(null);
+            setPairing(false);
             setReplacing(null);
             void load();
           }}
