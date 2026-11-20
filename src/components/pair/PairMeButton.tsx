@@ -25,14 +25,16 @@ export function PairMeButton() {
 }
 
 function PairMeFlow({ onClose }: { onClose: () => void }) {
-  const { loaded, published, load } = usePairDevice(request);
-  if (!loaded) return null;
+  const { loaded, published, load, error, forbidden } = usePairDevice(request);
+  // A failed first read says so in the same sheet, rather than leaving the button doing nothing.
+  const failed = !loaded && (forbidden || Boolean(error));
+  if (!loaded && !failed) return null;
   if (!published) {
     return (
       <SheetFrame
         title={PAIR_COPY.pairMe}
         size="confirm"
-        sub={CHILD_PHONES_COPY.remoteFirst}
+        sub={failed ? (forbidden ? PAIR_COPY.adminOnly : error) : CHILD_PHONES_COPY.remoteFirst}
         onClose={onClose}
         footer={
           <>

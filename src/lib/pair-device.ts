@@ -29,6 +29,8 @@ export const PAIR_COPY = {
   paired: "Paired devices",
   pairedSub: "Apps, Watches, agents and what they set up; revoke any one of them",
   noPhones: "No paired devices yet. Pair a device or connect an agent to add one.",
+  /** Nothing here but FamilyFi Me phones, which Pair FamilyFi Me lists. */
+  noPhonesMeElsewhere: "No devices paired here yet. FamilyFi Me phones are on Pair FamilyFi Me.",
   remoteFirst: "Turn on remote access, then pair a device. Agents connect over the home network.",
   remoteFirstPhones: "Turn on remote access, then pair a device.",
   expired: "Expired. Re-pair it to sign it in again.",

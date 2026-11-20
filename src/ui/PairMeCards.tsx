@@ -98,7 +98,7 @@ export function MePeopleCard({
                 </View>
               </View>
               {own.map((phone) => (
-                <PairedPhoneRow key={phone.id} phone={phone} disabled={disabled} onRevoke={() => onRevoke(phone)} />
+                <PairedPhoneRow key={phone.id} phone={phone} hidePerson disabled={disabled} onRevoke={() => onRevoke(phone)} />
               ))}
             </View>
           ))}

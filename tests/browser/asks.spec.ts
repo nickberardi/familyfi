@@ -354,6 +354,8 @@ test("Pair FamilyFi Me lists each person's phones and pairs a device for a perso
     const person = page.getByTestId(`me-person-${group.id}`);
     await expect(person).toContainText("Cassie's iPad");
     await expect(person).toContainText("Screen Time on");
+    // The row sits under Cassie, so it doesn't say so again.
+    await expect(person).not.toContainText("For Cassie");
     await expect(page.getByTestId("me-people")).not.toContainText(/child/i);
     await shot(page, "pair-me-page");
     await expectAccessible(page, "Pair FamilyFi Me");
@@ -367,6 +369,7 @@ test("Pair FamilyFi Me lists each person's phones and pairs a device for a perso
     await page.goto("/pair");
     await expect(page.getByTestId("paired-devices")).toBeVisible();
     await expect(page.getByTestId("paired-devices")).not.toContainText("Cassie's iPad");
+    await expect(page.getByTestId("paired-devices")).toContainText("FamilyFi Me phones are on Pair FamilyFi Me.");
     await expect(page.getByTestId("pair-me")).toHaveCount(0);
 
     // The Family page's Pair FamilyFi Me opens the same sheet, which asks which person.

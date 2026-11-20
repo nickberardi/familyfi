@@ -12,8 +12,8 @@ import type { GroupEdit } from "./use-group-edit";
 
 /**
  * A group's Edit sheet inside each client's own frame, as the design's "Edit <name>" modal has it:
- * its name, a person's role or a Things group's monogram, whether kids can ask about a Things
- * group in FamilyFi Me, what its card's Block button stands for
+ * its name, a person's role or a Things group's monogram, whether FamilyFi Me shows a Things group
+ * (Show in FamilyFi Me), what its card's Block button stands for
  * (shown when it has a category, app or website rule), where its category checks reach DNS, and
  * why the last save was refused. Save, Cancel and Delete belong to the frame: the web's dialog
  * footer, the app's navigation bar.

@@ -61,8 +61,11 @@ export function PairedPhoneRow({
   onRepair,
   onRemove,
   disabled,
+  hidePerson = false,
 }: {
   phone: PairedPhone;
+  /** Leaves out "For Emma" where the row already sits under that person. */
+  hidePerson?: boolean;
   /** The name of the app that set this device up: a Watch's, or its own Siri and shortcuts'. */
   parentName?: string | null;
   /** No changes while the phone's view of the household is stale. */
@@ -92,7 +95,7 @@ export function PairedPhoneRow({
       <View style={styles.phoneWords}>
         <View style={styles.nameRow}>
           <Text style={[text(14, 21, "ink"), styles.bold, styles.name]}>{phone.displayName}</Text>
-          {lines.tags.map((tag) => (
+          {lines.tags.filter((tag) => !(hidePerson && phone.person && tag.name === `For ${phone.person.name}`)).map((tag) => (
             <Tag key={tag.name} label={tag.label === tag.name ? undefined : tag.name} tone={tag.tone}>
               {tag.label}
             </Tag>
@@ -162,7 +165,7 @@ export function PairedDevicesCard({
       </View>
       {active.length === 0 ? (
         <Text style={[text(14, 21, "muted"), styles.empty]}>
-          {canPair ? COPY.noPhones : COPY.remoteFirst}
+          {!canPair ? COPY.remoteFirst : phones.some((phone) => phone.clientType === "me" && !phone.revokedAt) ? COPY.noPhonesMeElsewhere : COPY.noPhones}
         </Text>
       ) : (
         (showAll ? active : active.slice(0, PHONES_SHOWN)).map((phone) => (

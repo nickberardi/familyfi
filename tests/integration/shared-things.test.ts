@@ -1,5 +1,5 @@
 /**
- * Shared Things (FamilyFi Me): a parent switches "Kids can ask" on a Things group, and every child's
+ * Shared Things (FamilyFi Me): a parent switches "Show in FamilyFi Me" on a Things group, and every child's
  * phone then reads it through the routes it reads its own group with, and asks for more time on
  * it. A parent answers with the verbs that answer a child's own ask. Things not shared stay hidden.
  */

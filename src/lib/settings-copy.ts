@@ -180,7 +180,7 @@ export function removeLoginConfirm(account: Pick<Account, "username">, group: Pi
   };
 }
 
-/** Settings' card for asks: how long one waits for an answer, and how long after Not now before a child can ask again. */
+/** Pair FamilyFi Me's card for asks: how long one waits for an answer, and how long after Not now before they can ask again. */
 export const ASKS_CARD_COPY = {
   title: "Asking for more time",
   sub: "How long an ask from FamilyFi Me waits for you",
@@ -189,9 +189,9 @@ export const ASKS_CARD_COPY = {
   wait: "After Not now, they can ask again",
 } as const;
 
-/** The waits Settings offers for an unanswered ask, in minutes (the server takes 5 to 1440). */
+/** The waits the asks card offers for an unanswered ask, in minutes (the server takes 5 to 1440). */
 export const ASK_TIMEOUT_CHOICES = [5, 15, 30, 60, 120, 240, 1440] as const;
-/** The waits Settings offers after Not now, in minutes (the server takes 0 to 1440). */
+/** The waits the asks card offers after Not now, in minutes (the server takes 0 to 1440). */
 export const ASK_WAIT_CHOICES = [0, 15, 30, 60, 120] as const;
 
 /**
