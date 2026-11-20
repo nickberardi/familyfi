@@ -319,7 +319,7 @@ test("Pair FamilyFi Me and its pairing sheet fit a phone", { tag: "@phone" }, as
   }
 });
 
-test("Pair FamilyFi Me lists each person's phones and pairs a device for a person; Pair Device leaves them out", { tag: "@desktop" }, async ({ page }) => {
+test("Pair FamilyFi Me lists only its paired phones and pairs one for a person; Pair Device leaves them out", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const group = await cassie(page);
   const headers = await csrf(page);
@@ -351,18 +351,18 @@ test("Pair FamilyFi Me lists each person's phones and pairs a device for a perso
   await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "named", endpointId: route } });
   try {
     await page.goto("/pair-me");
-    const person = page.getByTestId(`me-person-${group.id}`);
-    await expect(person).toContainText("Cassie's iPad");
-    await expect(person).toContainText("Screen Time on");
-    // The row sits under Cassie, so it doesn't say so again.
-    await expect(person).not.toContainText("For Cassie");
-    await expect(page.getByTestId("me-people")).not.toContainText(/child/i);
+    // Paired devices lists FamilyFi Me phones only, each saying whom it is for; no row per person.
+    const phones = page.getByTestId("me-phones");
+    await expect(phones).toContainText("Cassie's iPad");
+    await expect(phones).toContainText("Screen Time on");
+    await expect(phones).toContainText("For Cassie");
+    await expect(phones).not.toContainText(/\bchild(ren)?\b/i);
     await shot(page, "pair-me-page");
     await expectAccessible(page, "Pair FamilyFi Me");
-    // Pair a device on a person's row pairs for them.
-    await page.getByTestId(`me-pair-${group.id}`).click();
+    // The header's Pair FamilyFi Me asks which person.
+    await page.getByTestId("pair-me-header").click();
     const sheet = page.getByRole("dialog", { name: "Pair FamilyFi Me" });
-    await expect(sheet.getByLabel("For")).toHaveValue(group.id);
+    await expect(sheet.getByLabel("For")).toBeVisible();
     await sheet.getByRole("button", { name: "Cancel" }).click();
 
     // Pair Device lists the household's own devices and agents, not FamilyFi Me phones.

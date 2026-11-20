@@ -18,7 +18,7 @@ import {
   invitePhone,
   isApp,
   isAppControls,
-  mePeople,
+  mePhones,
   pairedHereLabel,
   pairDeviceList,
   pairingAccounts,
@@ -302,20 +302,9 @@ describe("FamilyFi Me on a child's phone", () => {
     expect(pairDeviceList(phones).map((item) => item.id)).toEqual(["m2", "p1"]);
   });
 
-  it("lists everyone with FamilyFi Me and every child or teen without it, in the sheet's order", () => {
-    const groups = [
-      { id: "a1", kind: "family", name: "Nick", familyRole: "adult" },
-      { id: "a2", kind: "family", name: "Sue", familyRole: "adult" },
-      { id: "t2", kind: "family", name: "Betsy", familyRole: "teen" },
-      { id: "g1", kind: "family", name: "Emma", familyRole: "child" },
-      { id: "t1", kind: "things", name: "TV" },
-    ] as Group[];
-    const phones = [child(), child({ id: "m4", person: { id: "a1", name: "Nick" } }), phone()];
-    expect(mePeople(groups, phones).map(({ group, phones: own }) => [group.id, own.map((item) => item.id)])).toEqual([
-      ["g1", ["m1"]],
-      ["t2", []],
-      ["a1", ["m4"]],
-    ]);
+  it("lists only the FamilyFi Me phones still paired on Pair FamilyFi Me", () => {
+    const phones = [child(), child({ id: "m2", revokedAt: "2026-09-10T12:00:00Z" }), child({ id: "m4", person: { id: "a1", name: "Nick" } }), phone()];
+    expect(mePhones(phones).map((item) => item.id)).toEqual(["m1", "m4"]);
   });
 
   it("says how many devices paired through a route are on FamilyFi Me", () => {
@@ -332,7 +321,7 @@ describe("FamilyFi Me on a child's phone", () => {
   });
 
   it("never says child or children on Pair FamilyFi Me", () => {
-    const words = [...Object.values(ME_PAGE_COPY).map((value) => (typeof value === "function" ? value("Emma") : value)), ...Object.values(pairingSheetCopy({ child: true })).flatMap((value) => (typeof value === "string" ? [value] : Object.values(value)))];
+    const words = [...Object.values(ME_PAGE_COPY), ...Object.values(pairingSheetCopy({ child: true })).flatMap((value) => (typeof value === "string" ? [value] : Object.values(value)))];
     expect(words.filter((word) => /\bchild(ren)?\b|\bkids?\b/i.test(word))).toEqual([]);
   });
 
