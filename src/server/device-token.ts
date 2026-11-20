@@ -14,11 +14,24 @@ import { randomToken } from "./crypto";
  */
 export const DEVICE_TOKEN_VERSION = 1;
 
-/** The app version a device may send: semver, as the apps' own versions are. */
+/**
+ * An app version as the apps write it: their marketing version, X.Y (familyfi-mobile
+ * scripts/release.sh), or a full X.Y.Z, either with an optional pre-release or build suffix.
+ */
 export const AppVersion = z
   .string()
   .max(64)
-  .regex(/^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}([-+][0-9A-Za-z.-]+)?$/, "appVersion must be a version such as 2.1.0.");
+  .regex(/^[0-9]{1,4}[.][0-9]{1,4}([.][0-9]{1,6})?([-+][0-9A-Za-z.-]+)?$/);
+
+/**
+ * The app version a request names, or null when it names none or one that can't be read. A version
+ * is information, never a reason to refuse: an unreadable one is ignored rather than answered with
+ * 400, which an app would read as its refresh token refused, and sign out.
+ */
+export function namedAppVersion(value: unknown): string | null {
+  const parsed = AppVersion.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
 
 /** A new token: bare for a device that named no app version, else carrying that version. */
 export function newDeviceToken(appVersion?: string | null): string {

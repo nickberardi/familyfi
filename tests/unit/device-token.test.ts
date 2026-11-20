@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AppVersion, deviceTokenAppVersion, newDeviceToken } from "@/server/device-token";
+import { deviceTokenAppVersion, namedAppVersion, newDeviceToken } from "@/server/device-token";
 
 describe("device tokens", () => {
   it("gives a device that names no app version a bare random token, which carries none", () => {
@@ -27,8 +27,8 @@ describe("device tokens", () => {
     expect(deviceTokenAppVersion("not base64 json, but longer than a bare token is")).toBeNull();
   });
 
-  it("accepts app versions as the apps write them, and nothing else", () => {
-    for (const version of ["2.0.0", "2.1.0", "10.20.300", "2.1.0-beta.1", "2.1.0+42"]) expect(AppVersion.safeParse(version).success).toBe(true);
-    for (const version of ["", "2", "2.1", "v2.1.0", "2.1.0 ", "2.1.0\n", "x".repeat(65)]) expect(AppVersion.safeParse(version).success).toBe(false);
+  it("reads app versions as the apps write them, their X.Y marketing version among them, and ignores anything else", () => {
+    for (const version of ["2.0", "2.1", "2.0.0", "2.1.0", "10.20.300", "2.1.0-beta.1", "2.1.0+42"]) expect(namedAppVersion(version)).toBe(version);
+    for (const version of [undefined, null, 2.1, "", "2", "v2.1.0", "2.1.0 ", "2.1.0\n", "x".repeat(65)]) expect(namedAppVersion(version)).toBeNull();
   });
 });

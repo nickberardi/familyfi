@@ -3563,11 +3563,12 @@ components:
         appVersion:
           type: string
           maxLength: 64
-          pattern: "^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}([-+][0-9A-Za-z.-]+)?$"
+          pattern: "^[0-9]{1,4}[.][0-9]{1,4}([.][0-9]{1,6})?([-+][0-9A-Za-z.-]+)?$"
           description: |
-            The installed app's version. Apps from 2.0 on send it, and the tokens answered then carry it,
-            so every request names the app that sent it; the device's `appVersion` records it. Optional
-            while apps before 2.0, which never send it and keep getting bare tokens, are served.
+            The installed app's version, X.Y or X.Y.Z. Apps from 2.0 on send it, and the tokens answered
+            then carry it, so every request names the app that sent it; the device's `appVersion` records
+            it. Optional while apps before 2.0, which never send it and keep getting bare tokens, are
+            served. One that does not match is ignored, never refused.
     RefreshResponse:
       type: object
       additionalProperties: false
@@ -3914,11 +3915,12 @@ components:
         appVersion:
           type: string
           maxLength: 64
-          pattern: "^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}([-+][0-9A-Za-z.-]+)?$"
+          pattern: "^[0-9]{1,4}[.][0-9]{1,4}([.][0-9]{1,6})?([-+][0-9A-Za-z.-]+)?$"
           description: |
-            The installed app's version. Apps from 2.0 on send it, and the tokens answered then carry it,
-            so every request names the app that sent it; the device's `appVersion` records it. Optional
-            while apps before 2.0, which never send it and keep getting bare tokens, are served.
+            The installed app's version, X.Y or X.Y.Z. Apps from 2.0 on send it, and the tokens answered
+            then carry it, so every request names the app that sent it; the device's `appVersion` records
+            it. Optional while apps before 2.0, which never send it and keep getting bare tokens, are
+            served. One that does not match is ignored, never refused.
     PairedClaim:
       type: object
       additionalProperties: false

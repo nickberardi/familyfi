@@ -266,9 +266,11 @@ request it makes names the app that sent it, and the device's `appVersion` in `/
 the last one it named. An app before 2.0 never names one and keeps getting a bare random token, so a
 bearer with no payload is an app before 2.0. Tokens are still opaque to the device and only their
 hashes are stored: the payload is not a secret, and changing it changes the token, which then matches
-no session. A refresh that names no version keeps the one its refresh token carries, so a device that named one
-never drops back to a bare token. A Watch and the app's Siri sign-in take the version of the app that
-set them up, and keep it through their own refreshes. `appVersion` is optional while apps before 2.0 are served; it
+no session. An app that refreshes without naming a version gets bare tokens again, and its device
+keeps the last version it named. A Watch and the app's Siri sign-in take the version of the app that
+set them up and keep it through their own refreshes, which never name one. A version is X.Y (the
+apps' marketing version) or X.Y.Z; one that can't be read is ignored, never refused, since a refused
+refresh signs the app out. `appVersion` is optional while apps before 2.0 are served; it
 becomes required once they are not.
 The iPhone invites and claims its reachable Watch in one call (`POST /paired/invites?claim=true`),
 without an administrator: the Watch makes no network call to join, the phone hands it its bearer,
