@@ -5,6 +5,10 @@ info:
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
   x-min-app: 1.4.0
+  # Back to 1.4.0 for app 1.4 paired before a server's upgrade (familyfi#454), and only until 2.3.0,
+  # when it returns to 2.0.0 or later: x-min-app-by records that, and tests/unit/api-deprecations.test.ts holds it.
+  x-min-app-by:
+    2.3.0: 2.0.0
   # The oldest server API version an app built from this document can read: raised to `version`
   # when a response gains a required field. Apps compile it in; it never leaves the app.
   x-min-server: 2.0.0
@@ -3067,7 +3071,7 @@ paths:
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { name: clientType, in: query, required: false, explode: true, schema: { type: array, items: { type: string, enum: [app, app-watch, app-controls, me, agent] } }, description: "Only devices of these client types. An unknown client type answers 400." }
-        - { name: client, in: query, required: false, deprecated: true, explode: true, schema: { type: array, items: { type: string, enum: [app, phone, watch, agent] } }, description: "The filter apps before 2.0 send, still read so their Watch screen lists only Watches: `watch` is `app-watch`, `app` and `phone` are `app` and `app-controls`, `agent` is `agent`. Use `clientType`." }
+        - { name: client, in: query, required: false, deprecated: true, x-removed-in: 2.3.0, explode: true, schema: { type: array, items: { type: string, enum: [app, phone, watch, agent] } }, description: "Deprecated, and removed in 2.3.0. The filter apps before 2.0 send, still read so their Watch screen lists only Watches: `watch` is `app-watch`, `app` and `phone` are `app` and `app-controls`, `agent` is `agent`. Use `clientType`." }
         - { name: status, in: query, required: false, schema: { type: string, enum: [active, revoked] } }
       responses:
         "200": { description: Devices, content: { application/json: { schema: { type: object, additionalProperties: false, required: [devices], properties: { devices: { type: array, items: { $ref: "#/components/schemas/PairedDevice" } } } } } } }
@@ -3352,16 +3356,18 @@ components:
         minAppApiVersion:
           type: string
           deprecated: true
+          x-removed-in: 2.3.0
           description: |
-            Deprecated, and will be removed in a future version: send `?clientType=` and read
+            Deprecated, and removed in 2.3.0: send `?clientType=` and read
             `minApiVersion`. The oldest client API version this server still serves (`info.x-min-app`).
             A client whose API version is older must ask to be updated instead of reading the household.
             Apps built before 2.0.0 read only this, so it stays until they no longer need telling to update.
         minWatchApiVersion:
           type: string
           deprecated: true
+          x-removed-in: 2.3.0
           description: |
-            Deprecated, and will be removed in a future version: send `?clientType=app-watch` and read
+            Deprecated, and removed in 2.3.0: send `?clientType=app-watch` and read
             `minApiVersion`. The oldest watch app API version this server still serves
             (`info.x-min-app-watch`). A watch app whose API version is older must ask to be updated once
             a read it needs fails.
@@ -3569,7 +3575,8 @@ components:
             The installed app's version, X.Y or X.Y.Z. Apps from 2.0 on send it, and the tokens answered
             then carry it, so every request names the app that sent it; the device's `appVersion` records
             it. Optional while apps before 2.0, which never send it and keep getting bare tokens, are
-            served. One that does not match is ignored, never refused.
+            served. One that does not match is ignored, never refused. Required from 2.3.0.
+          x-required-in: 2.3.0
     RefreshResponse:
       type: object
       additionalProperties: false
@@ -3921,7 +3928,8 @@ components:
             The installed app's version, X.Y or X.Y.Z. Apps from 2.0 on send it, and the tokens answered
             then carry it, so every request names the app that sent it; the device's `appVersion` records
             it. Optional while apps before 2.0, which never send it and keep getting bare tokens, are
-            served. One that does not match is ignored, never refused.
+            served. One that does not match is ignored, never refused. Required from 2.3.0.
+          x-required-in: 2.3.0
     PairedClaim:
       type: object
       additionalProperties: false

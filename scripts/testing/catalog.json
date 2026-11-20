@@ -580,6 +580,11 @@
         "contracts"
       ]
     },
+    "tests/unit/api-deprecations.test.ts": {
+      "categories": [
+        "contracts"
+      ]
+    },
     "tests/integration/agent-pairing.test.ts": {
       "categories": [
         "pairing",

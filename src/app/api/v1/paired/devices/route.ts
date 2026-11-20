@@ -5,7 +5,7 @@ import { listPairedDevices } from "@/server/paired-devices";
 
 /**
  * The client types each value of the `?client=` filter apps before 2.0 send stands for. Their `app`
- * covered the app's Siri sign-in too, which was an `app` with `rulesOnly`; `phone` is `app` from before 1.1.
+ * covered the app's Siri sign-in too, which was an `app` with `rulesOnly`; `phone` is `app` from before 1.1. Deprecated in 2.0 and removed in 2.3.0.
  */
 const LEGACY_CLIENT: Record<string, string[]> = { app: ["app", "app-controls"], phone: ["app", "app-controls"], watch: ["app-watch"], agent: ["agent"] };
 
