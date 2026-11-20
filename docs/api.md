@@ -348,7 +348,9 @@ write fails. `POST /groups/{id}/asks/{askId}/decline` is Not now. Any other writ
 waiting ask is about (the group's unblock or allowance, the rule paused or allowed for the group or
 for everyone) answers it yes as well, by that parent. An ask nobody answers closes at the earlier of
 the household's `askTimeoutMinutes` and the end of the block it asks about (moved when the pause is set again or extended): `timedOut` or `ended`. It
-reads closed as soon as that time passes, and the next sync pass writes it so.
+reads closed as soon as that time passes, and the next sync pass writes it so. A yes to unblock ends (`ended`) when the group is blocked
+again, paused or its Block button rule put back, so a child's day never tells an unblock from
+before the newest block.
 
 An app's Siri, Shortcuts and system controls (Control Center, Quick Settings) run outside the app.
 They never use the app's own tokens: two holders of one rotating refresh token end the sign-in

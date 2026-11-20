@@ -1,7 +1,7 @@
 import { RuleLiftKind } from "@prisma/client";
 import { COUNTRIES_RULE_ID, LOCK_DNS_RULE_ID } from "@/lib/rules";
 import { extendSuspensionUntil } from "@/lib/schedule";
-import { answerAsks } from "./asks";
+import { answerAsks, endEarlierUnblockYes } from "./asks";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
 import { groupInclude, lifted, publicGroup, sessionActor } from "./groups";
@@ -62,10 +62,11 @@ export async function unblockGroup(
     // nothing blocks the group, and an ask for time off a rule it lifted.
     await answerAsks(session, groupId, { pause: blockedByPause || targets.length > 0, ruleIds: targets.map(({ rule }) => rule.id) });
   } else if (action === "end") {
-    await prisma().ruleGroup.updateMany({
+    const ended = await prisma().ruleGroup.updateMany({
       where: { groupId, rule: { systemGroupId: null }, ruleId: { notIn: [LOCK_DNS_RULE_ID, COUNTRIES_RULE_ID] }, pauseActive: true, pauseKind: RuleLiftKind.allow },
       data: CLEARED,
     });
+    if (ended.count) await endEarlierUnblockYes(groupId);
   } else {
     if (allowances.length === 0) throw new ApiError(409, "not_unblocked", "Extend requires an active unblock.");
     const timed = allowances.filter((link) => link.pauseUntil !== null);

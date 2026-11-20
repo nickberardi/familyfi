@@ -1,6 +1,6 @@
 import { RuleKind, RuleLiftKind, RuleMode, RuleScope } from "@prisma/client";
 import { extendSuspensionUntil } from "@/lib/schedule";
-import { answerAsks, blockedBeyondPause, claimAsk, followPause, releaseAsk } from "./asks";
+import { answerAsks, blockedBeyondPause, claimAsk, endEarlierUnblockYes, followPause, releaseAsk } from "./asks";
 import { isFullApp } from "./device-scope";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
@@ -67,6 +67,7 @@ export async function liftGroupInternet(
       });
       await tx.ruleGroup.updateMany({ where: { ...lifts, pauseActive: true, pauseKind: RuleLiftKind.allow }, data: CLEARED });
     });
+    await endEarlierUnblockYes(groupId);
     await followPause(groupId);
   } else if (action === "resume") {
     const resumed = await prisma().rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });

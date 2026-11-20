@@ -364,6 +364,53 @@ describe("asking for more time", () => {
     expect((await prisma().ask.findUniqueOrThrow({ where: { id: waiting.id } })).endsWithBlock).toBe(false);
   });
 
+  it("ends a yes to unpause once the group is paused again, so the child's day never tells it after that pause (issue 436)", async () => {
+    await verb(pauseRoute, "pause", admin, emma.id, "internet", { until: new Date(Date.now() + 60 * MINUTE).toISOString() });
+    const waiting = await askOf(await ask(child, emma.id, { about: "pause" }));
+    expect((await verb(resumeRoute, "resume", admin, emma.id, "internet", { askId: waiting.id })).status).toBe(200);
+    expect((await readGroup(child, emma.id)).ask).toMatchObject({ id: waiting.id, state: "yes" });
+
+    // Paused again later the same day: the earlier yes is over, before and after this pause.
+    expect((await verb(pauseRoute, "pause", admin, emma.id, "internet", { until: new Date(Date.now() + 60 * MINUTE).toISOString() })).status).toBe(200);
+    expect((await readGroup(child, emma.id)).ask).toMatchObject({ id: waiting.id, state: "ended" });
+    // Another parent ends the pause without an ask: nothing names the parent from before.
+    expect((await verb(resumeRoute, "resume", admin, emma.id, "internet")).status).toBe(200);
+    const after = (await readGroup(child, emma.id)).ask!;
+    expect(after).toMatchObject({ id: waiting.id, state: "ended" });
+    expect(after.by).toBeUndefined();
+  });
+
+  it("ends a yes to unblock a Thing once its Block button rule is put back, by the card's Block or the rule's resume", async () => {
+    const tv = await prisma().group.create({ data: { kind: GroupKind.things, name: "TV", kidsCanAsk: true } });
+    const video = await prisma().rule.create({ data: { name: "Video", kind: RuleKind.category, mode: RuleMode.always, targetIds: [4], groups: { create: { groupId: tv.id } } } });
+    await prisma().group.update({ where: { id: tv.id }, data: { blockButtonRuleId: video.id } });
+
+    // Yes through the card's Unblock, ended by the card's Block (the unblock's end).
+    const first = await askOf(await ask(child, tv.id, { about: "pause" }));
+    expect((await unblockRoute(post(`/api/v1/groups/${tv.id}/unblock`, admin, {}), groupParams(tv.id))).status).toBe(200);
+    expect((await readGroup(admin, tv.id)).ask).toMatchObject({ id: first.id, state: "yes" });
+    const { POST: endRoute } = await import("@/app/api/v1/groups/[id]/unblock/end/route");
+    expect((await endRoute(post(`/api/v1/groups/${tv.id}/unblock/end`, admin), groupParams(tv.id))).status).toBe(200);
+    expect((await readGroup(child, tv.id)).ask).toMatchObject({ id: first.id, state: "ended" });
+
+    // Yes through Video paused for TV, ended by Video's resume for TV.
+    const second = await askOf(await ask(child, tv.id, { about: "pause" }));
+    expect((await verb(pauseRoute, "pause", admin, tv.id, video.id, { until: new Date(Date.now() + 30 * MINUTE).toISOString() })).status).toBe(200);
+    expect((await readGroup(admin, tv.id)).ask).toMatchObject({ id: second.id, state: "yes" });
+    expect((await verb(resumeRoute, "resume", admin, tv.id, video.id)).status).toBe(200);
+    expect((await readGroup(child, tv.id)).ask).toMatchObject({ id: second.id, state: "ended" });
+  });
+
+  it("keeps a yes to unpause when another rule is resumed for the group", async () => {
+    const homework = await windowRule(emma.id);
+    await verb(pauseRoute, "pause", admin, emma.id, "internet", { until: new Date(Date.now() + 60 * MINUTE).toISOString() });
+    const waiting = await askOf(await ask(child, emma.id, { about: "pause" }));
+    expect((await verb(resumeRoute, "resume", admin, emma.id, "internet", { askId: waiting.id })).status).toBe(200);
+    expect((await verb(pauseRoute, "pause", admin, emma.id, homework.id, { until: new Date(Date.now() + 30 * MINUTE).toISOString() })).status).toBe(200);
+    expect((await verb(resumeRoute, "resume", admin, emma.id, homework.id)).status).toBe(200);
+    expect((await readGroup(child, emma.id)).ask).toMatchObject({ id: waiting.id, state: "yes" });
+  });
+
   it("keeps the household's timeout and wait in its settings, within bounds", async () => {
     const put = (body: unknown) => putHousehold(request("/api/v1/settings/household", { method: "PUT", auth: admin, headers: json, body: JSON.stringify(body) }));
     const saved = await put({ askTimeoutMinutes: 15, askWaitMinutes: 0 });
