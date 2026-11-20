@@ -29,6 +29,7 @@ export async function liftGroupInternet(
   action: LiftAction,
   groupId: string,
   body: LiftBody,
+  answering?: string,
 ) {
   const existing = await prisma().group.findUnique({ where: { id: groupId }, include: groupInclude });
   if (!existing) throw new ApiError(404, "not_found", "Group not found.");
@@ -71,7 +72,10 @@ export async function liftGroupInternet(
     await followPause(groupId);
   } else if (action === "resume") {
     const resumed = await prisma().rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
-    if (resumed.count) await answerAsks(session, groupId, { pause: true });
+    if (resumed.count) {
+      await endEarlierUnblockYes(groupId, answering);
+      await answerAsks(session, groupId, { pause: true });
+    }
   } else if (action === "extend") {
     if (!block || !blocking) throw new ApiError(409, "not_paused", "Extend requires an active pause.");
     if (!block.expiresAt) throw new ApiError(409, "indefinite", "An indefinite pause has no expiry to extend.");
@@ -107,6 +111,7 @@ export async function liftGroupInternet(
       // Read and cleared here, so a pause that lands meanwhile is replaced, not left beside the allow.
       await tx.rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
     });
+    if (blocking) await endEarlierUnblockYes(groupId);
     await answerAsks(session, groupId, { pause: true, ruleIds: targets.map(({ rule }) => rule.id) });
   } else {
     await clearAllowances();
@@ -162,7 +167,7 @@ async function liftForAsk(session: AnsweringSession, action: LiftAction, target:
   const ask = await claimAsk(session, body.askId!, { groupId: target.groupId, about, ruleId: target.ruleId });
   try {
     const rest: LiftBody = { ...body, askId: undefined };
-    if (about === "pause") return await liftGroupInternet(session, action, target.groupId, rest);
+    if (about === "pause") return await liftGroupInternet(session, action, target.groupId, rest, ask.id);
     const rule = await prisma().rule.findUnique({ where: { id: target.ruleId }, include: { windows: true } });
     if (!rule) throw new ApiError(404, "not_found", "Rule not found.");
     const now = new Date();
