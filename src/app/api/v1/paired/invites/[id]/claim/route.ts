@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { TUNNEL_HEADER } from "@/lib/constants";
-import { AppVersion } from "@/server/device-token";
+import { namedAppVersion } from "@/server/device-token";
 import { readBody } from "@/server/guard";
 import { jsonError } from "@/server/http";
 import { claimInviteFrom } from "@/server/pairing";
 
-/** `appVersion` is optional while apps before 2.0, which never send it, still pair. */
-const Body = z.object({ token: z.string().min(1), deviceName: z.string().trim().min(1).max(80), appVersion: AppVersion.optional() });
+/** `appVersion` is optional while apps before 2.0, which never send it, still pair; an unreadable one is ignored. */
+const Body = z.object({ token: z.string().min(1), deviceName: z.string().trim().min(1).max(80), appVersion: z.unknown().optional() });
 type Ctx = { params: Promise<{ id: string }> };
 
 /** Joins with an invite's single-use code. Every client gets the same answer: its device, bearer and refresh token. */
@@ -18,7 +18,7 @@ export async function POST(request: Request, context: Ctx) {
     id,
     token: parsed.data.token,
     displayName: parsed.data.deviceName,
-    appVersion: parsed.data.appVersion,
+    appVersion: namedAppVersion(parsed.data.appVersion),
     userAgent: request.headers.get("user-agent"),
     tunnelled: request.headers.get(TUNNEL_HEADER) === "tunnel",
   });

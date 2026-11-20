@@ -339,9 +339,10 @@ export async function refreshSession(
   // Remote access is for the household's phones; an agent renews from the home network or not at all.
   if (options.tunnelled && session.device.clientType === "agent") return { ok: false, code: "agent_remote", message: "Agents connect from the home network only." };
 
-  // A refresh that names no version keeps the one its token carries, so a device that named one once
-  // (or a Watch its app set up) never falls back to a bare token, which means an app before 2.0.
-  const appVersion = options.appVersion ?? deviceTokenAppVersion(refreshToken);
+  // An app that names no version is one before 2.0, and gets bare tokens. A Watch or the app's Siri
+  // sign-in never names one when it refreshes: it keeps the version of the app that set it up.
+  const companion = session.device.clientType === "app-watch" || session.device.clientType === "app-controls";
+  const appVersion = options.appVersion ?? (companion ? deviceTokenAppVersion(refreshToken) : null);
   const next = bearerSessionData(now, appVersion);
   const rotated = await prisma().session.updateMany({
     // A retry of the replaced token rotates only if its window is still the one read here.

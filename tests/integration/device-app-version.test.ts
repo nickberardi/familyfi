@@ -59,7 +59,7 @@ describe("the app version a paired device runs", () => {
     expect((await readSessionFromRequest(request("/api/v1/auth/session", { auth: bearer(claim.token) })))?.appVersion).toBe("2.1.0");
   });
 
-  it("moves the version on at refresh, and keeps it, in the tokens too, when a refresh names none", async () => {
+  it("moves the version on at refresh; a refresh that names none gets bare tokens, and the device keeps its last version", async () => {
     const claim = await pairPhone(await pairingAdminAuth(), { appVersion: "2.1.0" });
     const updated = await refreshed(claim.refreshToken, { appVersion: "2.2.0" });
     expect(deviceTokenAppVersion(updated.token)).toBe("2.2.0");
@@ -67,8 +67,8 @@ describe("the app version a paired device runs", () => {
     expect(await listedVersion(claim.device.id)).toBe("2.2.0");
 
     const silent = await refreshed(updated.refreshToken);
-    expect(deviceTokenAppVersion(silent.token)).toBe("2.2.0");
-    expect(deviceTokenAppVersion(silent.refreshToken)).toBe("2.2.0");
+    expect(silent.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(silent.refreshToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(await signedIn(silent.token)).toBe(true);
     expect(await listedVersion(claim.device.id)).toBe("2.2.0");
   });
@@ -80,16 +80,26 @@ describe("the app version a paired device runs", () => {
     expect(await listedVersion(claim.device.id)).toBe("2.1.0");
   });
 
-  it("refuses a version that is not one, at pairing and at refresh, without spending either", async () => {
+  it("reads the X.Y marketing version the apps ship with", async () => {
+    const claim = await pairPhone(await pairingAdminAuth(), { appVersion: "2.0" });
+    expect(deviceTokenAppVersion(claim.token)).toBe("2.0");
+    expect(await listedVersion(claim.device.id)).toBe("2.0");
+    const next = await refreshed(claim.refreshToken, { appVersion: "2.1" });
+    expect(deviceTokenAppVersion(next.token)).toBe("2.1");
+  });
+
+  it("ignores a version it can't read, at pairing and at refresh, rather than refusing either", async () => {
     const admin = await pairingAdminAuth();
     const issued = await issuedInvite(await invitePhoneRequest(admin, { endpointId: (await homeRoute()).id }));
-    expect((await claimInvite(issued, "iPhone", {}, { appVersion: "latest" })).status).toBe(400);
-    const claimed = await claimInvite(issued, "iPhone", {}, { appVersion: "2.1.0" });
+    const claimed = await claimInvite(issued, "iPhone", {}, { appVersion: "latest" });
     expect(claimed.status).toBe(200);
-    const claim = (await claimed.json()) as Pair;
+    const claim = (await claimed.json()) as Pair & { device: { id: string } };
+    expect(claim.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(await listedVersion(claim.device.id)).toBeNull();
 
-    expect((await refreshWith(claim.refreshToken, { appVersion: "2.1" })).status).toBe(400);
-    expect(await signedIn((await refreshed(claim.refreshToken)).token)).toBe(true);
+    const next = await refreshed(claim.refreshToken, { appVersion: 21 });
+    expect(next.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(await signedIn(next.token)).toBe(true);
   });
 
   it("gives a Watch the version of the app that set it up", async () => {
