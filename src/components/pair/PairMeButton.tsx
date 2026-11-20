@@ -6,6 +6,7 @@ import { PairPhoneSheet } from "@/components/pair/PairPhoneSheet";
 import { CANCEL_BUTTON, PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 import { request } from "@/lib/api";
 import { CHILD_PHONES_COPY, PAIR_COPY } from "@/lib/pair-device";
+import { Alert } from "@/ui/Alert";
 import { usePairDevice } from "@/ui/use-pair-device";
 
 /**
@@ -26,28 +27,38 @@ export function PairMeButton() {
 
 function PairMeFlow({ onClose }: { onClose: () => void }) {
   const { loaded, published, load, error, forbidden } = usePairDevice(request);
-  // A failed first read says so in the same sheet, rather than leaving the button doing nothing.
+  if (loaded && published) return <PairPhoneSheet route={published} child={{}} onClose={onClose} onPaired={() => void load()} />;
+  // Until remote access has loaded the sheet says so; a failed read is a danger Alert with Try again.
   const failed = !loaded && (forbidden || Boolean(error));
-  if (!loaded && !failed) return null;
-  if (!published) {
-    return (
-      <SheetFrame
-        title={PAIR_COPY.pairMe}
-        size="confirm"
-        sub={failed ? (forbidden ? PAIR_COPY.adminOnly : error) : CHILD_PHONES_COPY.remoteFirst}
-        onClose={onClose}
-        footer={
+  const cancel = (
+    <button type="button" className={CANCEL_BUTTON} onClick={onClose}>
+      {PAIR_COPY.cancel}
+    </button>
+  );
+  return (
+    <SheetFrame
+      title={PAIR_COPY.pairMe}
+      size="confirm"
+      sub={loaded ? CHILD_PHONES_COPY.remoteFirst : failed ? undefined : CHILD_PHONES_COPY.loading}
+      onClose={onClose}
+      footer={
+        loaded ? (
           <>
-            <button type="button" className={CANCEL_BUTTON} onClick={onClose}>
-              {PAIR_COPY.cancel}
-            </button>
+            {cancel}
             <Link href="/pair" className={PRIMARY_BUTTON} onClick={onClose}>
               {PAIR_COPY.openPairDevice}
             </Link>
           </>
-        }
-      />
-    );
-  }
-  return <PairPhoneSheet route={published} child={{}} onClose={onClose} onPaired={() => void load()} />;
+        ) : (
+          cancel
+        )
+      }
+    >
+      {failed ? (
+        <Alert tone="danger" role="alert" action={forbidden ? undefined : { label: CHILD_PHONES_COPY.tryAgain, onPress: () => void load() }}>
+          {forbidden ? PAIR_COPY.adminOnly : error}
+        </Alert>
+      ) : null}
+    </SheetFrame>
+  );
 }

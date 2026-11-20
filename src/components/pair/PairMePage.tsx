@@ -48,7 +48,7 @@ export function PairMePage() {
             type="button"
             className={PRIMARY_BUTTON}
             disabled={!canPair}
-            title={canPair ? undefined : CHILD_PHONES_COPY.remoteFirst}
+            title={canPair || !loaded ? undefined : CHILD_PHONES_COPY.remoteFirst}
             onClick={() => setPairing("")}
             data-testid="pair-me-header"
           >

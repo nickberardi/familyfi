@@ -389,8 +389,25 @@ test("the Family page's Pair FamilyFi Me says remote access comes first while no
   await page.getByTestId("family-pair-me").click();
   const sheet = page.getByRole("dialog", { name: "Pair FamilyFi Me" });
   await expect(sheet).toContainText("Turn on remote access under Pair Device, then pair FamilyFi Me.");
-  await sheet.getByRole("link", { name: "Pair Device" }).click();
+  await sheet.getByRole("link", { name: "Open Pair Device" }).click();
   await expect(page).toHaveURL(/\/pair$/);
+});
+
+test("the Family page's Pair FamilyFi Me says so when remote access can't be read, and tries again", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  let fail = true;
+  await page.route("**/api/v1/connection/tunnel", async (route) => {
+    if (fail) return route.fulfill({ status: 500, json: { error: { code: "internal", message: "Could not load remote access." } } });
+    return route.fallback();
+  });
+  await page.goto("/family");
+  await page.getByTestId("family-pair-me").click();
+  const sheet = page.getByRole("dialog", { name: "Pair FamilyFi Me" });
+  const alert = sheet.getByRole("alert");
+  await expect(alert).toContainText("Could not load remote access.");
+  fail = false;
+  await alert.getByRole("button", { name: "Try again" }).click();
+  await expect(sheet).toContainText("Turn on remote access under Pair Device, then pair FamilyFi Me.");
 });
 
 test("Pair FamilyFi Me's Shared Things switch shows a Thing in FamilyFi Me", { tag: "@desktop" }, async ({ page }) => {
