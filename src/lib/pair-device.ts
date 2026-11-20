@@ -408,7 +408,7 @@ export const ME_PAGE_COPY = {
   pairFor: "Pair a device",
   pairForLabel: (name: string) => `Pair a device for ${name}`,
   noPhone: "No phone paired yet",
-  empty: "Nobody has FamilyFi Me yet. Pair a device for a person in your family.",
+  empty: "Nobody has FamilyFi Me yet. Choose Pair FamilyFi Me to pair a person's phone.",
   noPeople: "Add a person under Family, then pair their phone.",
   shared: "Shared Things",
   sharedSub: "Things everyone with FamilyFi Me sees and can ask you for more time on",
