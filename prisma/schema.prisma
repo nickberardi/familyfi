@@ -244,6 +244,9 @@ model PairedDevice {
   protectionAt    DateTime? @db.Timestamptz(3)
   /// When parents were told this child's phone had gone quiet; cleared when it is heard from again.
   quietAlertedAt  DateTime? @db.Timestamptz(3)
+  /// The app version it last said it runs, at pairing or at its last token refresh
+  /// (src/server/device-token.ts). Null for apps before 2.0, which never say, and for agents.
+  appVersion      String?
   createdAt       DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime       @updatedAt @db.Timestamptz(3)
   sessions        Session[]

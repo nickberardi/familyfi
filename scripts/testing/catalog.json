@@ -114,6 +114,12 @@
         "sessions"
       ]
     },
+    "tests/unit/device-token.test.ts": {
+      "categories": [
+        "sessions",
+        "pairing"
+      ]
+    },
     "tests/unit/crypto.test.ts": {
       "categories": [
         "settings",
@@ -825,6 +831,12 @@
       "categories": [
         "pairing",
         "devices"
+      ]
+    },
+    "tests/integration/device-app-version.test.ts": {
+      "categories": [
+        "sessions",
+        "pairing"
       ]
     },
     "tests/integration/session-refresh.test.ts": {

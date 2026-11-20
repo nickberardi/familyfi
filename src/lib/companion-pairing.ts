@@ -154,13 +154,15 @@ export async function claimHousehold(
   transport: Transport,
   pending: PendingEnrollment,
   deviceName: string,
+  appVersion?: string | null,
 ): Promise<{ profile: ConnectionProfile; edgeCredentials: EndpointCredential[]; session: StoredSession }> {
   const { code, identity } = pending;
   const claim = await codeRequest(transport, code)<ClaimResponse>(
     `/api/v1/paired/invites/${encodeURIComponent(code.pairingId)}/claim`,
     {
       method: "POST",
-      body: { token: code.token, deviceName },
+      // The app version rides in the tokens the claim returns, so the household knows what each device runs.
+      body: { token: code.token, deviceName, ...(appVersion ? { appVersion } : {}) },
     },
   );
   const manifest = verifyManifest(claim.connection.manifest, identity.publicKey.x, identity.instanceId);
@@ -183,10 +185,10 @@ export async function claimHousehold(
  * Trades a refresh token for a new bearer and refresh token (`POST /api/v1/auth/refresh`). The
  * request carries no bearer: the refresh token is the credential. A refused token throws `ApiError`.
  */
-export async function renewPaired(request: ApiRequest, refreshToken: string): Promise<StoredSession> {
+export async function renewPaired(request: ApiRequest, refreshToken: string, appVersion?: string | null): Promise<StoredSession> {
   const result = await request<{ session: Session; token: string; refreshToken: string }>("/api/v1/auth/refresh", {
     method: "POST",
-    body: { refreshToken },
+    body: { refreshToken, ...(appVersion ? { appVersion } : {}) },
   });
   return { token: result.token, session: result.session, refreshToken: result.refreshToken };
 }

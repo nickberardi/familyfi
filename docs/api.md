@@ -258,6 +258,17 @@ because a copy exists. Once the new refresh token has been used, the replaced on
 (403 `invalid_refresh`). Both tokens live on one session, so revoking the
 device, signing out, a password change or removing the account ends them together. Removing an
 account also removes the paired devices that act as it.
+
+An app from 2.0 on names its installed version, `appVersion`, when it claims its code and each time
+it refreshes. The tokens it gets then carry that version (base64url JSON
+`{ "v": 1, "appVersion": "2.1.0", "token": "<random>" }`, `src/server/device-token.ts`), so every
+request it makes names the app that sent it, and the device's `appVersion` in `/paired/devices` records
+the last one it named. An app before 2.0 never names one and keeps getting a bare random token, so a
+bearer with no payload is an app before 2.0. Tokens are still opaque to the device and only their
+hashes are stored: the payload is not a secret, and changing it changes the token, which then matches
+no session. A Watch and the app's Siri sign-in take the version of the app that set them up, and keep it
+when they refresh without naming one. `appVersion` is optional while apps before 2.0 are served; it
+becomes required once they are not.
 The iPhone invites and claims its reachable Watch in one call (`POST /paired/invites?claim=true`),
 without an administrator: the Watch makes no network call to join, the phone hands it its bearer,
 refresh token and manifest, and the phone is recorded as its parent. The Watch acts as the phone's

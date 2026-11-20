@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 2.0.0
+  version: 2.1.0
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
   x-min-app: 2.0.0
@@ -3560,6 +3560,14 @@ components:
       required: [refreshToken]
       properties:
         refreshToken: { type: string, minLength: 1 }
+        appVersion:
+          type: string
+          maxLength: 64
+          pattern: "^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}([-+][0-9A-Za-z.-]+)?$"
+          description: |
+            The installed app's version. Apps from 2.0 on send it, and the tokens answered then carry it,
+            so every request names the app that sent it; the device's `appVersion` records it. Optional
+            while apps before 2.0, which never send it and keep getting bare tokens, are served.
     RefreshResponse:
       type: object
       additionalProperties: false
@@ -3903,6 +3911,14 @@ components:
       properties:
         token: { type: string }
         deviceName: { type: string, minLength: 1, maxLength: 80 }
+        appVersion:
+          type: string
+          maxLength: 64
+          pattern: "^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}([-+][0-9A-Za-z.-]+)?$"
+          description: |
+            The installed app's version. Apps from 2.0 on send it, and the tokens answered then carry it,
+            so every request names the app that sent it; the device's `appVersion` records it. Optional
+            while apps before 2.0, which never send it and keep getting bare tokens, are served.
     PairedClaim:
       type: object
       additionalProperties: false
@@ -3999,6 +4015,9 @@ components:
         parentDeviceId: { type: [string, "null"], description: "The paired device whose invite this one joined with: a Watch's phone, or the phone that paired a phone or agent. Revoking it revokes this device. A child's phone has none: it belongs to its group." }
         enrolledAt: { type: string, format: date-time }
         lastSeenAt: { type: [string, "null"], format: date-time }
+        appVersion:
+          type: [string, "null"]
+          description: "The app version the device last said it runs, at pairing or its last token refresh. Null for an app before 2.0, which never says, and for an agent. A Watch and the app's Siri sign-in take the version of the app that set them up. Absent from servers before 2.1.0."
         protection: { $ref: "#/components/schemas/MeProtection", description: "A child's phone (`me`) only, once it has said: its Screen Time permission. Absent on Android and on every other device." }
         protectionAt: { type: [string, "null"], format: date-time, description: "When a child's phone last changed `protection`; present with it." }
         revokedAt: { type: [string, "null"], format: date-time }

@@ -131,6 +131,8 @@ async function join(db: Db, input: {
   displayName: string;
   clientId?: string | null;
   userAgent?: string | null;
+  /** The app version the device runs, when it says (src/server/device-token.ts). */
+  appVersion?: string | null;
   now: Date;
 }): Promise<Pick<Joined, "device" | "bearer">> {
   const { invite, signer, now } = input;
@@ -160,6 +162,7 @@ async function join(db: Db, input: {
       groupId: signer.group?.id ?? null,
       parentDeviceId,
       lastSeenAt: now,
+      appVersion: input.appVersion ?? null,
     },
   });
   await db.pairing.update({ where: { id: invite.id }, data: { claimedDeviceId: device.id } });
@@ -169,7 +172,7 @@ async function join(db: Db, input: {
     await db.pairedDevice.updateMany({ where: { parentDeviceId: replaces, accountId: account.id }, data: { parentDeviceId: device.id } });
     await removeDevice(replaces, db, now);
   }
-  const bearer = bearerSessionData(now);
+  const bearer = bearerSessionData(now, input.appVersion);
   await db.session.create({
     data: { ...bearer.data, kind: SessionKind.bearer, accountId: account?.id ?? null, username: account ? account.username : meSessionUsername(device.id), deviceId: device.id, userAgent: input.userAgent ?? undefined },
   });
@@ -202,7 +205,7 @@ export async function claimResponse(joined: Joined, endpoint: Parameters<typeof 
 }
 
 /** Claims an invite with its single-use token; a phone takes its invite's name. A companion's invite is never claimable here: its phone claimed it already. */
-export async function claimInvite(input: { id: string; token: string; displayName: string; userAgent?: string | null }) {
+export async function claimInvite(input: { id: string; token: string; displayName: string; userAgent?: string | null; appVersion?: string | null }) {
   const invite = await prisma().pairing.findUnique({ where: { id: input.id }, include: { endpoint: true, account: true, group: { select: { id: true, name: true, kind: true } } } });
   if (!invite || !invite.scope || isCompanion(invite.clientType) || invite.claimedAt || invite.expiresAt <= new Date() || !safeEqual(invite.tokenHash, sha256(input.token))) return null;
   if ((invite.clientType === "app" || invite.clientType === "me") && !invite.endpoint) return null;
@@ -230,7 +233,7 @@ export async function claimInvite(input: { id: string; token: string; displayNam
     }
     // A phone is called what the administrator named it when inviting it; what it calls itself is often just "iPhone".
     const displayName = invite.clientType === "app" || invite.clientType === "me" ? invite.displayName : input.displayName;
-    return join(db, { invite, signer, displayName, userAgent: input.userAgent, now });
+    return join(db, { invite, signer, displayName, userAgent: input.userAgent, appVersion: input.appVersion, now });
   }).catch((caught: unknown) => {
     if (caught instanceof VoidInvite) return null;
     throw caught;
@@ -254,7 +257,7 @@ function isCompanion(clientType: string): clientType is CompanionClient {
  * makes a network call to join: the app hands it the tokens and manifest. Re-enrolling the same
  * `clientId` retires the old record.
  */
-async function inviteAndClaimCompanion(input: { clientType: CompanionClient; parentDeviceId: string; account: Account; clientId: string; displayName: string; userAgent?: string | null }) {
+async function inviteAndClaimCompanion(input: { clientType: CompanionClient; parentDeviceId: string; account: Account; clientId: string; displayName: string; userAgent?: string | null; appVersion?: string | null }) {
   const now = new Date();
   const joined = await prisma().$transaction(async (db) => {
     const invite = await db.pairing.create({
@@ -270,7 +273,7 @@ async function inviteAndClaimCompanion(input: { clientType: CompanionClient; par
         claimedAt: now,
       },
     });
-    return { invite, ...(await join(db, { invite, signer: { account: input.account }, displayName: input.displayName, clientId: input.clientId, userAgent: input.userAgent, now })) };
+    return { invite, ...(await join(db, { invite, signer: { account: input.account }, displayName: input.displayName, clientId: input.clientId, userAgent: input.userAgent, appVersion: input.appVersion, now })) };
   });
   return { invite: joined.invite, claim: await claimResponse({ ...joined, account: input.account }, null) };
 }
@@ -352,7 +355,8 @@ export function companionHost(session: SignedInSession) {
     throw new ApiError(403, "paired_phone_required", "Only a signed-in paired phone can invite and claim its Watch or its Siri and shortcuts.");
   }
   if (!mayPairAs(session.account)) throw new ApiError(403, "personal_account_required", RECOVERY_REFUSED);
-  return { deviceId: session.device.id, account: session.account };
+  // Its Watch and its Siri sign-in come with the app that sets them up, so they share its version.
+  return { deviceId: session.device.id, account: session.account, appVersion: session.appVersion };
 }
 
 /** A paired app invites its Watch, or its own `rulesOnly` sign-in, and claims it at once. */
@@ -370,6 +374,7 @@ export async function claimCompanion(
       clientId: input.clientId,
       displayName: input.displayName ?? COMPANION_NAME[input.clientType],
       userAgent,
+      appVersion: host.appVersion,
     });
   } catch (caught) {
     if (caught instanceof ClientIdInUseError) throw new ApiError(409, "client_id_in_use", caught.message);

@@ -4,6 +4,7 @@ import { type Account, AccountKind, SessionKind } from "@prisma/client";
 import { cookieValue } from "@/lib/cookie";
 import { randomToken, safeEqual, sha256 } from "./crypto";
 import { prisma } from "./db";
+import { deviceTokenAppVersion, newDeviceToken } from "./device-token";
 import { demoModeEnabled, recoveryPassword } from "./env";
 import { originAllowed } from "./origin";
 import { ensureCountriesRule, ensureLockDnsRule, ensureQuarantineRule } from "./rules";
@@ -266,11 +267,12 @@ export async function createSession(input: {
 
 /**
  * A paired device's token pair: an access token that lives an hour and the refresh token that
- * renews it. Only their hashes are stored; the raw values are returned to the device once.
+ * renews it. Only their hashes are stored; the raw values are returned to the device once. A device
+ * that names its app version gets tokens that carry it (src/server/device-token.ts).
  */
-export function bearerSessionData(now = new Date()) {
-  const token = randomToken();
-  const refreshToken = randomToken();
+export function bearerSessionData(now = new Date(), appVersion?: string | null) {
+  const token = newDeviceToken(appVersion);
+  const refreshToken = newDeviceToken(appVersion);
   const expiresAt = new Date(now.getTime() + ACCESS_TOKEN_TTL_MS);
   const refreshExpiresAt = new Date(now.getTime() + REFRESH_TOKEN_TTL_MS);
   return {
@@ -306,7 +308,10 @@ function awaitingUse(previousRefreshUntil: Date | null, now: Date) {
  * replaced token means a copy exists, so the whole sign-in is revoked. Once the new refresh token
  * has been used, the replaced one is simply invalid.
  */
-export async function refreshSession(refreshToken: string, options: { tunnelled?: boolean; now?: Date; reread?: boolean } = {}): Promise<RefreshResult> {
+export async function refreshSession(
+  refreshToken: string,
+  options: { tunnelled?: boolean; now?: Date; reread?: boolean; appVersion?: string | null } = {},
+): Promise<RefreshResult> {
   const now = options.now ?? new Date();
   const presented = sha256(refreshToken);
   const include = { account: true, device: { include: { group: { select: { name: true } } } } } as const;
@@ -334,7 +339,7 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
   // Remote access is for the household's phones; an agent renews from the home network or not at all.
   if (options.tunnelled && session.device.clientType === "agent") return { ok: false, code: "agent_remote", message: "Agents connect from the home network only." };
 
-  const next = bearerSessionData(now);
+  const next = bearerSessionData(now, options.appVersion);
   const rotated = await prisma().session.updateMany({
     // A retry of the replaced token rotates only if its window is still the one read here.
     where: { id: session.id, refreshTokenHash: current, revokedAt: null, ...(grace ? { previousRefreshUntil: session.previousRefreshUntil } : {}) },
@@ -357,7 +362,11 @@ export async function refreshSession(refreshToken: string, options: { tunnelled?
     }
     return INVALID_REFRESH;
   }
-  await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: now, quietAlertedAt: null } });
+  // An app that names its version records it; one that does not (before 2.0, or a Watch) leaves it as it was.
+  await prisma().pairedDevice.update({
+    where: { id: session.device.id },
+    data: { lastSeenAt: now, quietAlertedAt: null, ...(options.appVersion ? { appVersion: options.appVersion } : {}) },
+  });
   return { ok: true, session: { username: session.username, expiresAt: next.expiresAt, account: session.account, device: session.device }, token: next.token, refreshToken: next.refreshToken, refreshExpiresAt: next.refreshExpiresAt };
 }
 
@@ -402,7 +411,8 @@ export async function readSessionFromRequest(request: Request) {
     // Heard from again: a child's phone told as quiet can be told again next time.
     await prisma().pairedDevice.update({ where: { id: session.device.id }, data: { lastSeenAt: new Date(), quietAlertedAt: null } });
   }
-  return session;
+  // The app version the bearer carries, read from the token itself; null for a bare one.
+  return Object.assign(session, { appVersion: presented.bearer ? deviceTokenAppVersion(raw) : null });
 }
 
 /** What `toPublicSession` reads: the session, its account, and for a child's phone its group. */

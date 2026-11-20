@@ -95,6 +95,8 @@ export function createCompanionSession(deps: {
   deviceName: () => string;
   /** Which client this is, so it spends only a code made for it: the app by default. */
   client?: PairingClient;
+  /** The installed app's version, sent when pairing and refreshing so the household knows what each device runs. */
+  appVersion?: string | null;
 }) {
   const { transport, deviceName } = deps;
   const client = deps.client ?? "app";
@@ -149,7 +151,7 @@ export function createCompanionSession(deps: {
       const held = state.session;
       if (!asked || !held?.refreshToken) throw new ApiError("Signed out.", 401, "unauthorized");
       try {
-        const next = await renewPaired(sendUnsigned, held.refreshToken);
+        const next = await renewPaired(sendUnsigned, held.refreshToken, deps.appVersion);
         // Forgotten or paired again while it was asked: the answer is for a session the phone no longer holds.
         if (!holds(asked) || state.session !== held) return;
         // The server has already replaced the old refresh token: hold the new one even if storing it
@@ -230,7 +232,7 @@ export function createCompanionSession(deps: {
       });
     let token = held.token;
     if (held.refreshToken && Date.parse(held.session.expiresAt) - Date.now() < RENEW_AHEAD_MS) {
-      token = (await renewPaired(over(null), held.refreshToken).catch(() => null))?.token ?? token;
+      token = (await renewPaired(over(null), held.refreshToken, deps.appVersion).catch(() => null))?.token ?? token;
     }
     await over(token)(`/api/v1/paired/devices/${encodeURIComponent(profile.deviceId)}`, { method: "DELETE" }).catch(() => undefined);
   };
@@ -295,7 +297,7 @@ export function createCompanionSession(deps: {
      */
     async trust() {
       if (!state.pending) return;
-      const claimed = await claimHousehold(transport, state.pending, deviceName());
+      const claimed = await claimHousehold(transport, state.pending, deviceName(), deps.appVersion);
       // The code's client type is unsigned text, so what the claim signed the device in as decides:
       // FamilyFi Me keeps only a child's sign-in for a person, and the app never keeps one. Any other
       // is revoked at once and never stored.

@@ -54,6 +54,8 @@ function publicPairedDevice(device: Listed) {
     parentDeviceId: device.parentDeviceId,
     enrolledAt: device.createdAt.toISOString(),
     lastSeenAt: device.lastSeenAt?.toISOString() ?? null,
+    // The app version it last said it runs; null for an app before 2.0, which never says, and for agents.
+    appVersion: device.appVersion,
     revokedAt: device.revokedAt?.toISOString() ?? null,
     pairedVia: route ? { endpointId: route.id, url: route.url, transport: route.transport } : null,
     edgeTokens: device.edgeTokens,
