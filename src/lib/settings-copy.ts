@@ -183,7 +183,7 @@ export function removeLoginConfirm(account: Pick<Account, "username">, group: Pi
 /** Settings' card for asks: how long one waits for an answer, and how long after Not now before a child can ask again. */
 export const ASKS_CARD_COPY = {
   title: "Asking for more time",
-  sub: "How long a child's ask from FamilyFi Me waits for you",
+  sub: "How long an ask from FamilyFi Me waits for you",
   timeout: "An ask waits for an answer",
   timeoutNote: "Then it closes, and they can ask again.",
   wait: "After Not now, they can ask again",

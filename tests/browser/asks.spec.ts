@@ -128,11 +128,15 @@ test("a child's ask to unblock opens the card's own Unblock sheet when there is 
   }
 });
 
-test("Settings sets how long an ask waits and how soon a child can ask again", { tag: "@desktop" }, async ({ page }) => {
+test("Pair FamilyFi Me sets how long an ask waits and how soon they can ask again", { tag: "@desktop" }, async ({ page }) => {
   await signIn(page);
   const before = (await (await page.request.get("/api/v1/settings/household")).json()) as { household: { askTimeoutMinutes: number; askWaitMinutes: number } };
   try {
+    // The waits moved from Settings to Pair FamilyFi Me, with the rest of FamilyFi Me.
     await page.goto("/settings");
+    await expect(page.getByTestId("settings-alerts").first()).toBeVisible();
+    await expect(page.getByTestId("settings-asks")).toHaveCount(0);
+    await page.goto("/pair-me");
     const card = page.getByTestId("settings-asks");
     await expect(card).toContainText("Asking for more time");
     await card.getByLabel("An ask waits for an answer").selectOption("120");
@@ -290,29 +294,118 @@ test("a family member's FamilyFi Me phone is listed on their page and can be rev
   await expect(card).not.toContainText("Cassie's phone");
 });
 
-test("Pair Device, the pairing sheet and Settings fit a phone", { tag: "@phone" }, async ({ page }) => {
+test("Pair FamilyFi Me and its pairing sheet fit a phone", { tag: "@phone" }, async ({ page }) => {
   await signIn(page);
   const headers = await csrf(page);
   const url = `https://me-phone-${Date.now()}.tail1234.ts.net`;
   const route = ((await (await page.request.post("/api/v1/connection/endpoints", { headers, data: { url, transport: "tailscale", trustMode: "system", priority: 0 } })).json()) as { endpoint: { id: string } }).endpoint.id;
   await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "named", endpointId: route } });
   try {
-    await page.goto("/pair");
-    await expect(page.getByTestId("pair-me")).toBeEnabled();
-    await shot(page, "pair-page");
-    await page.getByTestId("pair-me").click();
+    await page.goto("/pair-me");
+    await expect(page.getByTestId("pair-me-header")).toBeEnabled();
+    await expect(page.getByTestId("me-app-stores")).toContainText("Get FamilyFi Me");
+    await shot(page, "pair-me-page");
+    await expectAccessible(page, "Pair FamilyFi Me");
+    await page.getByTestId("pair-me-header").click();
     const sheet = page.getByRole("dialog", { name: "Pair FamilyFi Me" });
     // Children first: the phone is most likely for one of them.
     await expect(sheet.getByLabel("Phone name")).toHaveValue("Cassie's phone");
     await shot(page, "pair-me-sheet");
     await expectAccessible(page, "the Pair FamilyFi Me sheet", "[role=dialog]");
     await sheet.getByRole("button", { name: "Cancel" }).click();
-    await page.goto("/settings");
-    await page.getByTestId("settings-asks").scrollIntoViewIfNeeded();
-    await shot(page, "settings-asks");
-    await expectAccessible(page, "Settings with asking for more time");
   } finally {
     await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "off" } });
     await page.request.delete(`/api/v1/connection/endpoints/${route}`, { headers });
+  }
+});
+
+test("Pair FamilyFi Me lists each person's phones and pairs a device for a person; Pair Device leaves them out", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const group = await cassie(page);
+  const headers = await csrf(page);
+  const phone = {
+    id: "me-listed",
+    displayName: "Cassie's iPad",
+    clientType: "me",
+    scope: "me:askOnly",
+    actsAs: null,
+    person: { id: group.id, name: group.name },
+    protection: "on",
+    parentDeviceId: null,
+    enrolledAt: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+    lastSeenAt: new Date(Date.now() - 10 * 60_000).toISOString(),
+    revokedAt: null,
+    pairedVia: null,
+    edgeTokens: [],
+    sessions: [{ id: "s1", username: "device:me-listed", expiresAt: new Date(Date.now() + 80 * 86_400_000).toISOString(), createdAt: new Date().toISOString() }],
+  };
+  // FamilyFi Me can't pair in a browser test, so the list carries one as FamilyFi sends it.
+  await page.route(/\/api\/v1\/paired\/devices(\?.*)?$/, async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    const response = await route.fetch();
+    const body = (await response.json()) as { devices: unknown[] };
+    await route.fulfill({ response, json: { devices: [phone, ...body.devices] } });
+  });
+  const url = `https://me-page-${Date.now()}.tail1234.ts.net`;
+  const route = ((await (await page.request.post("/api/v1/connection/endpoints", { headers, data: { url, transport: "tailscale", trustMode: "system", priority: 0 } })).json()) as { endpoint: { id: string } }).endpoint.id;
+  await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "named", endpointId: route } });
+  try {
+    await page.goto("/pair-me");
+    const person = page.getByTestId(`me-person-${group.id}`);
+    await expect(person).toContainText("Cassie's iPad");
+    await expect(person).toContainText("Screen Time on");
+    await expect(page.getByTestId("me-people")).not.toContainText(/child/i);
+    await shot(page, "pair-me-page");
+    await expectAccessible(page, "Pair FamilyFi Me");
+    // Pair a device on a person's row pairs for them.
+    await page.getByTestId(`me-pair-${group.id}`).click();
+    const sheet = page.getByRole("dialog", { name: "Pair FamilyFi Me" });
+    await expect(sheet.getByLabel("For")).toHaveValue(group.id);
+    await sheet.getByRole("button", { name: "Cancel" }).click();
+
+    // Pair Device lists the household's own devices and agents, not FamilyFi Me phones.
+    await page.goto("/pair");
+    await expect(page.getByTestId("paired-devices")).toBeVisible();
+    await expect(page.getByTestId("paired-devices")).not.toContainText("Cassie's iPad");
+    await expect(page.getByTestId("pair-me")).toHaveCount(0);
+
+    // The Family page's Pair FamilyFi Me opens the same sheet, which asks which person.
+    await page.goto("/family");
+    await page.getByTestId("family-pair-me").click();
+    await expect(page.getByRole("dialog", { name: "Pair FamilyFi Me" }).getByLabel("For")).toBeVisible();
+    await shot(page, "family-pair-me");
+  } finally {
+    await page.request.put("/api/v1/connection/tunnel", { headers, data: { mode: "off" } });
+    await page.request.delete(`/api/v1/connection/endpoints/${route}`, { headers });
+  }
+});
+
+test("the Family page's Pair FamilyFi Me says remote access comes first while none is published", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  await page.goto("/family");
+  await page.getByTestId("family-pair-me").click();
+  const sheet = page.getByRole("dialog", { name: "Pair FamilyFi Me" });
+  await expect(sheet).toContainText("Turn on remote access under Pair Device, then pair FamilyFi Me.");
+  await sheet.getByRole("link", { name: "Pair Device" }).click();
+  await expect(page).toHaveURL(/\/pair$/);
+});
+
+test("Pair FamilyFi Me's Shared Things switch shows a Thing in FamilyFi Me", { tag: "@desktop" }, async ({ page }) => {
+  await signIn(page);
+  const headers = await csrf(page);
+  const { groups } = (await (await page.request.get("/api/v1/groups")).json()) as { groups: (Group & { kidsCanAsk?: boolean })[] };
+  const thing = groups.find((item) => item.kind === "things" && !item.kidsCanAsk);
+  expect(thing, "the seed household has a Thing not shown in FamilyFi Me").toBeTruthy();
+  try {
+    await page.goto("/pair-me");
+    const toggle = page.getByRole("switch", { name: `Show ${thing!.name} in FamilyFi Me` });
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect
+      .poll(async () => ((await (await page.request.get(`/api/v1/groups/${thing!.id}`)).json()) as { group: { kidsCanAsk?: boolean } }).group.kidsCanAsk)
+      .toBe(true);
+  } finally {
+    await page.request.put(`/api/v1/groups/${thing!.id}`, { headers, data: { kidsCanAsk: false } });
   }
 });

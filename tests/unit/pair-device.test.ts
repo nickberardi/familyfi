@@ -5,6 +5,9 @@ import {
   TESTFLIGHT_URL,
   appStoresFor,
   CHILD_PHONES_COPY,
+  ME_APP_STORES,
+  ME_APP_STORE_URL,
+  ME_PAGE_COPY,
   PAIR_COPY,
   PLAY_BETA,
   canRepair,
@@ -15,6 +18,8 @@ import {
   invitePhone,
   isApp,
   isAppControls,
+  mePeople,
+  pairDeviceList,
   pairingAccounts,
   pairingChildGroups,
   pairingExpired,
@@ -289,6 +294,37 @@ describe("FamilyFi Me on a child's phone", () => {
   it("lists a family member's own phones that are still paired", () => {
     const phones = [child(), child({ id: "m2", revokedAt: "2026-09-10T12:00:00Z" }), child({ id: "m3", person: { id: "g2", name: "Max" } }), phone()];
     expect(childPhonesOf(phones, "g1").map((item) => item.id)).toEqual(["m1"]);
+  });
+
+  it("leaves FamilyFi Me phones still paired off Pair Device, and keeps revoked ones there to remove", () => {
+    const phones = [child(), child({ id: "m2", revokedAt: "2026-09-10T12:00:00Z" }), phone()];
+    expect(pairDeviceList(phones).map((item) => item.id)).toEqual(["m2", "p1"]);
+  });
+
+  it("lists everyone with FamilyFi Me and every child or teen without it, in the sheet's order", () => {
+    const groups = [
+      { id: "a1", kind: "family", name: "Nick", familyRole: "adult" },
+      { id: "a2", kind: "family", name: "Sue", familyRole: "adult" },
+      { id: "t2", kind: "family", name: "Betsy", familyRole: "teen" },
+      { id: "g1", kind: "family", name: "Emma", familyRole: "child" },
+      { id: "t1", kind: "things", name: "TV" },
+    ] as Group[];
+    const phones = [child(), child({ id: "m4", person: { id: "a1", name: "Nick" } }), phone()];
+    expect(mePeople(groups, phones).map(({ group, phones: own }) => [group.id, own.map((item) => item.id)])).toEqual([
+      ["g1", ["m1"]],
+      ["t2", []],
+      ["a1", ["m4"]],
+    ]);
+  });
+
+  it("points FamilyFi Me's App Store badge at its listing, with Google Play coming", () => {
+    expect(ME_APP_STORES.map((store) => store.url)).toEqual([ME_APP_STORE_URL, null]);
+    expect(ME_APP_STORE_URL).toBe("https://apps.apple.com/app/id6836159703");
+  });
+
+  it("never says child or children on Pair FamilyFi Me", () => {
+    const words = [...Object.values(ME_PAGE_COPY).map((value) => (typeof value === "function" ? value("Emma") : value)), ...Object.values(pairingSheetCopy({ child: true })).flatMap((value) => (typeof value === "string" ? [value] : Object.values(value)))];
+    expect(words.filter((word) => /\bchild(ren)?\b|\bkids?\b/i.test(word))).toEqual([]);
   });
 
   it("is paired for a family member, named for them until someone renames it", () => {

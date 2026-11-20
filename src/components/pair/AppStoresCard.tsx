@@ -68,14 +68,27 @@ function StepsBadge({ store }: { store: AppStore }) {
   );
 }
 
-/** Where to get the FamilyFi app before pairing a phone: each store's badge, linked once the store has a link. */
-export function AppStoresCard({ stores }: { stores: readonly AppStore[] }) {
+/**
+ * Where to get an app before pairing it: each store's badge, linked once the store has a link. The
+ * FamilyFi app by default; Pair FamilyFi Me passes FamilyFi Me's title and stores.
+ */
+export function AppStoresCard({
+  stores,
+  title = PAIR_COPY.getApp,
+  sub = PAIR_COPY.getAppSub,
+  testId = "app-stores",
+}: {
+  stores: readonly AppStore[];
+  title?: string;
+  sub?: string;
+  testId?: string;
+}) {
   return (
-    <section data-testid="app-stores" className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
+    <section data-testid={testId} className="rounded-[12px] border border-[var(--ff-hairline-card)] bg-[var(--ff-card)]">
       <div className="flex flex-wrap items-center gap-3 px-[18px] py-[15px]">
         <div className="min-w-[200px] flex-1">
-          <div className="text-[14px] font-semibold">{PAIR_COPY.getApp}</div>
-          <div className="mt-0.5 text-[14px] text-[var(--ff-ink-2)]">{PAIR_COPY.getAppSub}</div>
+          <div className="text-[14px] font-semibold">{title}</div>
+          <div className="mt-0.5 text-[14px] text-[var(--ff-ink-2)]">{sub}</div>
         </div>
         <div className="flex flex-wrap items-start gap-3">
           {stores.map((store) =>
