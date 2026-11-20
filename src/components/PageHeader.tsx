@@ -55,7 +55,8 @@ export function PageHeader({
       >
         ☰
       </button>
-      <div className="min-w-0 flex-1">
+      {/* At least 16rem, so on a phone the actions wrap under the title rather than squeezing it to a word a line. */}
+      <div className="min-w-[min(100%,16rem)] flex-1">
         <h1 className="m-0 text-[21px] leading-[1.2] font-bold tracking-tight">{title}</h1>
         {sub ? <p className="mt-0.5 text-[14px] leading-[1.25] text-[var(--ff-muted)]">{sub}</p> : null}
       </div>

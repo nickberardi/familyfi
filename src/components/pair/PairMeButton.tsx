@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { PairPhoneSheet } from "@/components/pair/PairPhoneSheet";
-import { PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
+import { CANCEL_BUTTON, PRIMARY_BUTTON, SECONDARY_BUTTON, SheetFrame } from "@/components/pair/SheetFrame";
 import { request } from "@/lib/api";
 import { CHILD_PHONES_COPY, PAIR_COPY } from "@/lib/pair-device";
 import { usePairDevice } from "@/ui/use-pair-device";
@@ -36,7 +36,7 @@ function PairMeFlow({ onClose }: { onClose: () => void }) {
         onClose={onClose}
         footer={
           <>
-            <button type="button" className={SECONDARY_BUTTON} onClick={onClose}>
+            <button type="button" className={CANCEL_BUTTON} onClick={onClose}>
               {PAIR_COPY.cancel}
             </button>
             <Link href="/pair" className={PRIMARY_BUTTON} onClick={onClose}>

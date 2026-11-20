@@ -18,7 +18,22 @@ function useText() {
   return (size: number, lineHeight: number, token: string) => ({ fontFamily: ui.font, fontSize: size, lineHeight, color: ui.color(token) });
 }
 
-export function TextButton({ label, token, onPress, disabled, testID }: { label: string; token: string; onPress: () => void; disabled?: boolean; testID?: string }) {
+export function TextButton({
+  label,
+  token,
+  onPress,
+  disabled,
+  testID,
+  accessibilityLabel,
+}: {
+  label: string;
+  token: string;
+  onPress: () => void;
+  disabled?: boolean;
+  testID?: string;
+  /** A fuller name than the words shown, such as the person a row's button is for. */
+  accessibilityLabel?: string;
+}) {
   const text = useText();
   return (
     <Pressable
@@ -27,6 +42,7 @@ export function TextButton({ label, token, onPress, disabled, testID }: { label:
       disabled={disabled}
       onPress={onPress}
       testID={testID}
+      aria-label={accessibilityLabel}
       style={({ pressed }) => [styles.textButton, disabled && { opacity: 0.4 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
     >
       <Text style={[text(14, 21, token), styles.bold]}>{label}</Text>
