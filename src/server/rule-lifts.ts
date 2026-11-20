@@ -3,7 +3,7 @@ import { z } from "zod";
 import { mapLimited } from "@/lib/concurrency";
 import { QUARANTINE_RULE_ID, type BuiltInRule } from "@/lib/rules";
 import { extendSuspensionUntil } from "@/lib/schedule";
-import { answerAsks } from "./asks";
+import { answerAsks, endEarlierUnblockYes } from "./asks";
 import { enqueueChange } from "./changes";
 import { deviceScopeRefusal } from "./auth";
 import { prisma } from "./db";
@@ -110,6 +110,11 @@ export async function liftRule(
   }
   // A pause or allowance lifts the rule: a child's waiting ask about it is answered.
   if (data && (action === "pause" || action === "allow")) await answerAsks(session, target.groupId ?? null, { ruleIds: [rule.id] });
+  // A Thing's Block button rule put back for it blocks it again: an earlier yes to unblock is over.
+  if (data && link && (action === "resume" || action === "disallow")) {
+    const group = await prisma().group.findUnique({ where: { id: link.groupId }, select: { blockButtonRuleId: true } });
+    if (group?.blockButtonRuleId === rule.id) await endEarlierUnblockYes(link.groupId);
+  }
   const fresh = await prisma().rule.findUniqueOrThrow({ where: { id: rule.id }, include: ruleInclude });
   const change = await enqueueChange(action === "disallow" ? "allow" : action);
   return { rule: await presentRule(fresh), change };

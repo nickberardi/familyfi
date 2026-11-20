@@ -772,6 +772,7 @@ enum AskState {
 /// pause (`about` pause) or to lift one rule's window for it (`about` rule). At most one waits per
 /// group. A parent answers yes with the group's resume or the rule's allow, or no with decline; an
 /// ask left waiting closes at `expiresAt`: `ended` when that is the block's end, else `timedOut`.
+/// A yes to unblock ends (`ended`) once the group is blocked again.
 model Ask {
   id                  String        @id @default(cuid())
   /// What the ask is about: the child's own group, or a Things group shared with children.
