@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { remoteStatus, routeTrust, transportLabel } from "@/lib/connection-routes";
-import { canRepair, isApp, isAppControls, PAIR_COPY as COPY, pairDeviceList, PHONES_SHOWN, phoneLines, revokedToggleLabel, showAllLabel, splitPhones } from "@/lib/pair-device";
+import { canRepair, isApp, isAppControls, mePhones, PAIR_COPY as COPY, pairDeviceList, PHONES_SHOWN, phoneLines, revokedToggleLabel, showAllLabel, splitPhones } from "@/lib/pair-device";
 import type { ConnectionRoute, PairedPhone, RemoteAccess } from "@/lib/types";
 
 import { Tag } from "./Tag";
@@ -18,22 +18,7 @@ function useText() {
   return (size: number, lineHeight: number, token: string) => ({ fontFamily: ui.font, fontSize: size, lineHeight, color: ui.color(token) });
 }
 
-export function TextButton({
-  label,
-  token,
-  onPress,
-  disabled,
-  testID,
-  accessibilityLabel,
-}: {
-  label: string;
-  token: string;
-  onPress: () => void;
-  disabled?: boolean;
-  testID?: string;
-  /** A fuller name than the words shown, such as the person a row's button is for. */
-  accessibilityLabel?: string;
-}) {
+function TextButton({ label, token, onPress, disabled, testID }: { label: string; token: string; onPress: () => void; disabled?: boolean; testID?: string }) {
   const text = useText();
   return (
     <Pressable
@@ -42,7 +27,6 @@ export function TextButton({
       disabled={disabled}
       onPress={onPress}
       testID={testID}
-      aria-label={accessibilityLabel}
       style={({ pressed }) => [styles.textButton, disabled && { opacity: 0.4 }, pressed && !disabled && { opacity: PRESS_OPACITY }]}
     >
       <Text style={[text(14, 21, token), styles.bold]}>{label}</Text>
@@ -61,11 +45,8 @@ export function PairedPhoneRow({
   onRepair,
   onRemove,
   disabled,
-  hidePerson = false,
 }: {
   phone: PairedPhone;
-  /** Leaves out "For Emma" where the row already sits under that person. */
-  hidePerson?: boolean;
   /** The name of the app that set this device up: a Watch's, or its own Siri and shortcuts'. */
   parentName?: string | null;
   /** No changes while the phone's view of the household is stale. */
@@ -95,7 +76,7 @@ export function PairedPhoneRow({
       <View style={styles.phoneWords}>
         <View style={styles.nameRow}>
           <Text style={[text(14, 21, "ink"), styles.bold, styles.name]}>{phone.displayName}</Text>
-          {lines.tags.filter((tag) => !(hidePerson && phone.person && tag.name === `For ${phone.person.name}`)).map((tag) => (
+          {lines.tags.map((tag) => (
             <Tag key={tag.name} label={tag.label === tag.name ? undefined : tag.name} tone={tag.tone}>
               {tag.label}
             </Tag>
@@ -165,7 +146,7 @@ export function PairedDevicesCard({
       </View>
       {active.length === 0 ? (
         <Text style={[text(14, 21, "muted"), styles.empty]}>
-          {!canPair ? COPY.remoteFirst : phones.some((phone) => phone.clientType === "me" && !phone.revokedAt) ? COPY.noPhonesMeElsewhere : COPY.noPhones}
+          {!canPair ? COPY.remoteFirst : mePhones(phones).length ? COPY.noPhonesMeElsewhere : COPY.noPhones}
         </Text>
       ) : (
         (showAll ? active : active.slice(0, PHONES_SHOWN)).map((phone) => (

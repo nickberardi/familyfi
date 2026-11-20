@@ -397,32 +397,23 @@ export function pairDeviceList(phones: readonly PairedPhone[]): PairedPhone[] {
   return phones.filter((phone) => phone.clientType !== "me" || phone.revokedAt);
 }
 
-/** System › Pair FamilyFi Me: getting FamilyFi Me, each person's phones, asking for more time, and the Things it shows. */
+/** System › Pair FamilyFi Me: getting FamilyFi Me, the phones paired with it, asking for more time, and the Things it shows. */
 export const ME_PAGE_COPY = {
   title: PAIR_COPY.pairMe,
   sub: "FamilyFi Me shows a person their own rules and lets them ask you for more time",
   getApp: "Get FamilyFi Me",
   getAppSub: "Install it on their phone before you pair it.",
-  people: "People",
-  peopleSub: "Each person's FamilyFi Me phones; revoke any one of them",
-  pairFor: "Pair a device",
-  pairForLabel: (name: string) => `Pair a device for ${name}`,
-  noPhone: "No phone paired yet",
-  empty: "Nobody has FamilyFi Me yet. Choose Pair FamilyFi Me to pair a person's phone.",
-  noPeople: "Add a person under Family, then pair their phone.",
+  phones: "Paired devices",
+  phonesSub: "FamilyFi Me on each person's phone; revoke any one of them",
+  empty: "No FamilyFi Me phones paired yet. Choose Pair FamilyFi Me to pair a person's phone.",
   shared: "Shared Things",
   sharedSub: "Things everyone with FamilyFi Me sees and can ask you for more time on",
   noThings: "No Things groups yet.",
 } as const;
 
-/**
- * Who Pair FamilyFi Me lists: everyone with a FamilyFi Me phone still paired, and every child and teen
- * still without one, in the order the pairing sheet offers them (children, teens, then adults).
- */
-export function mePeople(groups: readonly Group[], phones: readonly PairedPhone[]): { group: Group; phones: PairedPhone[] }[] {
-  return pairingChildGroups(groups)
-    .map((group) => ({ group, phones: childPhonesOf(phones, group.id) }))
-    .filter(({ group, phones: own }) => own.length > 0 || group.familyRole === "child" || group.familyRole === "teen");
+/** Pair FamilyFi Me's list: the FamilyFi Me phones still paired, the ones Pair Device leaves out (`pairDeviceList`). */
+export function mePhones(phones: readonly PairedPhone[]): PairedPhone[] {
+  return phones.filter((phone) => phone.clientType === "me" && !phone.revokedAt);
 }
 
 /**

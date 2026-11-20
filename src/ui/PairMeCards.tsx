@@ -5,14 +5,12 @@ import { StyleSheet, Text, View } from "react-native";
 import { groupEditDraft } from "@/lib/group-form";
 import { updateGroup } from "@/lib/group-writes";
 import type { HouseholdStore } from "@/lib/household-store";
-import { personMonogram } from "@/lib/internet-zone";
-import { CHILD_PHONES_COPY, ME_PAGE_COPY as COPY, mePeople } from "@/lib/pair-device";
+import { CHILD_PHONES_COPY, ME_PAGE_COPY as COPY, mePhones } from "@/lib/pair-device";
 import type { Group, PairedPhone } from "@/lib/types";
 
 import { Alert } from "./Alert";
-import { PairedPhoneRow, TextButton } from "./PairedDevices";
+import { PairedPhoneRow } from "./PairedDevices";
 import { useUI } from "./UIContext";
-import { useLargeText } from "./use-large-text";
 
 function useText() {
   const ui = useUI();
@@ -33,42 +31,35 @@ function CardHead({ title, sub }: { title: string; sub: string }) {
 }
 
 /**
- * Pair FamilyFi Me's people, as every client shows them: everyone with a FamilyFi Me phone and every
- * child or teen without one (`mePeople`), each with Pair a device and their phones as Pair Device lists
- * them, with Revoke. Pairing needs a published route (`canPair`). Until the phones have loaded it says
- * so, and a failed load offers Try again (`status`). Each callback asks first where the platform does.
+ * Pair FamilyFi Me's paired devices, as every client shows them: the FamilyFi Me phones still paired
+ * (`mePhones`), each drawn as Pair Device draws a phone, with whom it is for and Revoke. Pairing needs a
+ * published route (`canPair`), so without one it says so. Until the phones have loaded it says so, and
+ * a failed load offers Try again (`status`). Revoke asks first where the platform does.
  */
-export function MePeopleCard({
-  groups,
+export function MePhonesCard({
   phones,
   canPair,
   status,
-  onPair,
   onRevoke,
   onRetry,
   disabled,
 }: {
-  groups: readonly Group[];
   phones: readonly PairedPhone[];
   canPair: boolean;
   status: "loading" | "failed" | "ready";
-  onPair: (group: Group) => void;
   onRevoke: (phone: PairedPhone) => void;
   onRetry: () => void;
   disabled?: boolean;
 }) {
   const ui = useUI();
   const text = useText();
-  const large = useLargeText();
-  const people = mePeople(groups, phones);
-  const off = disabled || !canPair || status !== "ready";
-  const anyFamily = groups.some((group) => group.kind === "family");
+  const paired = mePhones(phones);
   return (
-    <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="me-people">
-      <CardHead title={COPY.people} sub={COPY.peopleSub} />
+    <View style={[styles.card, { backgroundColor: ui.color("card"), borderColor: ui.color("hairline-card") }]} testID="me-phones">
+      <CardHead title={COPY.phones} sub={COPY.phonesSub} />
       {status === "failed" ? (
         <View style={styles.empty}>
-          <Alert tone="danger" action={{ label: CHILD_PHONES_COPY.tryAgain, onPress: onRetry, testID: "me-people-retry" }}>
+          <Alert tone="danger" action={{ label: CHILD_PHONES_COPY.tryAgain, onPress: onRetry, testID: "me-phones-retry" }}>
             {CHILD_PHONES_COPY.loadFailed}
           </Alert>
         </View>
@@ -76,31 +67,11 @@ export function MePeopleCard({
         <Text style={[text(14, 21, "muted"), styles.empty]}>{CHILD_PHONES_COPY.loading}</Text>
       ) : (
         <>
-          {/* Why Pair a device is off, with phones listed or not. */}
+          {/* Why Pair FamilyFi Me is off, with phones listed or not. */}
           {!canPair ? <Text style={[text(14, 21, "muted"), styles.empty]}>{CHILD_PHONES_COPY.remoteFirst}</Text> : null}
-          {people.length === 0 ? <Text style={[text(14, 21, "muted"), styles.empty]}>{anyFamily ? COPY.empty : COPY.noPeople}</Text> : null}
-          {people.map(({ group, phones: own }, index) => (
-            <View key={group.id} style={index > 0 || !canPair ? { borderTopWidth: 1, borderTopColor: ui.color("hairline") } : undefined} testID={`me-person-${group.id}`}>
-              <View style={[styles.person, large && styles.personStacked]}>
-                <View style={styles.personName}>
-                  <View style={[styles.mark, { backgroundColor: ui.color("person-fill") }]} aria-hidden>
-                    <Text maxFontSizeMultiplier={1.2} style={{ fontFamily: ui.font, fontWeight: "600", fontSize: personMonogram(group).length > 2 ? 12 : 15, color: ui.color("person-ink") }}>
-                      {personMonogram(group)}
-                    </Text>
-                  </View>
-                  <View style={styles.grow}>
-                    <Text style={[text(14, 21, "ink"), styles.bold]}>{group.name}</Text>
-                    {own.length === 0 ? <Text style={text(14, 21, "muted")}>{COPY.noPhone}</Text> : null}
-                  </View>
-                </View>
-                <View style={styles.touch}>
-                  <TextButton label={COPY.pairFor} accessibilityLabel={COPY.pairForLabel(group.name)} token="accent" onPress={() => onPair(group)} disabled={off} testID={`me-pair-${group.id}`} />
-                </View>
-              </View>
-              {own.map((phone) => (
-                <PairedPhoneRow key={phone.id} phone={phone} hidePerson disabled={disabled} onRevoke={() => onRevoke(phone)} />
-              ))}
-            </View>
+          {paired.length === 0 ? <Text style={[text(14, 21, "muted"), styles.empty]}>{COPY.empty}</Text> : null}
+          {paired.map((phone) => (
+            <PairedPhoneRow key={phone.id} phone={phone} disabled={disabled} onRevoke={() => onRevoke(phone)} />
           ))}
         </>
       )}
@@ -144,10 +115,5 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
   grow: { flex: 1, minWidth: 0 },
   empty: { paddingHorizontal: 18, paddingVertical: 16 },
-  person: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 10 },
-  personStacked: { flexDirection: "column", alignItems: "flex-start", gap: 0 },
-  personName: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12, minWidth: 0 },
-  mark: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  touch: { minHeight: 44, justifyContent: "center" },
   thing: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 10, minHeight: 52 },
 });
