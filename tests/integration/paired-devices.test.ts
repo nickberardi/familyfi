@@ -62,6 +62,18 @@ describe("/paired/devices", () => {
     expect((await listDevices(request("/api/v1/paired/devices?clientType=watch", { auth }))).status).toBe(400);
   });
 
+  it("still reads the ?client= filter apps before 2.0 send, so their Watch screen lists only Watches", async () => {
+    const { phone, watch, agent } = await household();
+    const controls = (await (await claimWatchRequest(bearer(phone.token), { clientType: "app-controls", clientId: "3c1d2b4a-5e6f-4a7b-8c9d-0e1f2a3b4c5d" })).json()) as Claim;
+    const ids = async (query: string) => (await list(bearer(phone.token), query)).map((device) => device.id).sort();
+    // App 1.4's Watch screen: GET ?client=watch&status=active, then the ones under this phone.
+    expect(await ids("?client=watch&status=active")).toEqual([watch.device.id]);
+    // Its `app` covered the app and its Siri sign-in; `phone` is the same from before 1.1.
+    expect(await ids("?client=app&status=active")).toEqual([phone.device.id, controls.device.id].sort());
+    expect(await ids("?client=phone")).toEqual([phone.device.id, controls.device.id].sort());
+    expect(await ids("?client=agent")).toEqual([agent.device.id]);
+  });
+
   it("lets a phone set up several Watches, each listed under it", async () => {
     const auth = await admin();
     const phone = await pairPhone(auth);
