@@ -4,7 +4,7 @@ info:
   version: 2.0.0
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
-  x-min-app: 2.0.0
+  x-min-app: 1.4.0
   # The oldest server API version an app built from this document can read: raised to `version`
   # when a response gains a required field. Apps compile it in; it never leaves the app.
   x-min-server: 2.0.0
@@ -3067,6 +3067,7 @@ paths:
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - { name: clientType, in: query, required: false, explode: true, schema: { type: array, items: { type: string, enum: [app, app-watch, app-controls, me, agent] } }, description: "Only devices of these client types. An unknown client type answers 400." }
+        - { name: client, in: query, required: false, deprecated: true, explode: true, schema: { type: array, items: { type: string, enum: [app, phone, watch, agent] } }, description: "The filter apps before 2.0 send, still read so their Watch screen lists only Watches: `watch` is `app-watch`, `app` and `phone` are `app` and `app-controls`, `agent` is `agent`. Use `clientType`." }
         - { name: status, in: query, required: false, schema: { type: string, enum: [active, revoked] } }
       responses:
         "200": { description: Devices, content: { application/json: { schema: { type: object, additionalProperties: false, required: [devices], properties: { devices: { type: array, items: { $ref: "#/components/schemas/PairedDevice" } } } } } } }

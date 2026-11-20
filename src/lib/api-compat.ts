@@ -17,7 +17,7 @@ import { compareSemver, parseSemver } from "./semver";
  */
 export const API_VERSION: string = "2.0.0";
 /** The oldest client API version this server still serves (`info.x-min-app`). */
-export const MIN_APP_API_VERSION = "2.0.0";
+export const MIN_APP_API_VERSION = "1.4.0";
 /** The oldest server API version a client built from this contract can read (`info.x-min-server`). */
 export const MIN_SERVER_API_VERSION = "2.0.0";
 /** The oldest watch app API version this server still serves (`info.x-min-app-watch`), set by hand. */
