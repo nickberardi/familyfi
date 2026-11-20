@@ -67,7 +67,7 @@ export function useFilterCatalog({ upstream = true }: { upstream?: boolean } = {
   return catalog;
 }
 
-/** Family or Things; the Family page offers Pair FamilyFi Me beside New family member, except in the demo, which pairs nothing. */
+/** Family or Things; the Family page offers Pair FamilyFi Me beside New person, except in the demo, which pairs nothing. */
 export function GroupGrid({ kind, demo = false }: { kind: "family" | "things"; demo?: boolean }) {
   const { groups, rules, household } = useAppData();
   const [sheet, setSheet] = useState<{ group: Group; target: GroupSheetTarget } | null>(null);

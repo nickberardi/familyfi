@@ -43,6 +43,7 @@ export function PairMePage() {
       <PageHeader
         title={COPY.title}
         sub={COPY.sub}
+        // The page's one action, in the secondary slot because it is disabled, with why, while remote access is off.
         secondary={
           <button
             type="button"
