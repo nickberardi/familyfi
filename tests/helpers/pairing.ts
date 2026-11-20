@@ -68,19 +68,19 @@ export async function invitePhoneRequest(auth: SessionAuth, body: Record<string,
   return invite(request("/api/v1/paired/invites", { method: "POST", auth, headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ clientType: "app", displayName: "iPhone", ...body }) }));
 }
 
-export function claimInvite(issued: { inviteId: string; token: string }, deviceName = "iPhone", headers: Record<string, string> = {}) {
+export function claimInvite(issued: { inviteId: string; token: string }, deviceName = "iPhone", headers: Record<string, string> = {}, extra: Record<string, unknown> = {}) {
   return claimRoute(
-    request(`/api/v1/paired/invites/${issued.inviteId}/claim`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ token: issued.token, deviceName }) }),
+    request(`/api/v1/paired/invites/${issued.inviteId}/claim`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ token: issued.token, deviceName, ...extra }) }),
     { params: Promise.resolve({ id: issued.inviteId }) },
   );
 }
 
 /** A phone paired the way the app does it: an administrator invites it, and it claims the code. */
-export async function pairPhone(admin: SessionAuth, options: { endpointId?: string; accountId?: string; displayName?: string } = {}): Promise<Claim> {
+export async function pairPhone(admin: SessionAuth, options: { endpointId?: string; accountId?: string; displayName?: string; appVersion?: string } = {}): Promise<Claim> {
   const endpointId = options.endpointId ?? (await homeRoute()).id;
   const created = await invitePhoneRequest(admin, { endpointId, ...(options.accountId ? { accountId: options.accountId } : {}), displayName: options.displayName ?? "iPhone" });
   expect(created.status).toBe(201);
-  const claimed = await claimInvite(await issuedInvite(created), options.displayName ?? "iPhone");
+  const claimed = await claimInvite(await issuedInvite(created), options.displayName ?? "iPhone", {}, options.appVersion ? { appVersion: options.appVersion } : {});
   expect(claimed.status).toBe(200);
   return (await claimed.json()) as Claim;
 }

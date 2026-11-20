@@ -294,6 +294,8 @@ export type PairedPhone = {
   parentDeviceId: string | null;
   enrolledAt: string;
   lastSeenAt: string | null;
+  /** The app version it last said it runs; null for an app before 2.0 and for agents. Absent from servers before API 2.1.0. */
+  appVersion?: string | null;
   revokedAt: string | null;
   pairedVia: { endpointId: string; url: string; transport: ConnectionTransport } | null;
   /** The Access token version FamilyFi last handed this device, per protected route. */
