@@ -401,6 +401,41 @@ describe("asking for more time", () => {
     expect((await readGroup(child, tv.id)).ask).toMatchObject({ id: second.id, state: "ended" });
   });
 
+  it("ends a Thing's earlier yes when a parent unblocks it again without an ask, or resumes its Block button rule for everyone", async () => {
+    const tv = await prisma().group.create({ data: { kind: GroupKind.things, name: "TV", kidsCanAsk: true } });
+    const video = await prisma().rule.create({ data: { name: "Video", kind: RuleKind.category, mode: RuleMode.always, targetIds: [4], groups: { create: { groupId: tv.id } } } });
+    await prisma().group.update({ where: { id: tv.id }, data: { blockButtonRuleId: video.id } });
+
+    // Mom's yes unblocks TV for a while; Video blocks it again on its own when that ends.
+    const first = await askOf(await ask(child, tv.id, { about: "pause" }));
+    expect((await unblockRoute(post(`/api/v1/groups/${tv.id}/unblock`, admin, { until: new Date(Date.now() + 30 * MINUTE).toISOString() }), groupParams(tv.id))).status).toBe(200);
+    expect((await readGroup(admin, tv.id)).ask).toMatchObject({ id: first.id, state: "yes" });
+    await prisma().ruleGroup.update({ where: { ruleId_groupId: { ruleId: video.id, groupId: tv.id } }, data: { pauseUntil: new Date(Date.now() - MINUTE) } });
+    // Dad unblocks it again with no ask: Mom's yes is not told any more.
+    expect((await unblockRoute(post(`/api/v1/groups/${tv.id}/unblock`, admin, {}), groupParams(tv.id))).status).toBe(200);
+    expect((await readGroup(child, tv.id)).ask).toMatchObject({ id: first.id, state: "ended" });
+
+    // A yes through Video paused for everyone, ended by Video's resume for everyone.
+    await prisma().ruleGroup.update({ where: { ruleId_groupId: { ruleId: video.id, groupId: tv.id } }, data: { pauseActive: false, pauseUntil: null, pauseKind: "pause" } });
+    const second = await askOf(await ask(child, tv.id, { about: "pause" }));
+    expect((await rulePauseRoute(post(`/api/v1/rules/${video.id}/pause`, admin, { until: new Date(Date.now() + 30 * MINUTE).toISOString() }), groupParams(video.id))).status).toBe(200);
+    expect((await readGroup(admin, tv.id)).ask).toMatchObject({ id: second.id, state: "yes" });
+    const { POST: ruleResumeRoute } = await import("@/app/api/v1/rules/[id]/resume/route");
+    expect((await ruleResumeRoute(post(`/api/v1/rules/${video.id}/resume`, admin), groupParams(video.id))).status).toBe(200);
+    expect((await readGroup(child, tv.id)).ask).toMatchObject({ id: second.id, state: "ended" });
+  });
+
+  it("keeps the yes a parent's resume gives by the ask's id", async () => {
+    await verb(pauseRoute, "pause", admin, emma.id, "internet", { until: new Date(Date.now() + 60 * MINUTE).toISOString() });
+    const first = await askOf(await ask(child, emma.id, { about: "pause" }));
+    expect((await verb(resumeRoute, "resume", admin, emma.id, "internet", { askId: first.id })).status).toBe(200);
+    await verb(pauseRoute, "pause", admin, emma.id, "internet", { until: new Date(Date.now() + 60 * MINUTE).toISOString() });
+    const second = await askOf(await ask(child, emma.id, { about: "pause" }));
+    expect((await verb(resumeRoute, "resume", admin, emma.id, "internet", { askId: second.id })).status).toBe(200);
+    expect((await readGroup(child, emma.id)).ask).toMatchObject({ id: second.id, state: "yes" });
+    expect((await prisma().ask.findUniqueOrThrow({ where: { id: first.id } })).state).toBe("ended");
+  });
+
   it("keeps a yes to unpause when another rule is resumed for the group", async () => {
     const homework = await windowRule(emma.id);
     await verb(pauseRoute, "pause", admin, emma.id, "internet", { until: new Date(Date.now() + 60 * MINUTE).toISOString() });

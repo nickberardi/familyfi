@@ -58,8 +58,10 @@ export async function unblockGroup(
       }
       await tx.rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
     });
-    // Whatever a child asked about that this unblock lifted is answered yes: an ask to unblock once
-    // nothing blocks the group, and an ask for time off a rule it lifted.
+    // A newer unblock: an earlier yes to unblock is over. Whatever a child asked about that this
+    // unblock lifted is answered yes: an ask to unblock once nothing blocks the group, and an ask
+    // for time off a rule it lifted.
+    if (blockedByPause || targets.some(({ rule }) => rule.id === existing.blockButtonRuleId)) await endEarlierUnblockYes(groupId);
     await answerAsks(session, groupId, { pause: blockedByPause || targets.length > 0, ruleIds: targets.map(({ rule }) => rule.id) });
   } else if (action === "end") {
     const ended = await prisma().ruleGroup.updateMany({

@@ -1,4 +1,4 @@
-import { RuleLiftKind } from "@prisma/client";
+import { GroupKind, RuleLiftKind } from "@prisma/client";
 import { z } from "zod";
 import { mapLimited } from "@/lib/concurrency";
 import { QUARANTINE_RULE_ID, type BuiltInRule } from "@/lib/rules";
@@ -108,13 +108,15 @@ export async function liftRule(
     if (link) await prisma().ruleGroup.update({ where: { ruleId_groupId: { ruleId: rule.id, groupId: link.groupId } }, data });
     else await prisma().rule.update({ where: { id: rule.id }, data });
   }
+  // A Thing's Block button rule lifted or put back unblocks or blocks it anew: an earlier yes to
+  // unblock it is over.
+  if (data && action !== "extend") {
+    const groupIds = link ? [link.groupId] : rule.groups.map((item) => item.groupId);
+    const things = await prisma().group.findMany({ where: { id: { in: groupIds }, kind: GroupKind.things, blockButtonRuleId: rule.id }, select: { id: true } });
+    await endEarlierUnblockYes(things.map((group) => group.id));
+  }
   // A pause or allowance lifts the rule: a child's waiting ask about it is answered.
   if (data && (action === "pause" || action === "allow")) await answerAsks(session, target.groupId ?? null, { ruleIds: [rule.id] });
-  // A Thing's Block button rule put back for it blocks it again: an earlier yes to unblock is over.
-  if (data && link && (action === "resume" || action === "disallow")) {
-    const group = await prisma().group.findUnique({ where: { id: link.groupId }, select: { blockButtonRuleId: true } });
-    if (group?.blockButtonRuleId === rule.id) await endEarlierUnblockYes(link.groupId);
-  }
   const fresh = await prisma().rule.findUniqueOrThrow({ where: { id: rule.id }, include: ruleInclude });
   const change = await enqueueChange(action === "disallow" ? "allow" : action);
   return { rule: await presentRule(fresh), change };

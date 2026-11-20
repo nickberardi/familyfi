@@ -255,12 +255,18 @@ export async function followPause(groupId: string): Promise<void> {
 }
 
 /**
- * A group blocked again (paused, or its Block button rule put back) is newer than any yes that
- * unblocked it before: that yes ends, so the child's day stops telling who unblocked it once the
- * new block is over, and a later unblock without an ask names no one from before.
+ * A group unblocked or blocked again by a parent's write (paused, resumed, unblocked, or its Block
+ * button rule lifted or put back) is newer than any yes that unblocked it before: that yes ends, so
+ * the child's day tells only the newest unblock and never one from before a later block. `keep` is
+ * the ask this write answers by its id, already taken as yes (`claimAsk`).
  */
-export async function endEarlierUnblockYes(groupId: string): Promise<void> {
-  await prisma().ask.updateMany({ where: { groupId, about: "pause", state: AskState.yes }, data: { state: AskState.ended } });
+export async function endEarlierUnblockYes(groupIds: string | string[], keep?: string): Promise<void> {
+  const ids = typeof groupIds === "string" ? [groupIds] : groupIds;
+  if (!ids.length) return;
+  await prisma().ask.updateMany({
+    where: { groupId: { in: ids }, about: "pause", state: AskState.yes, ...(keep ? { id: { not: keep } } : {}) },
+    data: { state: AskState.ended },
+  });
 }
 
 /** Asks are kept a week, well past the day a group shows its latest. */
