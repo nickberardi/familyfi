@@ -4636,10 +4636,7 @@ components:
           description: |
             `waiting` for an answer; `yes` or `no` from a parent; `timedOut` when nobody answered
             within the household's `askTimeoutMinutes`; `ended` when the block it asked about
-            ended first, or when an ask to unblock answered `yes` is followed by a parent's newer
-            block or unblock (the group paused, resumed or unblocked again, or its Block button rule
-            lifted or put back), so that yes is not told again.
-            An ask past its end reads as closed at once.
+            ended first. An ask past its end reads as closed at once.
         at: { type: string, format: date-time, description: When the child asked. }
         expiresAt: { type: string, format: date-time, description: "While `waiting`: when it closes unanswered." }
         answeredAt: { type: string, format: date-time, description: "For `yes` and `no`: when a parent answered." }
