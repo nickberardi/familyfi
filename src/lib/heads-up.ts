@@ -181,6 +181,10 @@ export type HeadsUpEntry = {
    * runs out, nor on a pause.
    */
   ask: boolean;
+  /** Whether the block named is the group's pause, which the widget draws with the pause sign rather than the block sign. */
+  pause: boolean;
+  /** The plan ran out while windows go on: the widget can't say what is next, and must not look open. */
+  unknown: boolean;
 };
 
 /**
@@ -193,22 +197,22 @@ export function headsUpTimeline(blocks: HeadsUpBlock[], now: Date, timeZone: str
   let at = now;
   for (const block of blocks) {
     if (block.from.getTime() > at.getTime()) {
-      entries.push({ from: at, blocked: false, title: block.name, line: `Starts at ${timeAt(block.from, timeZone)}`, until: block.from, name: block.name, ask: !block.pause && !block.afterExtraTime });
+      entries.push({ from: at, blocked: false, title: block.name, line: `Starts at ${timeAt(block.from, timeZone)}`, until: block.from, name: block.name, ask: !block.pause && !block.afterExtraTime, pause: block.pause, unknown: false });
     }
     const from = block.from.getTime() > at.getTime() ? block.from : at;
     const line = block.to ? `Ends at ${timeAt(block.to, timeZone)}` : NO_END_TIME;
     // A pause that ran into Bedtime is told as the pause until it is over, then as Bedtime.
     const switchAt = block.switchAt && block.switchAt.getTime() > from.getTime() ? block.switchAt : null;
-    if (switchAt) entries.push({ from, blocked: true, title: block.name, line, until: block.to, name: block.name, ask: false });
+    if (switchAt) entries.push({ from, blocked: true, title: block.name, line, until: block.to, name: block.name, ask: false, pause: block.pause, unknown: false });
     const title = block.switchAt ? block.endName : block.name;
-    entries.push({ from: switchAt ?? from, blocked: true, title, line, until: block.to, name: title, ask: false });
+    entries.push({ from: switchAt ?? from, blocked: true, title, line, until: block.to, name: title, ask: false, pause: block.switchAt ? block.endPause : block.pause, unknown: false });
     if (!block.to) return entries;
     at = block.to;
   }
   entries.push(
     recurs
-      ? { from: at, blocked: false, title: HEADS_UP_WORDS.unknownTitle, line: HEADS_UP_WORDS.unknownLine, until: null, name: null, ask: false }
-      : { from: at, blocked: false, title: OPEN_TITLE, line: "Nothing planned", until: null, name: null, ask: false },
+      ? { from: at, blocked: false, title: HEADS_UP_WORDS.unknownTitle, line: HEADS_UP_WORDS.unknownLine, until: null, name: null, ask: false, pause: false, unknown: true }
+      : { from: at, blocked: false, title: OPEN_TITLE, line: "Nothing planned", until: null, name: null, ask: false, pause: false, unknown: false },
   );
   return entries;
 }
