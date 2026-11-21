@@ -253,7 +253,7 @@ export function addInternetPreset(mutate: Mutate, group: Pick<Group, "id" | "nam
   );
 }
 
-/** A tap on a group card: its header's button or More time, a rule area's (`ruleIds`, called `name`), or its ask line. */
+/** A tap on a group card: its header's button or More time, a rule area's (`ruleIds`, called `name`), or its ask strip's Answer. */
 export type GroupCardRun =
   /**
    * `ruleId` and `name`: the Block button rule a rule run acts on. `liftedUntil`: when its lift for
