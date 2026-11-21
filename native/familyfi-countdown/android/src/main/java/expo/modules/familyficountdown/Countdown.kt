@@ -19,10 +19,11 @@ import androidx.core.app.NotificationManagerCompat
  * screen and as a status bar chip counting down; before that, and when the person turns Live
  * Updates off for the app, it stays an ordinary ongoing notification.
  *
- * Its channel is silent but not low: Android hides low-importance notifications from the lock
- * screen, where a countdown is most use. Every word comes from the app, written with familyfi's
- * display functions. The FamilyFi app posts it through its pause module for a timed block made on
- * the phone; FamilyFi Me posts it from an alarm before a block starts.
+ * Its channel is never low importance: Android hides low-importance notifications from the lock
+ * screen, where a countdown is most use. It is silent unless the countdown asks to alert. Every
+ * word comes from the app, written with familyfi's display functions. The FamilyFi app posts it
+ * through its pause module for a timed block made on the phone; FamilyFi Me posts it from an alarm
+ * before a block starts.
  */
 object Countdown {
   /** The channel every countdown is posted on, in either app. */
@@ -45,6 +46,13 @@ object Countdown {
     /** The app link a tap on the countdown opens. */
     val url: String?,
     val actions: List<Action>,
+    /**
+     * Whether it sounds once when it first shows, as a warning does (FamilyFi Me's countdown to a
+     * block's start). Off for the FamilyFi app's timed block, which the parent just made. A sound
+     * also needs a channel that has one: an app that wants it creates the channel itself, with
+     * `CHANNEL` as its id, before it posts, and this leaves that channel as it is.
+     */
+    val alert: Boolean = false,
   )
 
   /** Whether the app may post notifications (Android 13 asks first). */
@@ -52,7 +60,8 @@ object Countdown {
 
   /**
    * Shows the countdown, or updates the one with the same tag. `channelName` and
-   * `channelDescription` are what the system's notification settings call the channel.
+   * `channelDescription` are what the system's notification settings call the channel, when this
+   * creates it (silent): an app that created it already keeps its own.
    */
   fun post(context: Context, spec: Spec, channelName: String, channelDescription: String) {
     val manager = NotificationManagerCompat.from(context)
@@ -68,7 +77,7 @@ object Countdown {
       .setStyle(NotificationCompat.BigTextStyle().bigText(spec.text))
       .setOngoing(true)
       .setOnlyAlertOnce(true)
-      .setSilent(true)
+      .setSilent(!spec.alert)
       .setCategory(NotificationCompat.CATEGORY_STATUS)
       .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
       .setWhen(spec.until)
@@ -110,7 +119,7 @@ object Countdown {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
     val manager = context.getSystemService(NotificationManager::class.java)
     if (manager.getNotificationChannel(CHANNEL) != null) return
-    // Default importance, so it shows on the lock screen; each countdown is posted silent.
+    // Default importance, so it shows on the lock screen, and no sound: the FamilyFi app's countdowns are silent.
     manager.createNotificationChannel(NotificationChannel(CHANNEL, name, NotificationManager.IMPORTANCE_DEFAULT).apply {
       this.description = description
       setSound(null, null)
