@@ -1390,6 +1390,12 @@
         "rules",
         "display"
       ]
+    },
+    "tests/unit/heads-up.test.ts": {
+      "categories": [
+        "schedules",
+        "display"
+      ]
     }
   }
 }
