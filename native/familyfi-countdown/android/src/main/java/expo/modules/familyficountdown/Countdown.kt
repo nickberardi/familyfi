@@ -96,7 +96,8 @@ object Countdown {
   /** The tags with a countdown showing: the system's own list, so a restart of the app loses none. */
   fun running(context: Context): List<String> =
     context.getSystemService(NotificationManager::class.java).activeNotifications
-      .filter { it.id == ID && it.tag != null && it.notification.channelId == CHANNEL }
+      // Channels came in Android 8.0; before it, id and tag alone tell a countdown apart.
+      .filter { it.id == ID && it.tag != null && (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || it.notification.channelId == CHANNEL) }
       .mapNotNull { it.tag }
 
   /** Removes a channel an earlier version posted countdowns on, so settings show only this one. */

@@ -124,7 +124,7 @@ describe("client boundary", () => {
 
   it("keeps the apps' native modules out of the web and the server", () => {
     // familyfi has no Expo, so nothing under src may import a native module.
-    const reaching = sourceFiles.filter((file) => importSpecifiers(readFileSync(file, "utf8")).some((specifier) => /(^|\/)native(\/|$)|^familyfi-(transport|scanner)(\/|$)/.test(specifier)));
+    const reaching = sourceFiles.filter((file) => importSpecifiers(readFileSync(file, "utf8")).some((specifier) => /(^|\/)native(\/|$)|^familyfi-(transport|scanner|countdown)(\/|$)/.test(specifier)));
     expect(reaching.map(rel)).toEqual([]);
   });
 });
