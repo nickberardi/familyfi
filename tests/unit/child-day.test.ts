@@ -54,6 +54,9 @@ describe("a child's day", () => {
     expect(soon.items[0]).toMatchObject({ now: true, title: "Not blocked", ask: { withLength: true, label: "Ask for more time" } });
     expect(tellDay({ windows: [BEDTIME] }, 21 * 60 - 10, PHONE_VOICE).items[0]!.ask).toBeUndefined();
     const waiting = tellDay({ windows: [BEDTIME], ask: { state: "waiting", at: 21 * 60 - 4, minutes: 30 } }, 21 * 60 - 3, PHONE_VOICE);
+    // A window starting at midnight is tomorrow's, and still askable at 11:57 PM.
+    const midnight = tellDay({ windows: [{ label: "Night", from: 0, to: 7 * 60 }] }, 24 * 60 - 3, PHONE_VOICE);
+    expect(midnight.items[0]!.ask).toMatchObject({ label: "Ask for more time" });
     expect(waiting.items[0]!.status?.text).toBe("You asked for 30 more minutes at 8:56 PM. Waiting for an answer.");
   });
 

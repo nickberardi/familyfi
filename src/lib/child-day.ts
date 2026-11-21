@@ -818,7 +818,9 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     };
     // In the heads-up's last minutes before a window starts (familyfi issue 457), the child can already ask
     // for more time on it, as FamilyFi takes it (`askableWindows`); not on one a parent already lifted.
-    const soon = next && !next.allowed && next.from > now && next.from - now <= ASK_AHEAD_MINUTES;
+    // One starting at midnight is tomorrow's, which `next` (today's) leaves out.
+    const ahead = next ?? firstWindowFrom(subject.windows, now, now + ASK_AHEAD_MINUTES + 1);
+    const soon = ahead && !ahead.allowed && ahead.from > now && ahead.from - now <= ASK_AHEAD_MINUTES;
     const current = soon && ask?.state !== "yes" && ask?.minutes ? ask : undefined;
     items = [soon ? withAskFor(current, open, true) : open, ...(next ? [windowItem(next)] : [])];
     day = { kind: "open", next };
