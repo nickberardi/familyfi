@@ -47,6 +47,16 @@ describe("a child's day", () => {
     expect(clock(31 * 60)).toBe("7 AM");
   });
 
+  // familyfi#457: the heads-up's countdown offers Ask for more time before the window starts.
+  it("lets the child ask for more time in the last five minutes before a window starts", () => {
+    const soon = tellDay({ windows: [BEDTIME] }, 21 * 60 - 3, PHONE_VOICE);
+    expect(soon.day.kind).toBe("open");
+    expect(soon.items[0]).toMatchObject({ now: true, title: "Not blocked", ask: { withLength: true, label: "Ask for more time" } });
+    expect(tellDay({ windows: [BEDTIME] }, 21 * 60 - 10, PHONE_VOICE).items[0]!.ask).toBeUndefined();
+    const waiting = tellDay({ windows: [BEDTIME], ask: { state: "waiting", at: 21 * 60 - 4, minutes: 30 } }, 21 * 60 - 3, PHONE_VOICE);
+    expect(waiting.items[0]!.status?.text).toBe("You asked for 30 more minutes at 8:56 PM. Waiting for an answer.");
+  });
+
   it("asks to unpause during a pause, with no length", () => {
     const story = tellDay(paused, NOW, PHONE_VOICE);
     expect(story.day.kind).toBe("paused");

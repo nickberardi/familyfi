@@ -1089,7 +1089,7 @@ paths:
         A child's ask, from FamilyFi Me on its own group or on a Things group shared with children
         (`kidsCanAsk`) (404 for any other; 403 `child_only` for anyone but a child's phone): `pause`
         to be unblocked, while the group is paused or, on a Thing, its Block button default blocks it, or `rule` for `minutes` in the window of one of the group's rules that is
-        blocking it now. Parents with alerts on are told (`ask.new`), and the ask shows as the group's
+        blocking it now or starts within five minutes (the heads-up's countdown), whose time then counts from the window's start. Parents with alerts on are told (`ask.new`), and the ask shows as the group's
         `ask` until answered, with `from` naming the child on a Thing. It waits until a parent
         answers, the household's `askTimeoutMinutes` pass, or the block it asks about ends,
         whichever comes first. One ask waits at a time for a group, whichever child filed it (409

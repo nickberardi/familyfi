@@ -32520,6 +32520,140 @@
     },
     {
       "fn": "askSheetOptions",
+      "name": "a window starting within five minutes counts from its start",
+      "input": {
+        "ask": {
+          "id": "a1",
+          "about": "rule",
+          "ruleId": "r1",
+          "minutes": 30,
+          "state": "waiting",
+          "at": "2026-11-17T01:56:00Z",
+          "expiresAt": "2026-11-17T02:56:00Z"
+        },
+        "rules": [
+          {
+            "id": "r1",
+            "name": "Bedtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "name": "",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "21:00",
+                "end": "23:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": []
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-11-17T01:57:00Z"
+      },
+      "expected": [
+        {
+          "label": "Allow 30 minutes",
+          "note": "until 9:30 PM",
+          "request": {
+            "kind": "asked"
+          }
+        },
+        {
+          "label": "Until Bedtime ends",
+          "note": "until 11:00 PM",
+          "request": {
+            "kind": "until",
+            "until": "2026-11-17T04:00:00.000Z"
+          }
+        }
+      ]
+    },
+    {
+      "fn": "askSheetOptions",
+      "name": "a window starting in more than five minutes is not on yet",
+      "input": {
+        "ask": {
+          "id": "a1",
+          "about": "rule",
+          "ruleId": "r1",
+          "minutes": 30,
+          "state": "waiting",
+          "at": "2026-11-17T01:49:00Z",
+          "expiresAt": "2026-11-17T02:56:00Z"
+        },
+        "rules": [
+          {
+            "id": "r1",
+            "name": "Bedtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "name": "",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "21:00",
+                "end": "23:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": []
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-11-17T01:50:00Z"
+      },
+      "expected": []
+    },
+    {
+      "fn": "askSheetOptions",
       "name": "less than a night window offers its end too",
       "input": {
         "ask": {
@@ -32831,6 +32965,76 @@
         "request": {
           "kind": "for",
           "minutes": 15
+        }
+      }
+    },
+    {
+      "fn": "askSheetCustom",
+      "name": "for a time before the window starts counts from its start",
+      "input": {
+        "custom": {
+          "kind": "for",
+          "minutes": 15
+        },
+        "ask": {
+          "id": "a1",
+          "about": "rule",
+          "ruleId": "r1",
+          "minutes": 30,
+          "state": "waiting",
+          "at": "2026-11-17T01:56:00Z",
+          "expiresAt": "2026-11-17T02:56:00Z"
+        },
+        "rules": [
+          {
+            "id": "r1",
+            "name": "Bedtime",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g1"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "name": "",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "21:00",
+                "end": "23:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": []
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-11-17T01:57:00Z"
+      },
+      "expected": {
+        "label": "For 15 minutes",
+        "note": "until 9:15 PM",
+        "request": {
+          "kind": "until",
+          "until": "2026-11-17T02:15:00.000Z"
         }
       }
     },

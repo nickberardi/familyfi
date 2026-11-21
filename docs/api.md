@@ -330,7 +330,8 @@ turning the switch off hides it again at once.
 
 FamilyFi Me asks on its own group with `POST /groups/{id}/asks`: `{ "about": "pause" }` to be
 unblocked (while the group is paused, or a Thing's Block button default blocks it), or `{ "about": "rule", "ruleId", "minutes" }` (5 to 240) for time in the window of one of
-the group's rules that is blocking it now. Only a child's phone asks (403 `child_only`), and only on
+the group's rules that is blocking it now, or that starts within five minutes (asked from the heads-up's
+countdown; a yes counts from the window's start). Only a child's phone asks (403 `child_only`), and only on
 its own group or a shared Thing (404). On a Thing the ask's `from` names the child who asked, the
 `ask.new` alert carries the Thing's name as `t` and opens the Thing, and refusals name the Thing. The ask shows as the group's `ask` (`GroupAsk`) on `GET /groups/{id}` and
 `GET /groups` for a day, and phones with alerts on hear `ask.new`. A group has one waiting ask at a

@@ -2,7 +2,7 @@ import { minutesText } from "./alert-copy";
 import { formatClock } from "./display";
 import { groupHeaderActions, rulesToUnblock, type GroupRun } from "./group-actions";
 import { askSheetCustomOption, type CustomPause, type PauseSheetPicker } from "./pause-sheet";
-import { activeWindowsEnd, ruleInternetWindows, type Rule } from "./rules";
+import { activeWindowsEnd, askableWindows, ruleInternetWindows, type Rule } from "./rules";
 import type { Group, GroupAsk } from "./types";
 
 /*
@@ -79,7 +79,7 @@ export function askSheetTitle(group: Pick<Group, "name">, ask: GroupAsk, rules: 
 export function askSheetBody(ask: GroupAsk, rules: Rule[], timezone: string, now: Date): string {
   const at = `Asked at ${formatClock(new Date(ask.at), timezone)}.`;
   const closes = ask.expiresAt ? `${at} It closes at ${formatClock(new Date(ask.expiresAt), timezone)} if no one answers.` : at;
-  // Time off a rule whose window is no longer on: nothing to allow, so only Not now is offered.
+  // Time off a rule whose window is no longer on (nor about to start): nothing to allow, so only Not now is offered.
   if (ask.about === "rule" && askSheetOptions(ask, rules, timezone, now).length === 0) {
     const rule = ruleOf(ask, rules);
     const name = rule?.name ?? "That rule";
@@ -98,7 +98,8 @@ export function askSheetBody(ask: GroupAsk, rules: Rule[], timezone: string, now
  * group (`group`) it is the group's `resume` on `internet` with the ask's id. To time off a rule:
  * what the child asked for, and the rest of the window when that is longer, each never past the
  * window's end, as the server caps it; nothing while the rule's window is not on, since then there is
- * nothing to lift. Not now comes last (`askSheetChoices`).
+ * nothing to lift. A window starting within five minutes counts as on (`askableWindows`): an ask from
+ * the heads-up's countdown, whose time counts from the window's start. Not now comes last (`askSheetChoices`).
  */
 export function askSheetOptions(
   ask: GroupAsk,
@@ -118,10 +119,12 @@ export function askSheetOptions(
     return [{ label: "Unblock", note: `${lifts}, for as long as you choose`, request }];
   }
   const rule = ruleOf(ask, rules);
-  const end = rule ? activeWindowsEnd(ruleInternetWindows(rule), now, timezone) : undefined;
-  // Not on now, or always on: no window to lift time off, and the server refuses it.
-  if (!rule || !end) return [];
-  const asked = ask.minutes ? new Date(now.getTime() + ask.minutes * 60_000) : null;
+  // The window on now, or the one starting within five minutes, whose time counts from its start.
+  const window = rule ? askableWindows(ruleInternetWindows(rule), now, timezone) : undefined;
+  const end = window?.end;
+  // Not on now nor about to be, or always on: no window to lift time off, and the server refuses it.
+  if (!rule || !window || !end) return [];
+  const asked = ask.minutes ? new Date(window.from.getTime() + ask.minutes * 60_000) : null;
   // What the child asked for, unless it runs past the window's end: then it is the rest of the window.
   const fits = asked && (!end || asked.getTime() <= end.getTime());
   const options: AskSheetOption[] = [];
@@ -140,14 +143,19 @@ export function askSheetOptions(
  */
 export function askSheetCustom(custom: CustomPause, ask: GroupAsk, rules: Rule[], timezone: string, now: Date): AskSheetOption | null {
   const rule = ruleOf(ask, rules);
-  const end = rule ? activeWindowsEnd(ruleInternetWindows(rule), now, timezone) : undefined;
-  const option = !end ? null : askSheetCustomOption(custom, timezone, now);
-  if (!option || option.request.kind === "extend" || option.request.kind === "current") return null;
-  const until = option.request.kind === "pauseFor" ? new Date(now.getTime() + option.request.minutes * 60_000) : new Date(option.request.until!);
+  const window = rule ? askableWindows(ruleInternetWindows(rule), now, timezone) : undefined;
+  const end = window?.end;
+  const option = !window || !end ? null : askSheetCustomOption(custom, timezone, now);
+  if (!window || !option || option.request.kind === "extend" || option.request.kind === "current") return null;
+  // For… counts from the window's start when it has not started yet.
+  const early = window.from.getTime() > now.getTime();
+  const until = option.request.kind === "pauseFor" ? new Date(window.from.getTime() + option.request.minutes * 60_000) : new Date(option.request.until!);
   if (end && until.getTime() >= end.getTime()) {
     return { label: option.label, note: `until ${formatClock(end, timezone)}`, request: { kind: "until", until: end.toISOString() } };
   }
-  const request: AskSheetRequest = option.request.kind === "pauseFor" ? { kind: "for", minutes: option.request.minutes } : { kind: "until", until: until.toISOString() };
+  if (until.getTime() <= window.from.getTime()) return null;
+  const request: AskSheetRequest =
+    option.request.kind === "pauseFor" && !early ? { kind: "for", minutes: option.request.minutes } : { kind: "until", until: until.toISOString() };
   return { label: option.label, note: `until ${formatClock(until, timezone)}`, request };
 }
 

@@ -2,7 +2,7 @@
 
 import { countriesSummary } from "./countries";
 import type { IconName } from "./icons";
-import { isWindowActive, windowDayBands, windowEndsAt, type InternetWindow } from "./rule-windows";
+import { isWindowActive, nextWindowStart, windowDayBands, windowEndsAt, type InternetWindow } from "./rule-windows";
 import type { Actor } from "./types";
 
 export type RuleKind = "internet" | "category" | "app" | "domain";
@@ -245,6 +245,29 @@ export function activeWindowsEnd(windows: InternetWindow[], now: Date, timezone:
   const ends = active.map((window) => windowEndsAt(window, now, timezone));
   if (ends.some((end) => end === null)) return null;
   return ends.reduce<Date | null>((latest, end) => (!latest || end!.getTime() > latest.getTime() ? end : latest), null);
+}
+
+/**
+ * How long before a window starts a person can already ask for more time on it: the heads-up's five
+ * minutes (familyfi#457), so the countdown's Ask for more time works before the block is on.
+ */
+export const ASK_AHEAD_MINUTES = 5;
+
+/**
+ * The windows a person can ask for time off now: those active now (`from` is now), or else the one
+ * starting within `ASK_AHEAD_MINUTES` (`from` is its start), with when they end (null: never).
+ * Undefined when neither, so there is nothing to ask about. A yes's time counts from `from`, so time
+ * asked before the start pushes the start back.
+ */
+export function askableWindows(windows: InternetWindow[], now: Date, timezone: string): { from: Date; end: Date | null } | undefined {
+  const active = activeWindowsEnd(windows, now, timezone);
+  if (active !== undefined) return { from: now, end: active };
+  const soon = windows
+    .map((window) => ({ window, start: nextWindowStart(window, now, timezone) }))
+    .filter((item): item is { window: InternetWindow; start: Date } => item.start !== null && item.start.getTime() - now.getTime() <= ASK_AHEAD_MINUTES * 60_000)
+    .sort((a, b) => a.start.getTime() - b.start.getTime())[0];
+  if (!soon) return undefined;
+  return { from: soon.start, end: windowEndsAt(soon.window, soon.start, timezone) };
 }
 
 /**
