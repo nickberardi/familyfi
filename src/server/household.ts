@@ -74,7 +74,6 @@ export async function updateHouseholdSettings(input: {
   return { household: await publicHousehold(household), change };
 }
 
-/** The household's time zone, which every caller may read, a Watch included, which may not read household settings. */
 /**
  * The household's time zone, and how long before a block FamilyFi Me's heads-up comes (and the
  * person can ask), as a session reads them.
@@ -84,6 +83,7 @@ export async function sessionHousehold(): Promise<{ timezone: string; askAheadMi
   return { timezone: householdTimezone(household), askAheadMinutes: household?.askAheadMinutes ?? 5 };
 }
 
+/** The household's time zone, which every caller may read, a Watch included, which may not read household settings. */
 export async function currentTimezone() {
   const household = await prisma().household.findUnique({ where: { id: currentHouseholdId() }, select: { timezone: true } });
   return householdTimezone(household);
