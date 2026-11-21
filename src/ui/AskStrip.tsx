@@ -1,6 +1,6 @@
 "use client";
 
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { Button } from "./Button";
 import type { AskAction } from "./CardActions";
@@ -18,7 +18,7 @@ export function AskStrip({ ask, style }: { ask: AskAction; style?: StyleProp<Vie
   const text = { fontFamily: ui.font, fontSize: 14, lineHeight: 21 } as const;
   return (
     <View style={[styles.strip, largeText && styles.stripStacked, { backgroundColor: ui.color("accent-wash"), borderColor: ui.color("line") }, style]}>
-      <View style={[styles.stripLine, largeText && styles.stripLineStacked]}>
+      <View style={[styles.stripLine, largeText && styles.stripLineStacked, largeText && styles.stripLineTop]}>
         <View aria-hidden style={styles.stripIcon}>
           <ui.Icon name="hand-waving" size={17} color={ui.color("accent")} />
         </View>
@@ -27,10 +27,13 @@ export function AskStrip({ ask, style }: { ask: AskAction; style?: StyleProp<Vie
           <Text style={{ color: ui.color("ink-2") }}>{` · ${ask.at}`}</Text>
         </Text>
       </View>
-      <Button label="Answer" size="md" onPress={ask.onPress} disabled={ask.disabled} accessibilityLabel={`Answer: ${ask.label}`} testID={ask.testID} />
+      <Button label="Answer" size="md" onPress={ask.onPress} disabled={ask.disabled} accessibilityLabel={`Answer: ${ask.label}`} testID={ask.testID} style={TOUCH} />
     </View>
   );
 }
+
+/** On a phone a button is 44pt tall to touch; the strip's padding leaves room for it. */
+const TOUCH = Platform.OS === "web" ? undefined : { minHeight: 44 };
 
 const styles = StyleSheet.create({
   strip: { flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: 1, borderBottomWidth: 1, paddingHorizontal: 16, paddingVertical: 10, marginBottom: 12 },
@@ -38,6 +41,8 @@ const styles = StyleSheet.create({
   stripLine: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10 },
   // Stacked, the line takes its own height: flex 1 in a column of no set height draws it at none.
   stripLineStacked: { flex: 0, flexShrink: 1 },
+  // Stacked words run to several lines; the hand sits by the first.
+  stripLineTop: { alignItems: "flex-start" },
   stripIcon: { flexShrink: 0 },
   stripText: { flex: 1, minWidth: 0 },
 });
