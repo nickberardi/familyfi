@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import type { InternetWindow } from "@/lib/rule-windows";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
+import { AskStrip } from "./AskStrip";
 import { CardButton, CardMenuButton, type AskAction, type ZoneAction } from "./CardActions";
 import { GROUP_TILE_INSET, GroupCardHeader } from "./GroupCardHeader";
-import { PRESS_OPACITY, useUI } from "./UIContext";
+import { useUI } from "./UIContext";
 import { useLargeText } from "./use-large-text";
 import { useWide } from "./use-wide";
 
@@ -103,37 +104,6 @@ export function GroupCardFrame({
   );
 }
 
-/** A waiting ask: a strip across the card, its line and time, and Answer, the one filled button in it. */
-function AskStrip({ ask }: { ask: AskAction }) {
-  const ui = useUI();
-  const largeText = useLargeText();
-  const text = { fontFamily: ui.font, fontSize: 14, lineHeight: 21 } as const;
-  return (
-    <View style={[styles.strip, largeText && styles.stripStacked, { backgroundColor: ui.color("accent-wash"), borderColor: ui.color("line") }]}>
-      <View style={styles.stripLine}>
-        <View aria-hidden style={styles.stripIcon}>
-          <ui.Icon name="hand-waving" size={17} color={ui.color("accent")} />
-        </View>
-        <Text style={[text, styles.stripText, { color: ui.color("ink") }]}>
-          <Text style={{ fontWeight: "600" }}>{ask.label}</Text>
-          <Text style={{ color: ui.color("ink-2") }}>{` · ${ask.at}`}</Text>
-        </Text>
-      </View>
-      <Pressable
-        role="button"
-        aria-label={`Answer: ${ask.label}`}
-        aria-disabled={ask.disabled}
-        disabled={ask.disabled}
-        onPress={ask.onPress}
-        testID={ask.testID}
-        style={({ pressed }) => [styles.answer, { backgroundColor: ui.color("accent") }, ask.disabled && { opacity: 0.6 }, pressed && { opacity: PRESS_OPACITY }]}
-      >
-        <Text style={[text, { fontWeight: "600", color: ui.color("ink-on-fill") }]}>Answer</Text>
-      </Pressable>
-    </View>
-  );
-}
-
 /** The group's one button, with its dropdown when it has choices for single rules. */
 function HeaderButton({
   action,
@@ -165,10 +135,4 @@ const styles = StyleSheet.create({
   caret: { marginTop: 2, flexShrink: 0 },
   action: { position: "absolute", top: 14, right: 16, zIndex: 10 },
   under: { marginTop: -4, paddingRight: HEADER_PAD, paddingBottom: 12, flexDirection: "row" },
-  strip: { flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: 1, borderBottomWidth: 1, paddingHorizontal: 16, paddingVertical: 10, marginBottom: 12 },
-  stripStacked: { flexDirection: "column", alignItems: "stretch" },
-  stripLine: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10 },
-  stripIcon: { flexShrink: 0 },
-  stripText: { flex: 1, minWidth: 0 },
-  answer: { minHeight: 36, borderRadius: 9, paddingHorizontal: 14, paddingVertical: 7, alignItems: "center", justifyContent: "center" },
 });
