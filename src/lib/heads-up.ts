@@ -200,7 +200,7 @@ export type HeadsUpEntry = {
  * widget is not up to date rather than "Nothing planned".
  */
 export function headsUpTimeline(blocks: HeadsUpBlock[], now: Date, timeZone: string, recurs = false): HeadsUpEntry[] {
-  const entries: Omit<HeadsUpEntry, "short">[] = [];
+  const entries: (Omit<HeadsUpEntry, "short"> & { short?: string })[] = [];
   let at = now;
   for (const block of blocks) {
     if (block.from.getTime() > at.getTime()) {
@@ -210,7 +210,8 @@ export function headsUpTimeline(blocks: HeadsUpBlock[], now: Date, timeZone: str
     const line = block.to ? `Ends at ${timeAt(block.to, timeZone)}` : NO_END_TIME;
     // A pause that ran into Bedtime is told as the pause until it is over, then as Bedtime.
     const switchAt = block.switchAt && block.switchAt.getTime() > from.getTime() ? block.switchAt : null;
-    if (switchAt) entries.push({ from, blocked: true, title: block.name, line, until: block.to, name: block.name, ask: false, pause: block.pause, unknown: false });
+    // Its one line names what ends it: the pause is over before then, so "Your pause ends in 11 hr" would be wrong.
+    if (switchAt) entries.push({ from, blocked: true, title: block.name, line, until: block.to, name: block.name, ask: false, pause: block.pause, unknown: false, short: block.endPause ? "Your pause ends in" : `${block.endName} ends in` });
     const title = block.switchAt ? block.endName : block.name;
     entries.push({ from: switchAt ?? from, blocked: true, title, line, until: block.to, name: title, ask: false, pause: block.switchAt ? block.endPause : block.pause, unknown: false });
     if (!block.to) return entries.map(withShort);
@@ -225,7 +226,8 @@ export function headsUpTimeline(blocks: HeadsUpBlock[], now: Date, timeZone: str
 }
 
 /** The one-line widget's words for an entry (`HeadsUpEntry.short`). */
-function withShort(entry: Omit<HeadsUpEntry, "short">): HeadsUpEntry {
+function withShort(entry: Omit<HeadsUpEntry, "short"> & { short?: string }): HeadsUpEntry {
+  if (entry.short) return { ...entry, short: entry.short };
   if (!entry.until) return { ...entry, short: `${entry.title} · ${entry.line}` };
   if (!entry.blocked) return { ...entry, short: `${entry.title} starts in` };
   return { ...entry, short: entry.pause ? "Your pause ends in" : `${entry.title} ends in` };
