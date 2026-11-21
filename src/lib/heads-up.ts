@@ -132,6 +132,11 @@ export type HeadsUpNotice = {
   edge: Date;
   kind: "start" | "end";
   title: string;
+  /**
+   * The title by the clock ("Bedtime starts at 9 PM"), for a phone that posts the notice late: Android
+   * may deliver an inexact alarm minutes after `at`, when "in 5 minutes" would no longer be true.
+   */
+  lateTitle: string;
   body: string;
 };
 
@@ -158,20 +163,22 @@ export function headsUpNotices(
   return notices.sort((a, b) => a.at.getTime() - b.at.getTime());
 }
 
-function startWords(block: HeadsUpBlock, timeZone: string, voice: HeadsUpVoice, minutes: number): { title: string; body: string } {
+type NoticeWords = { title: string; lateTitle: string; body: string };
+
+function startWords(block: HeadsUpBlock, timeZone: string, voice: HeadsUpVoice, minutes: number): NoticeWords {
   const lead = minutesText(minutes);
   const at = timeAt(block.from, timeZone);
   const stops = voice === "apps" ? `Your apps pause at ${at}.` : `Your internet pauses at ${at}.`;
-  if (block.afterExtraTime) return { title: `Your extra time ends in ${lead}`, body: `${block.name} is back on. ${stops}` };
-  return { title: `${block.name} starts in ${lead}`, body: `Save your game and finish your messages. ${stops}` };
+  if (block.afterExtraTime) return { title: `Your extra time ends in ${lead}`, lateTitle: `Your extra time ends at ${at}`, body: `${block.name} is back on. ${stops}` };
+  return { title: `${block.name} starts in ${lead}`, lateTitle: `${block.name} starts at ${at}`, body: `Save your game and finish your messages. ${stops}` };
 }
 
-function endWords(block: HeadsUpBlock, timeZone: string, voice: HeadsUpVoice, minutes: number): { title: string; body: string } {
+function endWords(block: HeadsUpBlock, timeZone: string, voice: HeadsUpVoice, minutes: number): NoticeWords {
   const lead = minutesText(minutes);
   const at = timeAt(block.to!, timeZone);
   const back = voice === "apps" ? `Your apps are back at ${at}.` : `Your internet is back at ${at}.`;
-  if (block.endPause) return { title: `Your pause ends in ${lead}`, body: back };
-  return { title: `${block.endName} ends in ${lead}`, body: back };
+  if (block.endPause) return { title: `Your pause ends in ${lead}`, lateTitle: `Your pause ends at ${at}`, body: back };
+  return { title: `${block.endName} ends in ${lead}`, lateTitle: `${block.endName} ends at ${at}`, body: back };
 }
 
 /**
