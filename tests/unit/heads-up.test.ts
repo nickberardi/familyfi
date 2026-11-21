@@ -88,10 +88,10 @@ describe("the heads-up before a block starts or ends", () => {
     // It ends as Bedtime, not as the pause that was over at 9:30 PM.
     const notices = headsUpNotices(blocks, MONDAY_EVENING, ZONE, "apps");
     expect(notices.map((notice) => notice.title)).toEqual(["Bedtime ends in 5 minutes"]);
-    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE).map(({ from, title }) => [from.toISOString(), title])).toEqual([
-      ["2026-11-17T01:00:00.000Z", "Paused"],
-      ["2026-11-17T02:30:00.000Z", "Bedtime"],
-      ["2026-11-17T12:00:00.000Z", "Open"],
+    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE).map(({ from, title, pause }) => [from.toISOString(), title, pause])).toEqual([
+      ["2026-11-17T01:00:00.000Z", "Paused", true],
+      ["2026-11-17T02:30:00.000Z", "Bedtime", false],
+      ["2026-11-17T12:00:00.000Z", "Open", false],
     ]);
   });
 
@@ -106,7 +106,8 @@ describe("the heads-up before a block starts or ends", () => {
 
   it("says the widget is not up to date when the plan runs out and windows go on", () => {
     const blocks = headsUpBlocks(me({ windows: [bedtime()] }), MONDAY_EVENING, 1);
-    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE, true).at(-1)).toMatchObject({ title: HEADS_UP_WORDS.unknownTitle, line: HEADS_UP_WORDS.unknownLine, until: null });
+    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE, true).at(-1)).toMatchObject({ title: HEADS_UP_WORDS.unknownTitle, line: HEADS_UP_WORDS.unknownLine, until: null, unknown: true });
+    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE).at(-1)).toMatchObject({ title: "Open", unknown: false });
   });
 
   it("offers no ask on a countdown to the end of extra time", () => {
