@@ -3,7 +3,7 @@ import { zonedFormat } from "@/lib/clock";
 import type { TimelineBand } from "@/lib/day-timeline";
 import { daysLabel, formatHhmm } from "@/lib/display";
 import { rulesToUnblock } from "@/lib/group-actions";
-import { groupLift, rulePaused, type Rule, type RulePause } from "@/lib/rules";
+import { ASK_AHEAD_MINUTES, groupLift, rulePaused, type Rule, type RulePause } from "@/lib/rules";
 import type { Actor, Group, GroupAsk } from "@/lib/types";
 import {
   isWindowActive,
@@ -805,18 +805,21 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     story = current;
   } else {
     const next = nextWindow(now);
-    items = [
-      {
-        time: "Now",
-        now: true,
-        tone: "on",
-        sign: "allowed",
-        title: "Not blocked",
-        detail: next ? `Until ${clock(next.from)}` : "For the rest of today",
-      },
-      ...(next ? [windowItem(next)] : []),
-    ];
+    const open: DayItem = {
+      time: "Now",
+      now: true,
+      tone: "on",
+      sign: "allowed",
+      title: "Not blocked",
+      detail: next ? `Until ${clock(next.from)}` : "For the rest of today",
+    };
+    // In the heads-up's last minutes before a window starts (familyfi#457), the child can already ask
+    // for more time on it, as FamilyFi takes it (`askableWindows`); not on one a parent already lifted.
+    const soon = next && !next.allowed && next.from > now && next.from - now <= ASK_AHEAD_MINUTES;
+    const current = soon && ask?.state !== "yes" && ask?.minutes ? ask : undefined;
+    items = [soon ? withAskFor(current, open, true) : open, ...(next ? [windowItem(next)] : [])];
     day = { kind: "open", next };
+    if (soon) story = current;
   }
   return { day, ask: story, bands, items, voice };
 }

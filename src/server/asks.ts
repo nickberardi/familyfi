@@ -8,7 +8,7 @@ import { prisma } from "./db";
 import { groupInclude, type GroupWithRules, lifted, publicGroup, sessionActor } from "./groups";
 import { loadHousehold } from "./household";
 import { ApiError } from "./http";
-import { activeWindowsEnd, builtInRule, ruleInternetWindows } from "./rules";
+import { askableWindows, builtInRule, ruleInternetWindows } from "./rules";
 import { unblockTargets } from "./unblock-targets";
 
 /*
@@ -102,11 +102,12 @@ export async function fileAsk(session: SignedInSession, groupId: string, input: 
     if (!link) throw new ApiError(404, "not_found", thing ? `That rule doesn't cover ${thing}.` : "That rule isn't one of yours.");
     const { rule } = link;
     if (rule.mode === RuleMode.always) throw new ApiError(409, "always_on", "You can't ask for more time on this one.");
-    const ends = activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone);
-    if (!rule.enabled || lifted(rule, now) || lifted(link, now) || !ends) {
+    // A window on now, or one starting within the heads-up's five minutes (familyfi#457).
+    const window = askableWindows(ruleInternetWindows(rule), now, household.timezone);
+    if (!rule.enabled || lifted(rule, now) || lifted(link, now) || !window?.end) {
       throw new ApiError(409, "not_blocked", thing ? `That rule isn't blocking ${thing} right now.` : "That rule isn't blocking you right now.");
     }
-    blockEnd = ends;
+    blockEnd = window.end;
     ruleName = rule.name;
   }
   const timeout = new Date(now.getTime() + household.askTimeoutMinutes * 60_000);

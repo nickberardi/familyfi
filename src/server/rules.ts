@@ -27,7 +27,7 @@ import { networkInScope, type NetworkScope } from "./unifi/scope";
 import { currentHouseholdId } from "./household-context";
 
 // A group's and a rule's allow share it with the clients.
-export { activeWindowsEnd } from "@/lib/rules";
+export { activeWindowsEnd, askableWindows } from "@/lib/rules";
 
 export const ruleInclude = {
   groups: true,

@@ -2,6 +2,7 @@ import { zonedFormat } from "@/lib/clock";
 import { NO_END_TIME, type GroupDay } from "@/lib/child-day";
 import { formatHhmm } from "@/lib/display";
 import { nextWindowStart, windowEndsAt } from "@/lib/rule-windows";
+import { ASK_AHEAD_MINUTES } from "@/lib/rules";
 
 /**
  * The heads-up FamilyFi Me gives on a person's own phone shortly before a block starts or ends
@@ -15,8 +16,8 @@ import { nextWindowStart, windowEndsAt } from "@/lib/rule-windows";
  * that touch or overlap are one block, named for the first.
  */
 
-/** How long before a block starts or ends the heads-up comes. */
-export const HEADS_UP_LEAD_MINUTES = 5;
+/** How long before a block starts or ends the heads-up comes: as long as a person can ask ahead of a window. */
+export const HEADS_UP_LEAD_MINUTES = ASK_AHEAD_MINUTES;
 
 /** How far ahead the phone plans. It plans again each time it reads FamilyFi. */
 export const HEADS_UP_DAYS = 7;

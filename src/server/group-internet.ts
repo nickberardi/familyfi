@@ -7,7 +7,7 @@ import { prisma } from "./db";
 import { blockRuleOf, groupInclude, internetLinks, lifted, publicGroup, sessionActor } from "./groups";
 import { ApiError } from "./http";
 import { CLEARED, liftRule, type LiftAction, type LiftBody } from "./rule-lifts";
-import { activeWindowsEnd, ruleInternetWindows } from "./rules";
+import { activeWindowsEnd, askableWindows, ruleInternetWindows } from "./rules";
 import { pauseRuleName } from "./unifi/names";
 import { currentHouseholdId } from "./household-context";
 
@@ -172,10 +172,12 @@ async function liftForAsk(session: AnsweringSession, action: LiftAction, target:
     if (!rule) throw new ApiError(404, "not_found", "Rule not found.");
     const now = new Date();
     const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
-    const windowEnd = activeWindowsEnd(ruleInternetWindows(rule), now, household.timezone);
-    // A yes lifts the window that is on, and never past its end.
-    if (!windowEnd) throw new ApiError(409, "not_in_window", "This rule is not blocking now.");
-    const wanted = body.until === undefined ? new Date(now.getTime() + (ask.minutes ?? 0) * 60_000) : body.until ? new Date(body.until) : null;
+    // A yes lifts the window that is on, or the one starting within the heads-up's five minutes, from
+    // its start, and never past its end.
+    const window = askableWindows(ruleInternetWindows(rule), now, household.timezone);
+    const windowEnd = window?.end;
+    if (!window || !windowEnd) throw new ApiError(409, "not_in_window", "This rule is not blocking now.");
+    const wanted = body.until === undefined ? new Date(window.from.getTime() + (ask.minutes ?? 0) * 60_000) : body.until ? new Date(body.until) : null;
     const until = windowEnd && (!wanted || windowEnd < wanted) ? windowEnd : wanted;
     return await liftRule(session, action, target, { ...rest, until: until?.toISOString() ?? null });
   } catch (error) {

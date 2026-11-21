@@ -79,6 +79,21 @@ async function windowRule(groupId: string, endsIn = 2 * 60 * MINUTE, name = "Hom
   });
 }
 
+/** A scheduled internet rule on `groupId` whose window, every day, starts `startsIn` from now (to the minute) and runs an hour. */
+async function upcomingRule(groupId: string, startsIn: number, name = "Bedtime") {
+  const start = new Date(Math.ceil((Date.now() + startsIn) / MINUTE) * MINUTE);
+  const rule = await prisma().rule.create({
+    data: {
+      name,
+      kind: RuleKind.internet,
+      mode: RuleMode.scheduled,
+      groups: { create: { groupId } },
+      windows: { create: [{ position: 0, name: "", days: [0, 1, 2, 3, 4, 5, 6], start: hhmm(start), end: hhmm(new Date(start.getTime() + 60 * MINUTE)) }] },
+    },
+  });
+  return { rule, start };
+}
+
 describe("asking for more time", () => {
   let admin: SessionAuth;
   let child: SessionAuth;
@@ -140,6 +155,22 @@ describe("asking for more time", () => {
     expect((await verb(allowRoute, "allow", admin, emma.id, reading.id, { askId: short.id })).status).toBe(200);
     const capped = await prisma().ruleGroup.findUniqueOrThrow({ where: { ruleId_groupId: { ruleId: reading.id, groupId: emma.id } } });
     expect(capped.pauseUntil!.getTime()).toBe(windowEnd);
+  });
+
+  // familyfi#457: the heads-up's countdown asks before the window starts; a yes pushes its start back.
+  it("asks in the five minutes before a window starts, and a yes counts from the start", async () => {
+    const later = await upcomingRule(emma.id, 10 * MINUTE, "Late");
+    const early = await ask(child, emma.id, { about: "rule", ruleId: later.rule.id, minutes: 30 });
+    expect(early.status).toBe(409);
+    expect(await errorCode(early)).toBe("not_blocked");
+
+    const { rule: bedtime, start } = await upcomingRule(emma.id, 2 * MINUTE);
+    const waiting = await askOf(await ask(child, emma.id, { about: "rule", ruleId: bedtime.id, minutes: 30 }));
+    expect(waiting).toMatchObject({ about: "rule", ruleId: bedtime.id, minutes: 30, state: "waiting" });
+    expect((await verb(allowRoute, "allow", admin, emma.id, bedtime.id, { askId: waiting.id })).status).toBe(200);
+    const link = await prisma().ruleGroup.findUniqueOrThrow({ where: { ruleId_groupId: { ruleId: bedtime.id, groupId: emma.id } } });
+    expect(link).toMatchObject({ pauseActive: true, pauseKind: "allow" });
+    expect(link.pauseUntil!.getTime()).toBe(start.getTime() + 30 * MINUTE);
   });
 
   it("takes a parent's Not now, and the child asks again only after the household's wait", async () => {
