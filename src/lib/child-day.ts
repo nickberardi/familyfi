@@ -813,7 +813,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       title: "Not blocked",
       detail: next ? `Until ${clock(next.from)}` : "For the rest of today",
     };
-    // In the heads-up's last minutes before a window starts (familyfi#457), the child can already ask
+    // In the heads-up's last minutes before a window starts (familyfi issue 457), the child can already ask
     // for more time on it, as FamilyFi takes it (`askableWindows`); not on one a parent already lifted.
     const soon = next && !next.allowed && next.from > now && next.from - now <= ASK_AHEAD_MINUTES;
     const current = soon && ask?.state !== "yes" && ask?.minutes ? ask : undefined;

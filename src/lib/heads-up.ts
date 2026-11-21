@@ -6,7 +6,7 @@ import { ASK_AHEAD_MINUTES } from "@/lib/rules";
 
 /**
  * The heads-up FamilyFi Me gives on a person's own phone shortly before a block starts or ends
- * (familyfi#457): a notice, a countdown on the Lock Screen and in the Dynamic Island (an Android Live
+ * (familyfi issue 457): a notice, a countdown on the Lock Screen and in the Dynamic Island (an Android Live
  * Update), and a widget that says what changes next. Everything here is worked out on the phone from
  * the day FamilyFi already answered (`GroupDay`), so nothing about the person is sent anywhere, and the
  * block still starts on time: asking for more time stays the way to get longer.

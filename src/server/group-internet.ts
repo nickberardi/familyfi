@@ -147,7 +147,7 @@ type AnsweringSession = Parameters<typeof liftRule>[0] & {
 /**
  * A parent's yes to a child's ask, given with its id. The ask is taken first, so a second parent
  * answering it gets 409 `ask_closed`, and put back if the lift fails. A window's yes lasts the
- * minutes asked for from now, or the parent's own `until`, and never past the window's end.
+ * minutes asked for from now (from the window's start when it has not started yet), or the parent's own `until`, and never past the window's end.
  */
 async function liftForAsk(session: AnsweringSession, action: LiftAction, target: { groupId: string; ruleId: string }, body: LiftBody) {
   const internet = target.ruleId === INTERNET_RULE_ID;
