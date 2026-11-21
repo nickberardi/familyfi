@@ -46,6 +46,9 @@ export type DaySign = "pause" | "window" | "allowed" | "morning" | "waiting" | "
  */
 export type DayPause = { by?: string; from: Clock; to: Clock; open?: boolean };
 
+/** The ask button's words, on the day and on the heads-up's countdown (`HEADS_UP_WORDS`). */
+export const ASK_FOR_MORE_TIME = "Ask for more time";
+
 /** What a pause with no end time says where a time would go. */
 export const NO_END_TIME = "No end time";
 
@@ -615,7 +618,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   // The Now block: askable with no request, else the request's state under it.
   const withAskFor = (request: DayAsk | undefined, item: DayItem, withLength: boolean): DayItem => {
     const ask = request;
-    const askable = { withLength, label: withLength ? "Ask for more time" : voice.endAsk };
+    const askable = { withLength, label: withLength ? ASK_FOR_MORE_TIME : voice.endAsk };
     if (!ask) return { ...item, ask: askable };
     // No one answered in time: the child can ask again. Nobody said no, so it is not drawn as one.
     if (ask.state === "timedOut" || ask.state === "ended")

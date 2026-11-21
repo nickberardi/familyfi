@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GroupDay } from "@/lib/child-day";
-import { headsUpBlocks, headsUpNotices, headsUpTimeline } from "@/lib/heads-up";
+import { HEADS_UP_WORDS, headsUpBlocks, headsUpNotices, headsUpTimeline } from "@/lib/heads-up";
 
 const ZONE = "America/New_York";
 // Monday 16 November 2026, 8 PM in New York (UTC-5).
@@ -97,11 +97,22 @@ describe("the heads-up before a block starts or ends", () => {
 
   it("gives the widget what comes next, then what is under way, then open", () => {
     const blocks = headsUpBlocks(me({ windows: [bedtime()] }), MONDAY_EVENING, 1);
-    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE).map(({ from, blocked, title, line, until }) => [from.toISOString(), blocked, title, line, until?.toISOString() ?? null])).toEqual([
-      ["2026-11-17T01:00:00.000Z", false, "Bedtime", "Starts at 9 PM", "2026-11-17T02:00:00.000Z"],
-      ["2026-11-17T02:00:00.000Z", true, "Bedtime", "Ends at 7 AM", "2026-11-17T12:00:00.000Z"],
-      ["2026-11-17T12:00:00.000Z", false, "Open", "Nothing planned", null],
+    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE).map(({ from, blocked, title, line, until, ask }) => [from.toISOString(), blocked, title, line, until?.toISOString() ?? null, ask])).toEqual([
+      ["2026-11-17T01:00:00.000Z", false, "Bedtime", "Starts at 9 PM", "2026-11-17T02:00:00.000Z", true],
+      ["2026-11-17T02:00:00.000Z", true, "Bedtime", "Ends at 7 AM", "2026-11-17T12:00:00.000Z", false],
+      ["2026-11-17T12:00:00.000Z", false, "Open", "Nothing planned", null, false],
     ]);
+  });
+
+  it("says the widget is not up to date when the plan runs out and windows go on", () => {
+    const blocks = headsUpBlocks(me({ windows: [bedtime()] }), MONDAY_EVENING, 1);
+    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE, true).at(-1)).toMatchObject({ title: HEADS_UP_WORDS.unknownTitle, line: HEADS_UP_WORDS.unknownLine, until: null });
+  });
+
+  it("offers no ask on a countdown to the end of extra time", () => {
+    const now = new Date("2026-11-17T02:10:00Z");
+    const blocks = headsUpBlocks(me({ windows: [bedtime({ by: "Nick", until: "2026-11-17T02:30:00Z" })] }), now, 1);
+    expect(headsUpTimeline(blocks, now, ZONE)[0]).toMatchObject({ blocked: false, title: "Bedtime", ask: false });
   });
 
   it("stops the widget at a block with no end", () => {

@@ -1,5 +1,5 @@
 import { zonedFormat } from "@/lib/clock";
-import { NO_END_TIME, type GroupDay } from "@/lib/child-day";
+import { ASK_FOR_MORE_TIME, NO_END_TIME, type GroupDay } from "@/lib/child-day";
 import { formatHhmm } from "@/lib/display";
 import { nextWindowStart, windowEndsAt } from "@/lib/rule-windows";
 import { ASK_AHEAD_MINUTES } from "@/lib/rules";
@@ -21,6 +21,26 @@ export const HEADS_UP_LEAD_MINUTES = ASK_AHEAD_MINUTES;
 
 /** How far ahead the phone plans. It plans again each time it reads FamilyFi. */
 export const HEADS_UP_DAYS = 7;
+
+/**
+ * The words the countdown and the widget draw around familyfi's lines, in one place so iPhone,
+ * Android and the Watch say the same (docs/design.md, "The heads-up before a block").
+ */
+export const HEADS_UP_WORDS = {
+  /** The countdown's button, before a block a person can ask about; the day's own ask button says the same. */
+  ask: ASK_FOR_MORE_TIME,
+  /** The countdown once its block has started, until the phone takes it down. */
+  started: "Started",
+  /** The widget's label over what is under way, and over what comes next. */
+  now: "Now",
+  next: "Next",
+  /** The inline widget: "Bedtime starts in 2 hr", "Bedtime ends in 1 hr". */
+  startsIn: "starts in",
+  endsIn: "ends in",
+  /** The widget once its plan has run out, or before the phone ever planned: it can't say what is next. */
+  unknownTitle: "Not up to date",
+  unknownLine: "Open FamilyFi Me to update",
+} as const;
 
 /** One block on the phone's plan. */
 export type HeadsUpBlock = {
@@ -155,27 +175,41 @@ export type HeadsUpEntry = {
   until: Date | null;
   /** The block the countdown is for: the one starting next, or the one under way. */
   name: string | null;
+  /**
+   * Whether the person can ask for more time on the block starting at `until`: a window on its
+   * schedule, as the day offers it (`tellDay`). Not when it starts because extra time a parent gave
+   * runs out, nor on a pause.
+   */
+  ask: boolean;
 };
 
-/** The widget's timeline from `now`: one entry for now, then one at each start and each end. */
-export function headsUpTimeline(blocks: HeadsUpBlock[], now: Date, timeZone: string): HeadsUpEntry[] {
+/**
+ * The widget's timeline from `now`: one entry for now, then one at each start and each end. With
+ * `recurs` (the group has scheduled windows) blocks go on past the plan, so the last entry says the
+ * widget is not up to date rather than "Nothing planned".
+ */
+export function headsUpTimeline(blocks: HeadsUpBlock[], now: Date, timeZone: string, recurs = false): HeadsUpEntry[] {
   const entries: HeadsUpEntry[] = [];
   let at = now;
   for (const block of blocks) {
     if (block.from.getTime() > at.getTime()) {
-      entries.push({ from: at, blocked: false, title: block.name, line: `Starts at ${timeAt(block.from, timeZone)}`, until: block.from, name: block.name });
+      entries.push({ from: at, blocked: false, title: block.name, line: `Starts at ${timeAt(block.from, timeZone)}`, until: block.from, name: block.name, ask: !block.pause && !block.afterExtraTime });
     }
     const from = block.from.getTime() > at.getTime() ? block.from : at;
     const line = block.to ? `Ends at ${timeAt(block.to, timeZone)}` : NO_END_TIME;
     // A pause that ran into Bedtime is told as the pause until it is over, then as Bedtime.
     const switchAt = block.switchAt && block.switchAt.getTime() > from.getTime() ? block.switchAt : null;
-    if (switchAt) entries.push({ from, blocked: true, title: block.name, line, until: block.to, name: block.name });
+    if (switchAt) entries.push({ from, blocked: true, title: block.name, line, until: block.to, name: block.name, ask: false });
     const title = block.switchAt ? block.endName : block.name;
-    entries.push({ from: switchAt ?? from, blocked: true, title, line, until: block.to, name: title });
+    entries.push({ from: switchAt ?? from, blocked: true, title, line, until: block.to, name: title, ask: false });
     if (!block.to) return entries;
     at = block.to;
   }
-  entries.push({ from: at, blocked: false, title: OPEN_TITLE, line: "Nothing planned", until: null, name: null });
+  entries.push(
+    recurs
+      ? { from: at, blocked: false, title: HEADS_UP_WORDS.unknownTitle, line: HEADS_UP_WORDS.unknownLine, until: null, name: null, ask: false }
+      : { from: at, blocked: false, title: OPEN_TITLE, line: "Nothing planned", until: null, name: null, ask: false },
+  );
   return entries;
 }
 
