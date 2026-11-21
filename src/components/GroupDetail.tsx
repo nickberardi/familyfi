@@ -9,6 +9,7 @@ import { groupBadge, groupDetailColor, groupStatusParts } from "@/lib/group-acti
 import { StatusBadge } from "@/ui/StatusBadge";
 import type { GroupSheetTarget } from "@/lib/group-pause-sheet";
 import { groupCardControls } from "@/ui/group-card-controls";
+import { AskStrip } from "@/ui/AskStrip";
 import { CardMenuButton } from "@/ui/CardActions";
 import { internetRulesForGroup, internetWindowsForGroup } from "@/lib/rules";
 import { cardNoteLine } from "@/lib/display";
@@ -25,7 +26,6 @@ import { GroupChildPhones } from "@/components/GroupChildPhones";
 import { PRIMARY_BUTTON } from "@/components/ui/buttons";
 import { BackLink } from "@/components/ui/BackLink";
 import { NotFound } from "@/components/ui/NotFound";
-import { Icon } from "@/components/ui/Icon";
 
 export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "things"; id: string; demo?: boolean }) {
   const router = useRouter();
@@ -83,18 +83,7 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
               </button>
             )}
           </div>
-          {header.ask ? (
-            <div className="mb-3 flex items-center gap-3 border-y border-[var(--ff-line)] bg-[var(--ff-accent-wash)] px-4 py-2.5">
-              <Icon name="hand-waving" size={17} color="var(--ff-accent)" />
-              <p data-testid={header.ask.lineTestID} className="min-w-0 flex-1 text-[14px] text-[var(--ff-ink)]">
-                <span className="font-semibold">{header.ask.label}</span>
-                <span className="text-[var(--ff-ink-2)]"> · {header.ask.at}</span>
-              </p>
-              <button type="button" disabled={busy} onClick={header.ask.onPress} data-testid={header.ask.testID} className={`shrink-0 ${PRIMARY_BUTTON}`}>
-                Answer
-              </button>
-            </div>
-          ) : null}
+          {header.ask ? <AskStrip ask={{ ...header.ask, disabled: busy }} /> : null}
           <div className="px-3 pb-3">
             <GroupSchedule
               group={group}
