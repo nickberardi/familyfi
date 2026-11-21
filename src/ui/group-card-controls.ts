@@ -1,10 +1,11 @@
-import { groupAskLine } from "@/lib/group-ask";
+import { formatClock } from "@/lib/display";
+import { groupAskLine, waitingAsk } from "@/lib/group-ask";
 import { groupHeaderActions } from "@/lib/group-actions";
 import type { GroupCardRun } from "@/lib/group-writes";
 import { groupLift, type Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
 
-import type { ZoneAction } from "./CardActions";
+import type { AskAction, ZoneAction } from "./CardActions";
 
 /**
  * A group's one button, as every client draws it: Block, Unblock or Resume (with a Block button
@@ -23,7 +24,7 @@ export function groupCardControls(
   now: Date,
   onRun: (tap: GroupCardRun) => void,
   enabled = true,
-): { action: ZoneAction; more: ZoneAction | null; menu: ZoneAction[]; pageMenu: ZoneAction[]; ask: ZoneAction | null } {
+): { action: ZoneAction; more: ZoneAction | null; menu: ZoneAction[]; pageMenu: ZoneAction[]; ask: AskAction | null } {
   const header = groupHeaderActions(group, rules, timezone, now);
   const liftedUntil = (ruleIds: string[]) => {
     const rule = rules.find((candidate) => candidate.id === ruleIds[0]);
@@ -53,7 +54,19 @@ export function groupCardControls(
     }),
   );
   const pageMenu = menu.filter((_, index) => header.menu[index]!.run === "blockInternet");
+  // More time leads the dropdown, so the header keeps one control.
+  const more = header.more ? { ...asHeader(header.more, false), testID: `group-action-${header.more.run}-${group.id}` } : null;
   const askLine = groupAskLine(group, rules, now);
-  const ask: ZoneAction | null = askLine ? { label: askLine, disabled: !enabled, onPress: () => onRun({ kind: "ask" }), testID: `group-ask-${group.id}` } : null;
-  return { action: asHeader(header.action, true), more: header.more ? asHeader(header.more, false) : null, menu, pageMenu, ask };
+  const asked = waitingAsk(group, now);
+  const ask: AskAction | null =
+    askLine && asked
+      ? { label: askLine, at: formatClock(new Date(asked.at), timezone), disabled: !enabled, onPress: () => onRun({ kind: "ask" }), testID: `group-ask-${group.id}` }
+      : null;
+  return {
+    action: asHeader(header.action, true),
+    more,
+    menu: more ? [more, ...menu] : menu,
+    pageMenu: more ? [more, ...pageMenu] : pageMenu,
+    ask,
+  };
 }
