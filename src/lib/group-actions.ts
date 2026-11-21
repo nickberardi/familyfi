@@ -52,7 +52,7 @@ export function blockButtonChoice(rule: Pick<Rule, "kind" | "builtIn">): boolean
   return rule.kind !== "internet" && !rule.builtIn;
 }
 
-/** What a tap on the group's header button, or its More time link, does. */
+/** What a tap on the group's header button, or More time in its dropdown, does. */
 export type GroupRun =
   | "block"
   | "moreBlock"
@@ -339,7 +339,7 @@ export function groupDetailColor(change: GroupStatusParts["change"]): string {
 }
 
 /**
- * The group's one header button, its More time link while a timed block or unblock lasts, and its
+ * The group's one header button, its More time while a timed block or unblock lasts (the clients' dropdown leads with it), and its
  * dropdown (`groupMenu`). Unblock shows whenever anything blocks the group now but its standing
  * rules: its own block, an internet rule, or a scheduled category, app or website rule even while
  * it has the internet. It lifts all of them (at once when only its own block does, otherwise from

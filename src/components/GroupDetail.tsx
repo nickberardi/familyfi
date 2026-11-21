@@ -69,7 +69,7 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
               <p className="mt-0.5 text-[14px] text-[var(--ff-ink-3)]">{cardNoteLine(group, windows)}</p>
             </div>
             {header.pageMenu.length ? (
-              // Its rules each have their own Pause below, so the dropdown only blocks the internet.
+              // Its rules each have their own Pause below, so the dropdown holds only More time and Block internet.
               <CardMenuButton action={header.action} menu={header.pageMenu} menuLabel={`More choices for ${group.name}`} />
             ) : (
               <button
@@ -83,7 +83,7 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
               </button>
             )}
           </div>
-          {header.ask ? <AskStrip ask={{ ...header.ask, disabled: busy }} /> : null}
+          {header.ask ? <AskStrip ask={header.ask} /> : null}
           <div className="px-3 pb-3">
             <GroupSchedule
               group={group}

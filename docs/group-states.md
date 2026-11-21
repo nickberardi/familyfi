@@ -63,7 +63,8 @@ case 6).
 ### How the button decides
 
 "Blocking" means a rule that counts as blocking now (spec 3.1). An all-day rule counts only when it
-is the default. "More time" shows only when what it extends has an end time.
+is the default. "More time" shows only when what it extends has an end time, as the first choice
+in the dropdown (3.4); "+ More time" below means that choice.
 
 ```mermaid
 flowchart TD
@@ -153,10 +154,12 @@ the group isn't paused.
 
 ### 3.4 Dropdown
 
-The dropdown appears while the button acts on the default (rows B1 and B2), or while a
-category, app or website rule other than the button's is blocking or lifted for the group. Here
-"blocking" includes all-day rules. It lists:
+The dropdown appears while a timed block or unblock lasts (rows A, B2 and D with an end time),
+while the button acts on the default (rows B1 and B2), or while a category, app or website rule
+other than the button's is blocking or lifted for the group. Here "blocking" includes all-day
+rules. It lists:
 
+0. **More time**, first, while what the button ends has an end time. It is never on the card itself.
 1. **Block internet**, unless the internet is already blocked, or the button is already Block for
    all internet (row E).
 2. **Unblock <rule>** for each rule blocking now, all-day rules included: internet rules first, then
@@ -202,21 +205,21 @@ A time past the window's end stops at the end, as the server caps it. **Not now*
 `decline`, with when the child can ask again (the household's `askWaitMinutes`). An answer takes
 the line away at once; one a second parent already gave is refused with 409 `ask_closed`.
 
-### 3.6 Examples (checked against `groupHeaderActions` and `groupStatusParts`)
+### 3.6 Examples (checked against `groupCardControls` and `groupStatusParts`)
 
 The TV group from section 1.
 
 | Default | Time and state | Badge | Line | Button (row) | Dropdown |
 | --- | --- | --- | --- | --- | --- |
 | none | 9 AM | Online | No internet rule | Block (E) | Unblock Video, Unblock Social |
-| none | 9 AM, paused until 6 PM | Blocked | Until 6:00 PM by Sam | Unblock + More time (A) | Unblock Video, Unblock Social |
+| none | 9 AM, paused until 6 PM | Blocked | Until 6:00 PM by Sam | Unblock (A) | More time, Unblock Video, Unblock Social |
 | none | 11 AM | Online | Gaming blocked until 12:00 PM | Unblock (C) | Block internet, Unblock Video, Unblock Social |
-| none | 11 AM, unblocked | Online | Unblocked until 12:00 PM by Sam | Resume + More time (D) | Block internet, Unblock Video, Unblock Social |
+| none | 11 AM, unblocked | Online | Unblocked until 12:00 PM by Sam | Resume (D) | More time, Block internet, Unblock Video, Unblock Social |
 | Video | 9 AM | Blocked | Video blocked | Unblock (B1) | Block internet, Unblock Social |
-| Video | 9 AM, Video lifted for an hour | Unblocked | Video unblocked until 10:00 AM by Sam | Block + More time (B2) | Block internet, Unblock Social |
+| Video | 9 AM, Video lifted for an hour | Unblocked | Video unblocked until 10:00 AM by Sam | Block (B2) | More time, Block internet, Unblock Social |
 | Video | 11 AM | Blocked | Video and Gaming blocked | Unblock (C) | Block internet, Unblock Gaming, Unblock Video, Unblock Social |
 | Video | 11 AM, Video already lifted | Unblocked | Gaming blocked until 12:00 PM | Unblock (C) | Block internet, Unblock Social, Block Video again |
-| Video | 11 AM, Video already lifted, then unblocked | Unblocked | Unblocked until 12:00 PM by Sam | Resume + More time (D) | Block internet, Unblock Social, Block Video again |
+| Video | 11 AM, Video already lifted, then unblocked | Unblocked | Unblocked until 12:00 PM by Sam | Resume (D) | More time, Block internet, Unblock Social, Block Video again |
 | Video, scheduled 7 to 9 PM | 3 PM | Online | Video at 7:00 PM | Block (E): pauses all internet | Unblock Social |
 
 ### 3.7 What each request does on the gateway
