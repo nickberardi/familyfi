@@ -249,7 +249,7 @@ export function activeWindowsEnd(windows: InternetWindow[], now: Date, timezone:
 
 /**
  * How long before a window starts a person can already ask for more time on it: the heads-up's five
- * minutes (familyfi#457), so the countdown's Ask for more time works before the block is on.
+ * minutes (familyfi issue 457), so the countdown's Ask for more time works before the block is on.
  */
 export const ASK_AHEAD_MINUTES = 5;
 
