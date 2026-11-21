@@ -77,7 +77,7 @@ export function PairMePage() {
         />
 
         {household?.askTimeoutMinutes !== undefined && household.askWaitMinutes !== undefined ? (
-          <AsksCard timeout={household.askTimeoutMinutes} wait={household.askWaitMinutes} mutate={store.mutate} />
+          <AsksCard timeout={household.askTimeoutMinutes} wait={household.askWaitMinutes} ahead={household.askAheadMinutes} mutate={store.mutate} />
         ) : null}
 
         <SharedThingsCard groups={groups} mutate={store.mutate} />

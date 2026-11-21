@@ -1,3 +1,4 @@
+import { minutesText } from "@/lib/alert-copy";
 import { zonedFormat } from "@/lib/clock";
 import { ASK_FOR_MORE_TIME, NO_END_TIME, type GroupDay } from "@/lib/child-day";
 import { formatHhmm } from "@/lib/display";
@@ -16,7 +17,10 @@ import { ASK_AHEAD_MINUTES } from "@/lib/rules";
  * that touch or overlap are one block, named for the first.
  */
 
-/** How long before a block starts or ends the heads-up comes: as long as a person can ask ahead of a window. */
+/**
+ * How long before a block starts or ends the heads-up comes unless the household chose otherwise
+ * (`askAheadMinutes`, 0 for off): as long as a person can ask ahead of a window.
+ */
 export const HEADS_UP_LEAD_MINUTES = ASK_AHEAD_MINUTES;
 
 /** How far ahead the phone plans. It plans again each time it reads FamilyFi. */
@@ -120,7 +124,7 @@ const PAUSE_NAME = "Paused";
 /** What the heads-up says is stopping: "your apps" with Screen Time on, "your internet" otherwise. */
 export type HeadsUpVoice = "apps" | "internet";
 
-/** One heads-up notice, shown at `at`, `HEADS_UP_LEAD_MINUTES` before its block starts or ends at `edge`. */
+/** One heads-up notice, shown at `at`, the household's lead before its block starts or ends at `edge`. */
 export type HeadsUpNotice = {
   /** Stable for one block's start or end, so the phone replaces a notice rather than adding a second. */
   id: string;
@@ -131,34 +135,43 @@ export type HeadsUpNotice = {
   body: string;
 };
 
-/** The notices for `blocks` that are still to come, in order. */
-export function headsUpNotices(blocks: HeadsUpBlock[], now: Date, timeZone: string, voice: HeadsUpVoice): HeadsUpNotice[] {
-  const lead = HEADS_UP_LEAD_MINUTES * 60_000;
+/** The notices for `blocks` that are still to come, in order, `minutes` ahead of each; none when it is 0 (off). */
+export function headsUpNotices(
+  blocks: HeadsUpBlock[],
+  now: Date,
+  timeZone: string,
+  voice: HeadsUpVoice,
+  minutes: number = HEADS_UP_LEAD_MINUTES,
+): HeadsUpNotice[] {
+  if (minutes <= 0) return [];
+  const lead = minutes * 60_000;
   const notices: HeadsUpNotice[] = [];
   for (const block of blocks) {
     const startAt = block.from.getTime() - lead;
     if (startAt > now.getTime()) {
-      notices.push({ id: `start-${block.from.toISOString()}`, at: new Date(startAt), edge: block.from, kind: "start", ...startWords(block, timeZone, voice) });
+      notices.push({ id: `start-${block.from.toISOString()}`, at: new Date(startAt), edge: block.from, kind: "start", ...startWords(block, timeZone, voice, minutes) });
     }
     if (block.to && block.to.getTime() - lead > now.getTime()) {
-      notices.push({ id: `end-${block.to.toISOString()}`, at: new Date(block.to.getTime() - lead), edge: block.to, kind: "end", ...endWords(block, timeZone, voice) });
+      notices.push({ id: `end-${block.to.toISOString()}`, at: new Date(block.to.getTime() - lead), edge: block.to, kind: "end", ...endWords(block, timeZone, voice, minutes) });
     }
   }
   return notices.sort((a, b) => a.at.getTime() - b.at.getTime());
 }
 
-function startWords(block: HeadsUpBlock, timeZone: string, voice: HeadsUpVoice): { title: string; body: string } {
+function startWords(block: HeadsUpBlock, timeZone: string, voice: HeadsUpVoice, minutes: number): { title: string; body: string } {
+  const lead = minutesText(minutes);
   const at = timeAt(block.from, timeZone);
   const stops = voice === "apps" ? `Your apps pause at ${at}.` : `Your internet pauses at ${at}.`;
-  if (block.afterExtraTime) return { title: `Your extra time ends in ${HEADS_UP_LEAD_MINUTES} minutes`, body: `${block.name} is back on. ${stops}` };
-  return { title: `${block.name} starts in ${HEADS_UP_LEAD_MINUTES} minutes`, body: `Save your game and finish your messages. ${stops}` };
+  if (block.afterExtraTime) return { title: `Your extra time ends in ${lead}`, body: `${block.name} is back on. ${stops}` };
+  return { title: `${block.name} starts in ${lead}`, body: `Save your game and finish your messages. ${stops}` };
 }
 
-function endWords(block: HeadsUpBlock, timeZone: string, voice: HeadsUpVoice): { title: string; body: string } {
+function endWords(block: HeadsUpBlock, timeZone: string, voice: HeadsUpVoice, minutes: number): { title: string; body: string } {
+  const lead = minutesText(minutes);
   const at = timeAt(block.to!, timeZone);
   const back = voice === "apps" ? `Your apps are back at ${at}.` : `Your internet is back at ${at}.`;
-  if (block.endPause) return { title: `Your pause ends in ${HEADS_UP_LEAD_MINUTES} minutes`, body: back };
-  return { title: `${block.endName} ends in ${HEADS_UP_LEAD_MINUTES} minutes`, body: back };
+  if (block.endPause) return { title: `Your pause ends in ${lead}`, body: back };
+  return { title: `${block.endName} ends in ${lead}`, body: back };
 }
 
 /**

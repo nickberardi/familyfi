@@ -18,6 +18,8 @@ export type HouseholdPublic = {
   /** How long a child's ask waits for an answer, and how long after Not now before they can ask again; servers before asks leave them out. */
   askTimeoutMinutes?: number;
   askWaitMinutes?: number;
+  /** How long before a block FamilyFi Me's heads-up comes, and how early they can ask; 0 is off. Servers before API 2.1.0 leave it out. */
+  askAheadMinutes?: number;
 };
 
 export type MutationPayload = {

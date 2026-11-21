@@ -330,8 +330,10 @@ turning the switch off hides it again at once.
 
 FamilyFi Me asks on its own group with `POST /groups/{id}/asks`: `{ "about": "pause" }` to be
 unblocked (while the group is paused, or a Thing's Block button default blocks it), or `{ "about": "rule", "ruleId", "minutes" }` (5 to 240) for time in the window of one of
-the group's rules that is blocking it now, or that starts within five minutes (asked from the heads-up's
-countdown; a yes counts from the window's start). Only a child's phone asks (403 `child_only`), and only on
+the group's rules that is blocking it now, or that starts within the household's `askAheadMinutes` (5 unless
+changed, 0 for never; asked from the heads-up's countdown; a yes counts from the window's start). A child's phone
+reads `askAheadMinutes` from `GET /auth/session`, beside `timezone`; an administrator sets it with
+`PUT /settings/household`, as it sets `askTimeoutMinutes` and `askWaitMinutes`. Only a child's phone asks (403 `child_only`), and only on
 its own group or a shared Thing (404). On a Thing the ask's `from` names the child who asked, the
 `ask.new` alert carries the Thing's name as `t` and opens the Thing, and refusals name the Thing. The ask shows as the group's `ask` (`GroupAsk`) on `GET /groups/{id}` and
 `GET /groups` for a day, and phones with alerts on hear `ask.new`. A group has one waiting ask at a
@@ -344,7 +346,7 @@ No route says yes: a parent answers with the verb that lifts what the ask is abo
 `askId`. An ask to unblock (`pause`) is answered by what the group card's Unblock button sends, as if the parent tapped it: `POST /groups/{id}/unblock`, or, while the Block button default alone blocks, that rule's `POST /groups/{id}/rules/{ruleId}/pause`, each for the time the parent picks on the card's own sheet. Those carry no `askId`: the ask is answered yes once nothing it is about blocks the group (`POST /groups/{id}/rules/internet/resume` with `askId` answers it by id while only a pause is behind it, and is 409 `still_blocked` while a Thing's Block button default blocks it too); `POST
 /groups/{id}/rules/{ruleId}/allow` lifts the rule for the group for the minutes asked, from now (from the window's start when the
 ask came in the five minutes before it), or until the parent's own `until`, and never past the end of that window
-(409 `not_in_window` once it is neither on nor about to start). Only an administrator answers by `askId`, as only one declines (403 `administrator_required` for a Watch, the app's controls or an agent). The ask is taken
+(409 `not_in_window` once it is neither on nor starting within `askAheadMinutes`). Only an administrator answers by `askId`, as only one declines (403 `administrator_required` for a Watch, the app's controls or an agent). The ask is taken
 before the write, so a second parent answering it gets 409 `ask_closed`, and is put back if the
 write fails. `POST /groups/{id}/asks/{askId}/decline` is Not now. Any other write that lifts what a
 waiting ask is about (the group's unblock or allowance, the rule paused or allowed for the group or

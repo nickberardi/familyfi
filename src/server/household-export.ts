@@ -76,7 +76,14 @@ const Config = z
       displayName: z.string().trim().min(1).max(80),
       quarantineEnforced: z.boolean(),
       /** Asking for more time; absent in exports made before it. */
-      asks: z.object({ timeoutMinutes: z.number().int().min(5).max(1440), waitMinutes: z.number().int().min(0).max(1440) }).optional(),
+      asks: z
+        .object({
+          timeoutMinutes: z.number().int().min(5).max(1440),
+          waitMinutes: z.number().int().min(0).max(1440),
+          // Exports before the heads-up setting leave it out; the household keeps its own.
+          aheadMinutes: z.number().int().min(0).max(30).optional(),
+        })
+        .optional(),
       unifi: z.object({
         mode: z.string().nullable(),
         baseUrl: z.string().nullable(),
@@ -254,7 +261,7 @@ export async function householdConfig(): Promise<HouseholdConfig> {
       timezone: household.timezone,
       displayName: household.displayName,
       quarantineEnforced: household.quarantineEnforced,
-      asks: { timeoutMinutes: household.askTimeoutMinutes, waitMinutes: household.askWaitMinutes },
+      asks: { timeoutMinutes: household.askTimeoutMinutes, waitMinutes: household.askWaitMinutes, aheadMinutes: household.askAheadMinutes },
       unifi: {
         mode: household.unifiMode,
         baseUrl: household.unifiBaseUrl,
@@ -610,7 +617,13 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
           timezone: config.household.timezone,
           displayName: config.household.displayName,
           quarantineEnforced: config.household.quarantineEnforced,
-          ...(config.household.asks ? { askTimeoutMinutes: config.household.asks.timeoutMinutes, askWaitMinutes: config.household.asks.waitMinutes } : {}),
+          ...(config.household.asks
+            ? {
+                askTimeoutMinutes: config.household.asks.timeoutMinutes,
+                askWaitMinutes: config.household.asks.waitMinutes,
+                ...(config.household.asks.aheadMinutes !== undefined ? { askAheadMinutes: config.household.asks.aheadMinutes } : {}),
+              }
+            : {}),
           ...(summary.gateway === "imported"
             ? {
                 unifiMode: unifi.mode,

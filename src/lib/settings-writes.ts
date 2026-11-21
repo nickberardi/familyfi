@@ -17,8 +17,11 @@ export function setAlertsRelay(mutate: Mutate, alertsRelay: boolean) {
   return mutate((send) => send("/api/v1/settings/household", { method: "PUT", body: { alertsRelay } }));
 }
 
-/** How long a child's ask waits for an answer, or how long after Not now before they can ask again. */
-export function setAskWait(mutate: Mutate, wait: { askTimeoutMinutes: number } | { askWaitMinutes: number }) {
+/**
+ * How long a child's ask waits for an answer, how long after Not now before they can ask again, or
+ * how long before a block their heads-up comes (and they can ask).
+ */
+export function setAskWait(mutate: Mutate, wait: { askTimeoutMinutes: number } | { askWaitMinutes: number } | { askAheadMinutes: number }) {
   return mutate((send) => send("/api/v1/settings/household", { method: "PUT", body: wait }));
 }
 

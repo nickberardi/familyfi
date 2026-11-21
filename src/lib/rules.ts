@@ -248,23 +248,29 @@ export function activeWindowsEnd(windows: InternetWindow[], now: Date, timezone:
 }
 
 /**
- * How long before a window starts a person can already ask for more time on it: the heads-up's five
- * minutes (familyfi issue 457), so the countdown's Ask for more time works before the block is on.
+ * How long before a window starts a person can already ask for more time on it, unless the household
+ * chose otherwise (`askAheadMinutes`, 0 for off): the heads-up's lead (familyfi issue 457), so the
+ * countdown's Ask for more time works before the block is on.
  */
 export const ASK_AHEAD_MINUTES = 5;
 
 /**
  * The windows a person can ask for time off now: those active now (`from` is now), or else the one
- * starting within `ASK_AHEAD_MINUTES` (`from` is its start), with when they end (null: never).
+ * starting within `ahead` minutes (`from` is its start), with when they end (null: never).
  * Undefined when neither, so there is nothing to ask about. A yes's time counts from `from`, so time
  * asked before the start pushes the start back.
  */
-export function askableWindows(windows: InternetWindow[], now: Date, timezone: string): { from: Date; end: Date | null } | undefined {
+export function askableWindows(
+  windows: InternetWindow[],
+  now: Date,
+  timezone: string,
+  ahead: number = ASK_AHEAD_MINUTES,
+): { from: Date; end: Date | null } | undefined {
   const active = activeWindowsEnd(windows, now, timezone);
   if (active !== undefined) return { from: now, end: active };
   const soon = windows
     .map((window) => ({ window, start: nextWindowStart(window, now, timezone) }))
-    .filter((item): item is { window: InternetWindow; start: Date } => item.start !== null && item.start.getTime() - now.getTime() <= ASK_AHEAD_MINUTES * 60_000)
+    .filter((item): item is { window: InternetWindow; start: Date } => item.start !== null && item.start.getTime() - now.getTime() <= ahead * 60_000)
     .sort((a, b) => a.start.getTime() - b.start.getTime())[0];
   if (!soon) return undefined;
   return { from: soon.start, end: windowEndsAt(soon.window, soon.start, timezone) };

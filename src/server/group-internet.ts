@@ -174,7 +174,7 @@ async function liftForAsk(session: AnsweringSession, action: LiftAction, target:
     const household = await prisma().household.findUniqueOrThrow({ where: { id: currentHouseholdId() } });
     // A yes lifts the window that is on, or the one starting within the heads-up's five minutes, from
     // its start, and never past its end.
-    const window = askableWindows(ruleInternetWindows(rule), now, household.timezone);
+    const window = askableWindows(ruleInternetWindows(rule), now, household.timezone, household.askAheadMinutes);
     const windowEnd = window?.end;
     if (!window || !windowEnd) throw new ApiError(409, "not_in_window", "This rule is not blocking now.");
     const wanted = body.until === undefined ? new Date(window.from.getTime() + (ask.minutes ?? 0) * 60_000) : body.until ? new Date(body.until) : null;

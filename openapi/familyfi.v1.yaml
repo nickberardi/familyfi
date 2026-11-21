@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FamilyFi API
-  version: 2.0.0
+  version: 2.1.0
   # The oldest app API version this server still serves: raised to `version` when a change breaks
   # old apps (oasdiff `breaking`). GET /api/v1/health reports it as `minAppApiVersion`.
   x-min-app: 1.4.0
@@ -506,6 +506,11 @@ paths:
                   minimum: 0
                   maximum: 1440
                   description: How long after a parent's Not now a child can ask again.
+                askAheadMinutes:
+                  type: integer
+                  minimum: 0
+                  maximum: 30
+                  description: How long before a block FamilyFi Me's heads-up comes, and how early a child can ask for more time on a window about to start; 0 turns both off.
       responses:
         "200":
           description: Updated
@@ -1089,7 +1094,7 @@ paths:
         A child's ask, from FamilyFi Me on its own group or on a Things group shared with children
         (`kidsCanAsk`) (404 for any other; 403 `child_only` for anyone but a child's phone): `pause`
         to be unblocked, while the group is paused or, on a Thing, its Block button default blocks it, or `rule` for `minutes` in the window of one of the group's rules that is
-        blocking it now. Parents with alerts on are told (`ask.new`), and the ask shows as the group's
+        blocking it now or starts within the household's `askAheadMinutes` (the heads-up's countdown), whose time then counts from the window's start. Parents with alerts on are told (`ask.new`), and the ask shows as the group's
         `ask` until answered, with `from` naming the child on a Thing. It waits until a parent
         answers, the household's `askTimeoutMinutes` pass, or the block it asks about ends,
         whichever comes first. One ask waits at a time for a group, whichever child filed it (409
@@ -2038,7 +2043,7 @@ paths:
       tags: [Groups, Rules]
       summary: Allow a rule for one group
       description: |
-        Overrides the rule for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it. Same request and errors as `/rules/{id}/allow`, and `askId`: it answers yes to the group's waiting ask for minutes in this rule's window (`GroupAsk`), lifting the rule for the group for those minutes from now, or until `until` when given, and never past the end of the window that is on: an administrator alone (403 `administrator_required` otherwise), 409 `not_in_window` when the window is no longer on, 409 `ask_closed` when the ask is no longer waiting.
+        Overrides the rule for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it. Same request and errors as `/rules/{id}/allow`, and `askId`: it answers yes to the group's waiting ask for minutes in this rule's window (`GroupAsk`), lifting the rule for the group for those minutes from now (from the window's start when it has not started yet: an ask from the minutes before it, `askAheadMinutes`), or until `until` when given, and never past the end of that window: an administrator alone (403 `administrator_required` otherwise), 409 `not_in_window` when the window is neither on nor starting within `askAheadMinutes`, 409 `ask_closed` when the ask is no longer waiting.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -3599,6 +3604,15 @@ components:
           type: string
           description: The household's IANA time zone, for clock times and window labels. A Watch reads it here because it may not read household settings.
           example: America/New_York
+        askAheadMinutes:
+          type: integer
+          minimum: 0
+          maximum: 30
+          description: >-
+            How long before a block starts or ends FamilyFi Me gives its heads-up, which is also how early a
+            child can ask for more time on a window about to start (`POST /groups/{id}/asks`); 0 turns both
+            off. 5 unless changed. A child's phone reads it here because it does not read household settings.
+            Servers before API 2.1.0 leave it out.
     Account:
       type: object
       additionalProperties: false
@@ -3661,6 +3675,14 @@ components:
           description: >-
             How long after a parent's Not now a child can ask again; 30 unless changed. Servers before
             API 2.0.0 leave it out.
+        askAheadMinutes:
+          type: integer
+          minimum: 0
+          maximum: 30
+          description: >-
+            How long before a block starts or ends FamilyFi Me gives its heads-up, which is also how early a
+            child can ask for more time on a window about to start; 0 turns both off. 5 unless changed.
+            Servers before API 2.1.0 leave it out.
     ConnectionIdentity:
       type: object
       additionalProperties: false
