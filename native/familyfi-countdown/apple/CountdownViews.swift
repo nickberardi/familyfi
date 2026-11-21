@@ -22,6 +22,17 @@ struct FFCountdown {
     let until: Date
     /// The card's buttons, quiet first and the strong one last (More time, then Unblock).
     let actions: [FFCountdownAction]
+    /// Past its end (the activity's stale date) and not yet ended by the app, which may not be
+    /// running: the line says what happened instead, and the timer, bar and buttons go, so it never
+    /// sits at 0:00 offering buttons for a block that is over.
+    var stale = false
+    /// The line once it is past its end: "Block ended", or "Started" for a block that began.
+    var staleLine = ""
+
+    /// The line to show now.
+    var shownLine: String { stale ? staleLine : line }
+    /// The buttons to show now: none once it is past its end.
+    var shownActions: [FFCountdownAction] { stale ? [] : actions }
 
     /// What is left; never backwards once the end has passed.
     var remaining: ClosedRange<Date> { Date.now...max(until, Date.now) }
@@ -63,13 +74,17 @@ struct FFCountdownLockScreen: View {
                 FFCountdownMark(monogram: countdown.monogram, ink: ink, scheme: scheme)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(countdown.name).font(.headline).lineLimit(1)
-                    Text(countdown.line).font(.system(size: 14)).foregroundStyle(.secondary).lineLimit(2)
+                    Text(countdown.shownLine).font(.system(size: 14)).foregroundStyle(.secondary).lineLimit(2)
                 }
                 Spacer(minLength: 8)
-                FFCountdownTimer(countdown: countdown, size: 28, ink: ink)
+                if !countdown.stale {
+                    FFCountdownTimer(countdown: countdown, size: 28, ink: ink)
+                }
             }
-            FFCountdownBar(countdown: countdown, ink: ink)
-            FFCountdownActions(actions: countdown.actions, scheme: scheme)
+            if !countdown.stale {
+                FFCountdownBar(countdown: countdown, ink: ink)
+            }
+            FFCountdownActions(actions: countdown.shownActions, scheme: scheme)
         }
         .padding(16)
     }
@@ -93,8 +108,10 @@ struct FFCountdownIslandTrailing: View {
     let countdown: FFCountdown
 
     var body: some View {
-        FFCountdownTimer(countdown: countdown, size: 28, ink: FFCountdownPalette.pausedDark)
-            .frame(maxHeight: .infinity)
+        if !countdown.stale {
+            FFCountdownTimer(countdown: countdown, size: 28, ink: FFCountdownPalette.pausedDark)
+                .frame(maxHeight: .infinity)
+        }
     }
 }
 
@@ -104,9 +121,11 @@ struct FFCountdownIslandBottom: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(countdown.line).font(.system(size: 14)).foregroundStyle(.white.opacity(0.75)).lineLimit(2)
-            FFCountdownBar(countdown: countdown, ink: FFCountdownPalette.pausedDark)
-            FFCountdownActions(actions: countdown.actions, scheme: .dark)
+            Text(countdown.shownLine).font(.system(size: 14)).foregroundStyle(.white.opacity(0.75)).lineLimit(2)
+            if !countdown.stale {
+                FFCountdownBar(countdown: countdown, ink: FFCountdownPalette.pausedDark)
+            }
+            FFCountdownActions(actions: countdown.shownActions, scheme: .dark)
         }
         .padding(.top, 4)
     }
@@ -129,11 +148,15 @@ struct FFCountdownCompactTrailing: View {
     let countdown: FFCountdown
 
     var body: some View {
-        Text(timerInterval: countdown.remaining, countsDown: true)
-            .font(.subheadline.weight(.semibold).monospacedDigit())
-            .multilineTextAlignment(.trailing)
-            .foregroundStyle(FFCountdownPalette.pausedDark)
-            .frame(width: countdown.timerWidth)
+        if countdown.stale {
+            Image(systemName: "checkmark").font(.subheadline.weight(.semibold)).foregroundStyle(FFCountdownPalette.pausedDark)
+        } else {
+            Text(timerInterval: countdown.remaining, countsDown: true)
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .multilineTextAlignment(.trailing)
+                .foregroundStyle(FFCountdownPalette.pausedDark)
+                .frame(width: countdown.timerWidth)
+        }
     }
 }
 
@@ -165,8 +188,12 @@ struct FFCountdownSmall: View {
                 FFCountdownGlyph(ink: ink, size: 16)
                 Text(countdown.name).font(.headline).lineLimit(1)
             }
-            FFCountdownTimer(countdown: countdown, size: 26, ink: ink)
-            FFCountdownBar(countdown: countdown, ink: ink)
+            if countdown.stale {
+                Text(countdown.staleLine).font(.system(size: 14)).foregroundStyle(.secondary)
+            } else {
+                FFCountdownTimer(countdown: countdown, size: 26, ink: ink)
+                FFCountdownBar(countdown: countdown, ink: ink)
+            }
         }
         .padding(10)
     }
