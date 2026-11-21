@@ -17,11 +17,11 @@ export function AskStrip({ ask, style }: { ask: AskAction; style?: StyleProp<Vie
   const text = { fontFamily: ui.font, fontSize: 14, lineHeight: 21 } as const;
   return (
     <View style={[styles.strip, largeText && styles.stripStacked, { backgroundColor: ui.color("accent-wash"), borderColor: ui.color("line") }, style]}>
-      <View style={styles.stripLine}>
+      <View style={[styles.stripLine, largeText && styles.stripLineStacked]}>
         <View aria-hidden style={styles.stripIcon}>
           <ui.Icon name="hand-waving" size={17} color={ui.color("accent")} />
         </View>
-        <Text style={[text, styles.stripText, { color: ui.color("ink") }]}>
+        <Text style={[text, styles.stripText, largeText && styles.stripLineStacked, { color: ui.color("ink") }]}>
           <Text style={{ fontWeight: "600" }}>{ask.label}</Text>
           <Text style={{ color: ui.color("ink-2") }}>{` · ${ask.at}`}</Text>
         </Text>
@@ -45,6 +45,8 @@ const styles = StyleSheet.create({
   strip: { flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: 1, borderBottomWidth: 1, paddingHorizontal: 16, paddingVertical: 10, marginBottom: 12 },
   stripStacked: { flexDirection: "column", alignItems: "stretch" },
   stripLine: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10 },
+  // Stacked, the line takes its own height: flex 1 in a column of no set height draws it at none.
+  stripLineStacked: { flex: 0, flexShrink: 1 },
   stripIcon: { flexShrink: 0 },
   stripText: { flex: 1, minWidth: 0 },
   answer: { minHeight: 36, borderRadius: 9, paddingHorizontal: 14, paddingVertical: 7, alignItems: "center", justifyContent: "center" },
