@@ -1,0 +1,10 @@
+{
+  "name": "familyfi-countdown",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The countdown both apps show outside the app: an Android ongoing notification promoted to a Live Update, and the Live Activity views an iPhone widget extension draws.",
+  "main": "index.ts",
+  "license": "BUSL-1.1",
+  "author": "FamilyFi",
+  "homepage": "https://github.com/nickberardi/familyfi"
+}

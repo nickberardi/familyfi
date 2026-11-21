@@ -32,7 +32,7 @@ src/components   web UI
 src/ui           components shared with the native app (React Native, rendered on the web by react-native-web)
 src/server       env, database, auth, schedule, UniFi, reconciliation
 src/lib          client-safe constants, types, and pure logic (schedule windows)
-native           Expo native modules both apps link: the pinned transport and the QR scanner
+native           Expo native modules both apps link: the pinned transport, the QR scanner and the countdown outside the app
 prisma           PostgreSQL schema and migrations
 openapi          versioned HTTP contract
 docker           Dockerfile and Compose files
