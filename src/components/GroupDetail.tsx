@@ -25,6 +25,7 @@ import { GroupChildPhones } from "@/components/GroupChildPhones";
 import { PRIMARY_BUTTON } from "@/components/ui/buttons";
 import { BackLink } from "@/components/ui/BackLink";
 import { NotFound } from "@/components/ui/NotFound";
+import { Icon } from "@/components/ui/Icon";
 
 export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "things"; id: string; demo?: boolean }) {
   const router = useRouter();
@@ -66,28 +67,6 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
                 {status.detail ? <span style={{ color: groupDetailColor(status.change) }}>{status.detail}</span> : null}
               </h2>
               <p className="mt-0.5 text-[14px] text-[var(--ff-ink-3)]">{cardNoteLine(group, windows)}</p>
-              {header.ask ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={header.ask.onPress}
-                  data-testid={header.ask.testID}
-                  className="mt-1 block text-left text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-40"
-                >
-                  {header.ask.label}
-                </button>
-              ) : null}
-              {header.more ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={header.more.onPress}
-                  data-testid={header.more.testID}
-                  className="mt-1 text-[14px] font-semibold text-[var(--ff-accent)] disabled:opacity-40"
-                >
-                  {header.more.label}
-                </button>
-              ) : null}
             </div>
             {header.pageMenu.length ? (
               // Its rules each have their own Pause below, so the dropdown only blocks the internet.
@@ -104,6 +83,18 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
               </button>
             )}
           </div>
+          {header.ask ? (
+            <div className="mb-3 flex items-center gap-3 border-y border-[var(--ff-line)] bg-[var(--ff-accent-wash)] px-4 py-2.5">
+              <Icon name="hand-waving" size={17} color="var(--ff-accent)" />
+              <p className="min-w-0 flex-1 text-[14px] text-[var(--ff-ink)]">
+                <span className="font-semibold">{header.ask.label}</span>
+                <span className="text-[var(--ff-ink-2)]"> · {header.ask.at}</span>
+              </p>
+              <button type="button" disabled={busy} onClick={header.ask.onPress} data-testid={header.ask.testID} className={`shrink-0 ${PRIMARY_BUTTON}`}>
+                Answer
+              </button>
+            </div>
+          ) : null}
           <div className="px-3 pb-3">
             <GroupSchedule
               group={group}

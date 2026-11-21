@@ -64,7 +64,6 @@ export function ExpandingGroupCard({
       open={open}
       onToggle={() => setOpen(!open)}
       action={header.action}
-      more={header.more}
       ask={header.ask}
       menu={onDetails ? header.menu : header.pageMenu}
       testID={group.id}
