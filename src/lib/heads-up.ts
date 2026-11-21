@@ -96,7 +96,8 @@ export function headsUpBlocks(day: GroupDay, now: Date, days: number = HEADS_UP_
     const last = merged.at(-1);
     if (last && span.from <= last.to) {
       if (span.to > last.to) {
-        if (span.endName !== last.endName || span.endPause !== last.endPause) last.switchAt = last.to;
+        // The name changes once, when the block it is named for ends; a longer chain is then told by what ends it.
+        if (last.switchAt === null && (span.endName !== last.name || span.endPause !== last.pause)) last.switchAt = last.to;
         Object.assign(last, { to: span.to, endName: span.endName, endPause: span.endPause });
       }
     } else merged.push({ ...span });

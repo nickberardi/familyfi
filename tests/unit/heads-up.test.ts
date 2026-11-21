@@ -96,6 +96,18 @@ describe("the heads-up before a block starts or ends", () => {
     expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE).map((entry) => entry.short)).toEqual(["Bedtime ends in", "Bedtime ends in", "Open · Nothing planned"]);
   });
 
+  it("names a chain of blocks by the pause until it ends, then by what ends the chain", () => {
+    const homework = { ...bedtime(), ruleId: "r2", ruleName: "School", name: "Homework", start: "21:00", end: "22:30" };
+    const day = me({ pause: { by: "Nick", until: "2026-11-17T02:30:00Z" }, windows: [homework, { ...bedtime(), start: "22:00" }] });
+    const blocks = headsUpBlocks(day, MONDAY_EVENING, 1);
+    expect(blocks).toHaveLength(1);
+    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE).map(({ from, title }) => [from.toISOString(), title])).toEqual([
+      ["2026-11-17T01:00:00.000Z", "Paused"],
+      ["2026-11-17T02:30:00.000Z", "Bedtime"],
+      ["2026-11-17T12:00:00.000Z", "Open"],
+    ]);
+  });
+
   it("gives the widget what comes next, then what is under way, then open", () => {
     const blocks = headsUpBlocks(me({ windows: [bedtime()] }), MONDAY_EVENING, 1);
     expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE).map(({ from, blocked, title, line, until, ask }) => [from.toISOString(), blocked, title, line, until?.toISOString() ?? null, ask])).toEqual([
