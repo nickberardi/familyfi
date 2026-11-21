@@ -1089,7 +1089,7 @@ paths:
         A child's ask, from FamilyFi Me on its own group or on a Things group shared with children
         (`kidsCanAsk`) (404 for any other; 403 `child_only` for anyone but a child's phone): `pause`
         to be unblocked, while the group is paused or, on a Thing, its Block button default blocks it, or `rule` for `minutes` in the window of one of the group's rules that is
-        blocking it now or starts within five minutes (the heads-up's countdown), whose time then counts from the window's start. Parents with alerts on are told (`ask.new`), and the ask shows as the group's
+        blocking it now. Parents with alerts on are told (`ask.new`), and the ask shows as the group's
         `ask` until answered, with `from` naming the child on a Thing. It waits until a parent
         answers, the household's `askTimeoutMinutes` pass, or the block it asks about ends,
         whichever comes first. One ask waits at a time for a group, whichever child filed it (409
@@ -2038,7 +2038,7 @@ paths:
       tags: [Groups, Rules]
       summary: Allow a rule for one group
       description: |
-        Overrides the rule for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it. Same request and errors as `/rules/{id}/allow`, and `askId`: it answers yes to the group's waiting ask for minutes in this rule's window (`GroupAsk`), lifting the rule for the group for those minutes from now (from the window's start when it has not started yet: an ask from the five minutes before it), or until `until` when given, and never past the end of that window: an administrator alone (403 `administrator_required` otherwise), 409 `not_in_window` when the window is neither on nor starting within five minutes, 409 `ask_closed` when the ask is no longer waiting.
+        Overrides the rule for one group alone. 404 when the group does not have the rule. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it. Same request and errors as `/rules/{id}/allow`, and `askId`: it answers yes to the group's waiting ask for minutes in this rule's window (`GroupAsk`), lifting the rule for the group for those minutes from now, or until `until` when given, and never past the end of the window that is on: an administrator alone (403 `administrator_required` otherwise), 409 `not_in_window` when the window is no longer on, 409 `ask_closed` when the ask is no longer waiting.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
