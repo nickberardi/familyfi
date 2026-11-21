@@ -165,6 +165,14 @@ struct FFCountdownMinimal: View {
     let countdown: FFCountdown
 
     var body: some View {
+        if countdown.stale {
+            Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(FFCountdownPalette.pausedDark)
+        } else {
+            ring
+        }
+    }
+
+    private var ring: some View {
         ProgressView(timerInterval: countdown.span, countsDown: true) {
             EmptyView()
         } currentValueLabel: {
