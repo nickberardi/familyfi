@@ -34,9 +34,11 @@ export const HEADS_UP_WORDS = {
   /** The widget's label over what is under way, and over what comes next. */
   now: "Now",
   next: "Next",
-  /** The inline widget: "Bedtime starts in 2 hr", "Bedtime ends in 1 hr". */
-  startsIn: "starts in",
-  endsIn: "ends in",
+  /** Android's notification settings: the notices' channel and the countdown's, each with what it is for. */
+  noticesChannel: "Before a block",
+  noticesChannelAbout: "Five minutes before a block starts or ends.",
+  countdownChannel: "Block countdown",
+  countdownChannelAbout: "Counts down to a block's start.",
   /** The widget once its plan has run out, or before the phone ever planned: it can't say what is next. */
   unknownTitle: "Not up to date",
   unknownLine: "Open FamilyFi Me to update",
@@ -181,6 +183,11 @@ export type HeadsUpEntry = {
    * runs out, nor on a pause.
    */
   ask: boolean;
+  /**
+   * The one-line widget's words before its relative time: "Bedtime starts in", "Bedtime ends in",
+   * "Your pause ends in"; with no `until` the whole line: "Paused · No end time", "Open · Nothing planned".
+   */
+  short: string;
   /** Whether the block named is the group's pause, which the widget draws with the pause sign rather than the block sign. */
   pause: boolean;
   /** The plan ran out while windows go on: the widget can't say what is next, and must not look open. */
@@ -193,7 +200,7 @@ export type HeadsUpEntry = {
  * widget is not up to date rather than "Nothing planned".
  */
 export function headsUpTimeline(blocks: HeadsUpBlock[], now: Date, timeZone: string, recurs = false): HeadsUpEntry[] {
-  const entries: HeadsUpEntry[] = [];
+  const entries: Omit<HeadsUpEntry, "short">[] = [];
   let at = now;
   for (const block of blocks) {
     if (block.from.getTime() > at.getTime()) {
@@ -206,7 +213,7 @@ export function headsUpTimeline(blocks: HeadsUpBlock[], now: Date, timeZone: str
     if (switchAt) entries.push({ from, blocked: true, title: block.name, line, until: block.to, name: block.name, ask: false, pause: block.pause, unknown: false });
     const title = block.switchAt ? block.endName : block.name;
     entries.push({ from: switchAt ?? from, blocked: true, title, line, until: block.to, name: title, ask: false, pause: block.switchAt ? block.endPause : block.pause, unknown: false });
-    if (!block.to) return entries;
+    if (!block.to) return entries.map(withShort);
     at = block.to;
   }
   entries.push(
@@ -214,7 +221,14 @@ export function headsUpTimeline(blocks: HeadsUpBlock[], now: Date, timeZone: str
       ? { from: at, blocked: false, title: HEADS_UP_WORDS.unknownTitle, line: HEADS_UP_WORDS.unknownLine, until: null, name: null, ask: false, pause: false, unknown: true }
       : { from: at, blocked: false, title: OPEN_TITLE, line: "Nothing planned", until: null, name: null, ask: false, pause: false, unknown: false },
   );
-  return entries;
+  return entries.map(withShort);
+}
+
+/** The one-line widget's words for an entry (`HeadsUpEntry.short`). */
+function withShort(entry: Omit<HeadsUpEntry, "short">): HeadsUpEntry {
+  if (!entry.until) return { ...entry, short: `${entry.title} · ${entry.line}` };
+  if (!entry.blocked) return { ...entry, short: `${entry.title} starts in` };
+  return { ...entry, short: entry.pause ? "Your pause ends in" : `${entry.title} ends in` };
 }
 
 const OPEN_TITLE = "Open";
