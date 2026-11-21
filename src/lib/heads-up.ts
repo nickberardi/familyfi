@@ -30,8 +30,10 @@ export type HeadsUpBlock = {
   /** The one that ends it, when blocks ran into each other: a pause that runs into Bedtime ends as Bedtime. */
   endName: string;
   endPause: boolean;
+  /** When the name changes to `endName`, if it does: when the pause that ran into Bedtime ends. */
+  switchAt: Date | null;
   from: Date;
-  /** null: until a parent ends it. */
+  /** null: no end time. */
   to: Date | null;
   /** It begins when time a parent gave (a yes to an ask, an unblock) runs out, not on its schedule. */
   afterExtraTime: boolean;
