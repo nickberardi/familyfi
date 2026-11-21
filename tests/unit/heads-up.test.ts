@@ -68,6 +68,16 @@ describe("the heads-up before a block starts or ends", () => {
     expect(first).toMatchObject({ kind: "start", title: "Your extra time ends in 5 minutes", body: "Bedtime is back on. Your apps pause at 9:30 PM." });
   });
 
+  it("gives every notice a title by the clock, for a phone that posts it late", () => {
+    const notices = headsUpNotices(headsUpBlocks(me({ windows: [bedtime()] }), MONDAY_EVENING, 1), MONDAY_EVENING, ZONE, "apps");
+    expect(notices.map((notice) => notice.lateTitle)).toEqual(["Bedtime starts at 9 PM", "Bedtime ends at 7 AM"]);
+    const now = new Date("2026-11-17T02:10:00Z");
+    const extra = headsUpBlocks(me({ windows: [bedtime({ by: "Nick", until: "2026-11-17T02:30:00Z" })] }), now, 1);
+    expect(headsUpNotices(extra, now, ZONE, "apps")[0]!.lateTitle).toBe("Your extra time ends at 9:30 PM");
+    const paused = headsUpBlocks(me({ pause: { by: "Nick", until: "2026-11-17T01:30:00Z" } }), MONDAY_EVENING, 1);
+    expect(headsUpNotices(paused, MONDAY_EVENING, ZONE, "apps")[0]!.lateTitle).toBe("Your pause ends at 8:30 PM");
+  });
+
   it("comes as long before as the household chose, and not at all when it is off", () => {
     const blocks = headsUpBlocks(me({ windows: [bedtime()] }), MONDAY_EVENING, 1);
     const [first] = headsUpNotices(blocks, MONDAY_EVENING, ZONE, "apps", 10);
