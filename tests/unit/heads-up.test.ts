@@ -93,7 +93,7 @@ describe("the heads-up before a block starts or ends", () => {
       ["2026-11-17T02:30:00.000Z", "Bedtime", false],
       ["2026-11-17T12:00:00.000Z", "Open", false],
     ]);
-    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE).map((entry) => entry.short)).toEqual(["Your pause ends in", "Bedtime ends in", "Open · Nothing planned"]);
+    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE).map((entry) => entry.short)).toEqual(["Bedtime ends in", "Bedtime ends in", "Open · Nothing planned"]);
   });
 
   it("gives the widget what comes next, then what is under way, then open", () => {
