@@ -78,6 +78,8 @@ object Countdown {
       .setOngoing(true)
       .setOnlyAlertOnce(true)
       .setSilent(!spec.alert)
+      // Before Android 8.0 there are no channels: the notification asks for the sound itself.
+      .setDefaults(if (spec.alert) NotificationCompat.DEFAULT_SOUND else 0)
       .setCategory(NotificationCompat.CATEGORY_STATUS)
       .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
       .setWhen(spec.until)
@@ -119,7 +121,7 @@ object Countdown {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
     val manager = context.getSystemService(NotificationManager::class.java)
     if (manager.getNotificationChannel(CHANNEL) != null) return
-    // Default importance, so it shows on the lock screen, and no sound: the FamilyFi app's countdowns are silent.
+    // Default importance, so it shows on the lock screen, and no sound: the FamilyFi app's are silent.
     manager.createNotificationChannel(NotificationChannel(CHANNEL, name, NotificationManager.IMPORTANCE_DEFAULT).apply {
       this.description = description
       setSound(null, null)
