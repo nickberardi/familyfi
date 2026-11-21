@@ -83,8 +83,16 @@ describe("the heads-up before a block starts or ends", () => {
   it("joins a pause that runs into bedtime into one block named for the pause", () => {
     const blocks = headsUpBlocks(me({ pause: { by: "Nick", until: "2026-11-17T02:30:00Z" }, windows: [bedtime()] }), MONDAY_EVENING, 1);
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]).toMatchObject({ name: "Pause", pause: true });
+    expect(blocks[0]).toMatchObject({ name: "Paused", pause: true, endName: "Bedtime", endPause: false });
     expect(blocks[0]!.to?.toISOString()).toBe("2026-11-17T12:00:00.000Z");
+    // It ends as Bedtime, not as the pause that was over at 9:30 PM.
+    const notices = headsUpNotices(blocks, MONDAY_EVENING, ZONE, "apps");
+    expect(notices.map((notice) => notice.title)).toEqual(["Bedtime ends in 5 minutes"]);
+    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE).map(({ from, title }) => [from.toISOString(), title])).toEqual([
+      ["2026-11-17T01:00:00.000Z", "Paused"],
+      ["2026-11-17T02:30:00.000Z", "Bedtime"],
+      ["2026-11-17T12:00:00.000Z", "Open"],
+    ]);
   });
 
   it("gives the widget what comes next, then what is under way, then open", () => {
@@ -98,7 +106,7 @@ describe("the heads-up before a block starts or ends", () => {
 
   it("stops the widget at a block with no end", () => {
     const blocks = headsUpBlocks(me({ pause: { by: "Nick", until: null }, windows: [bedtime()] }), MONDAY_EVENING, 1);
-    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE).map(({ blocked, title, line }) => [blocked, title, line])).toEqual([[true, "Pause", "Until a parent ends it"]]);
+    expect(headsUpTimeline(blocks, MONDAY_EVENING, ZONE).map(({ blocked, title, line }) => [blocked, title, line])).toEqual([[true, "Paused", "No end time"]]);
     expect(headsUpNotices(blocks, MONDAY_EVENING, ZONE, "apps")).toEqual([]);
   });
 });

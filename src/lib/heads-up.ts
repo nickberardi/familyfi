@@ -1,5 +1,5 @@
 import { zonedFormat } from "@/lib/clock";
-import type { GroupDay } from "@/lib/child-day";
+import { NO_END_TIME, type GroupDay } from "@/lib/child-day";
 import { formatHhmm } from "@/lib/display";
 import { nextWindowStart, windowEndsAt } from "@/lib/rule-windows";
 
@@ -23,10 +23,13 @@ export const HEADS_UP_DAYS = 7;
 
 /** One block on the phone's plan. */
 export type HeadsUpBlock = {
-  /** "Bedtime", the window's name; "Pause" for the group's pause; an always-on rule's name. */
+  /** "Bedtime", the window's name; "Paused" for the group's pause; an always-on rule's name. */
   name: string;
   /** Whether it is the group's pause, which a parent set, not a schedule. */
   pause: boolean;
+  /** The one that ends it, when blocks ran into each other: a pause that runs into Bedtime ends as Bedtime. */
+  endName: string;
+  endPause: boolean;
   from: Date;
   /** null: until a parent ends it. */
   to: Date | null;
@@ -38,12 +41,12 @@ export type HeadsUpBlock = {
 export function headsUpBlocks(day: GroupDay, now: Date, days: number = HEADS_UP_DAYS): HeadsUpBlock[] {
   const start = now.getTime();
   const horizon = start + days * 86_400_000;
-  type Span = { name: string; pause: boolean; from: number; to: number; afterExtraTime: boolean };
+  type Span = { name: string; pause: boolean; from: number; to: number; afterExtraTime: boolean; endName: string; endPause: boolean; switchAt: number | null };
   const spans: Span[] = [];
   const add = (name: string, pause: boolean, from: number, to: number, liftedUntil?: string | null) => {
     const lift = liftedUntil ? new Date(liftedUntil).getTime() : -Infinity;
     const begin = Math.max(from, start, lift);
-    if (begin < to && begin < horizon) spans.push({ name, pause, from: begin, to, afterExtraTime: lift > from && lift > start && begin === lift });
+    if (begin < to && begin < horizon) spans.push({ name, pause, from: begin, to, afterExtraTime: lift > from && lift > start && begin === lift, endName: name, endPause: pause, switchAt: null });
   };
 
   if (day.pause) add(PAUSE_NAME, true, start, day.pause.until ? new Date(day.pause.until).getTime() : Infinity);
@@ -66,8 +69,12 @@ export function headsUpBlocks(day: GroupDay, now: Date, days: number = HEADS_UP_
   const merged: Span[] = [];
   for (const span of spans) {
     const last = merged.at(-1);
-    if (last && span.from <= last.to) last.to = Math.max(last.to, span.to);
-    else merged.push({ ...span });
+    if (last && span.from <= last.to) {
+      if (span.to > last.to) {
+        if (span.endName !== last.endName || span.endPause !== last.endPause) last.switchAt = last.to;
+        Object.assign(last, { to: span.to, endName: span.endName, endPause: span.endPause });
+      }
+    } else merged.push({ ...span });
   }
   return merged.map((span) => ({
     name: span.name,
@@ -75,10 +82,14 @@ export function headsUpBlocks(day: GroupDay, now: Date, days: number = HEADS_UP_
     from: new Date(span.from),
     to: span.to === Infinity ? null : new Date(span.to),
     afterExtraTime: span.afterExtraTime,
+    endName: span.endName,
+    endPause: span.endPause,
+    switchAt: span.switchAt === null ? null : new Date(span.switchAt),
   }));
 }
 
-const PAUSE_NAME = "Pause";
+/** A pause is named as the day names it (docs/design.md): "Paused". */
+const PAUSE_NAME = "Paused";
 
 /** What the heads-up says is stopping: "your apps" with Screen Time on, "your internet" otherwise. */
 export type HeadsUpVoice = "apps" | "internet";
@@ -120,8 +131,8 @@ function startWords(block: HeadsUpBlock, timeZone: string, voice: HeadsUpVoice):
 function endWords(block: HeadsUpBlock, timeZone: string, voice: HeadsUpVoice): { title: string; body: string } {
   const at = timeAt(block.to!, timeZone);
   const back = voice === "apps" ? `Your apps are back at ${at}.` : `Your internet is back at ${at}.`;
-  if (block.pause) return { title: `Your pause ends in ${HEADS_UP_LEAD_MINUTES} minutes`, body: back };
-  return { title: `${block.name} ends in ${HEADS_UP_LEAD_MINUTES} minutes`, body: back };
+  if (block.endPause) return { title: `Your pause ends in ${HEADS_UP_LEAD_MINUTES} minutes`, body: back };
+  return { title: `${block.endName} ends in ${HEADS_UP_LEAD_MINUTES} minutes`, body: back };
 }
 
 /**
@@ -133,9 +144,9 @@ function endWords(block: HeadsUpBlock, timeZone: string, voice: HeadsUpVoice): {
 export type HeadsUpEntry = {
   from: Date;
   blocked: boolean;
-  /** "Bedtime", "Pause", or "Open" when nothing blocks. */
+  /** "Bedtime", "Paused", or "Open" when nothing blocks. */
   title: string;
-  /** "Starts at 9 PM", "Ends at 7 AM", "Until a parent ends it", "Nothing planned". */
+  /** "Starts at 9 PM", "Ends at 7 AM", "No end time", "Nothing planned". */
   line: string;
   /** The countdown's end, the change `line` names. */
   until: Date | null;
@@ -152,14 +163,12 @@ export function headsUpTimeline(blocks: HeadsUpBlock[], now: Date, timeZone: str
       entries.push({ from: at, blocked: false, title: block.name, line: `Starts at ${timeAt(block.from, timeZone)}`, until: block.from, name: block.name });
     }
     const from = block.from.getTime() > at.getTime() ? block.from : at;
-    entries.push({
-      from,
-      blocked: true,
-      title: block.name,
-      line: block.to ? `Ends at ${timeAt(block.to, timeZone)}` : "Until a parent ends it",
-      until: block.to,
-      name: block.name,
-    });
+    const line = block.to ? `Ends at ${timeAt(block.to, timeZone)}` : NO_END_TIME;
+    // A pause that ran into Bedtime is told as the pause until it is over, then as Bedtime.
+    const switchAt = block.switchAt && block.switchAt.getTime() > from.getTime() ? block.switchAt : null;
+    if (switchAt) entries.push({ from, blocked: true, title: block.name, line, until: block.to, name: block.name });
+    const title = block.switchAt ? block.endName : block.name;
+    entries.push({ from: switchAt ?? from, blocked: true, title, line, until: block.to, name: title });
     if (!block.to) return entries;
     at = block.to;
   }
