@@ -1,9 +1,10 @@
 "use client";
 
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
+import { Button } from "./Button";
 import type { AskAction } from "./CardActions";
-import { PRESS_OPACITY, useUI } from "./UIContext";
+import { useUI } from "./UIContext";
 import { useLargeText } from "./use-large-text";
 
 /**
@@ -21,22 +22,12 @@ export function AskStrip({ ask, style }: { ask: AskAction; style?: StyleProp<Vie
         <View aria-hidden style={styles.stripIcon}>
           <ui.Icon name="hand-waving" size={17} color={ui.color("accent")} />
         </View>
-        <Text style={[text, styles.stripText, largeText && styles.stripLineStacked, { color: ui.color("ink") }]}>
+        <Text testID={ask.lineTestID} style={[text, styles.stripText, largeText && styles.stripLineStacked, { color: ui.color("ink") }]}>
           <Text style={{ fontWeight: "600" }}>{ask.label}</Text>
           <Text style={{ color: ui.color("ink-2") }}>{` · ${ask.at}`}</Text>
         </Text>
       </View>
-      <Pressable
-        role="button"
-        aria-label={`Answer: ${ask.label}`}
-        aria-disabled={ask.disabled}
-        disabled={ask.disabled}
-        onPress={ask.onPress}
-        testID={ask.testID}
-        style={({ pressed }) => [styles.answer, { backgroundColor: ui.color("accent") }, ask.disabled && { opacity: 0.6 }, pressed && { opacity: PRESS_OPACITY }]}
-      >
-        <Text style={[text, { fontWeight: "600", color: ui.color("ink-on-fill") }]}>Answer</Text>
-      </Pressable>
+      <Button label="Answer" size="md" onPress={ask.onPress} disabled={ask.disabled} accessibilityLabel={`Answer: ${ask.label}`} testID={ask.testID} />
     </View>
   );
 }
@@ -49,5 +40,4 @@ const styles = StyleSheet.create({
   stripLineStacked: { flex: 0, flexShrink: 1 },
   stripIcon: { flexShrink: 0 },
   stripText: { flex: 1, minWidth: 0 },
-  answer: { minHeight: 36, borderRadius: 9, paddingHorizontal: 14, paddingVertical: 7, alignItems: "center", justifyContent: "center" },
 });

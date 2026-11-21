@@ -67,7 +67,7 @@ describe("a child's ask, as a parent answers it", () => {
   it("shows the line while the ask waits, and opens the answer sheet from it", () => {
     const opened: unknown[] = [];
     const controls = groupCardControls(emma(ruleAsk), [bedtime], TZ, NOW, (tap) => runGroupCardAction((async () => undefined) as never, emma(ruleAsk), tap, (target) => opened.push(target)));
-    expect(controls.ask).toMatchObject({ label: "Asked for 30 minutes off Bedtime", testID: "group-ask-g1" });
+    expect(controls.ask).toMatchObject({ label: "Asked for 30 minutes off Bedtime", at: "10:25 PM", testID: "group-ask-g1", lineTestID: "group-ask-line-g1" });
     controls.ask!.onPress();
     expect(opened).toEqual([{ kind: "ask" }]);
     expect(groupCardControls(emma(undefined), [bedtime], TZ, NOW, () => undefined).ask).toBeNull();

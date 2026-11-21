@@ -16,8 +16,8 @@ export type ZoneAction = {
   testID?: string;
 };
 
-/** A waiting ask's strip: what was asked, when (`at`, "9:40 PM"), and its Answer button. */
-export type AskAction = ZoneAction & { at: string };
+/** A waiting ask's strip: what was asked (`label`, its line's `lineTestID`), when (`at`, "9:40 PM"), and Answer (`onPress`). */
+export type AskAction = ZoneAction & { at: string; lineTestID?: string };
 
 /** A group card's button: the header's Block, Unblock or Resume (strong), or a rule area's Pause or Resume. */
 export function CardButton({ action }: { action: ZoneAction }) {
