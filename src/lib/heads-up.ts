@@ -40,7 +40,7 @@ export const HEADS_UP_WORDS = {
   next: "Next",
   /** Android's notification settings: the notices' channel and the countdown's, each with what it is for. */
   noticesChannel: "Before a block",
-  noticesChannelAbout: "Five minutes before a block starts or ends.",
+  noticesChannelAbout: "Before a block starts or ends.",
   countdownChannel: "Block countdown",
   countdownChannelAbout: "Counts down to a block's start.",
   /** The widget once its plan has run out, or before the phone ever planned: it can't say what is next. */
