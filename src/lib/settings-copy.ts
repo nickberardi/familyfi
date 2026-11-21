@@ -180,10 +180,10 @@ export function removeLoginConfirm(account: Pick<Account, "username">, group: Pi
   };
 }
 
-/** Pair FamilyFi Me's card for asks: how long one waits for an answer, and how long after Not now before they can ask again. */
+/** Pair FamilyFi Me's card for asks: how long one waits for an answer, how long after Not now before they can ask again, and how long before a block FamilyFi Me gives its heads-up. */
 export const ASKS_CARD_COPY = {
   title: "Asking for more time",
-  sub: "How long an ask from FamilyFi Me waits for you",
+  sub: "When FamilyFi Me lets them ask, and how long an ask waits for you",
   timeout: "An ask waits for an answer",
   timeoutNote: "Then it closes, and they can ask again.",
   wait: "After Not now, they can ask again",

@@ -180,9 +180,10 @@ export function AlertsCard({
 }
 
 /**
- * How long a child's ask waits for an answer before it closes, and how long after Not now before
- * they can ask again. Each saves when it is chosen. A server before asks leaves both out (`undefined`),
- * and the card is not shown.
+ * How long a person's ask waits for an answer before it closes, how long after Not now before
+ * they can ask again, and the heads-up before a block (`ahead`). Each saves when it is chosen. A server
+ * before asks leaves the two waits out (`undefined`) and the card is not shown; one before the heads-up
+ * setting leaves `ahead` out and the card shows the waits alone.
  */
 export function AsksCard({
   timeout,
