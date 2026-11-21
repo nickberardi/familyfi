@@ -99,12 +99,12 @@ function AskSheet({ group, timezone, onOpen, onClose }: { group: Group; timezone
   return (
     <PauseSheetView
       title={askSheetTitle(group, ask, rules)}
-      body={askSheetBody(ask, rules, timezone, now)}
+      body={askSheetBody(ask, rules, timezone, now, household?.askAheadMinutes)}
       confirm="Allow"
-      choices={askSheetChoices(ask, rules, timezone, now, household?.askWaitMinutes, group)}
+      choices={askSheetChoices(ask, rules, timezone, now, household?.askWaitMinutes, group, household?.askAheadMinutes)}
       recent={null}
       // Resolved when it is tapped, so a sheet left open never sends an end already passed.
-      custom={(choice) => askSheetCustom(choice, ask, rules, timezone, new Date())}
+      custom={(choice) => askSheetCustom(choice, ask, rules, timezone, new Date(), household?.askAheadMinutes)}
       onPick={(option) =>
         answerAsk(store.mutate, group, ask, option, ruleName, new Date(), (target) => {
           next.current = target;

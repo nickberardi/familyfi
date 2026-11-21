@@ -16,6 +16,7 @@ import { POST as rulePauseRoute } from "@/app/api/v1/rules/[id]/pause/route";
 import { GET as oneGroup } from "@/app/api/v1/groups/[id]/route";
 import { POST as unblockRoute } from "@/app/api/v1/groups/[id]/unblock/route";
 import { PUT as putHousehold } from "@/app/api/v1/settings/household/route";
+import { GET as sessionRoute } from "@/app/api/v1/auth/session/route";
 import type { Group, GroupAsk } from "@/lib/types";
 import { registerPush } from "@/server/alerts/registrations";
 import { ASKS_PER_HOUR, closeLapsedAsks } from "@/server/asks";
@@ -171,6 +172,24 @@ describe("asking for more time", () => {
     const link = await prisma().ruleGroup.findUniqueOrThrow({ where: { ruleId_groupId: { ruleId: bedtime.id, groupId: emma.id } } });
     expect(link).toMatchObject({ pauseActive: true, pauseKind: "allow" });
     expect(link.pauseUntil!.getTime()).toBe(start.getTime() + 30 * MINUTE);
+  });
+
+  it("asks as early as the household's heads-up says, and not at all with it off", async () => {
+    // The child's phone reads how early it can ask with its sign-in.
+    expect(await (await sessionRoute(request("/api/v1/auth/session", { auth: child }))).json()).toMatchObject({ askAheadMinutes: 5 });
+    const put = (askAheadMinutes: number) =>
+      putHousehold(request("/api/v1/settings/household", { method: "PUT", auth: admin, headers: json, body: JSON.stringify({ askAheadMinutes }) }));
+    expect((await put(31)).status).toBe(400);
+    expect((await put(10)).status).toBe(200);
+    expect(await (await sessionRoute(request("/api/v1/auth/session", { auth: child }))).json()).toMatchObject({ askAheadMinutes: 10 });
+    const { rule: bedtime } = await upcomingRule(emma.id, 8 * MINUTE);
+    expect((await ask(child, emma.id, { about: "rule", ruleId: bedtime.id, minutes: 30 })).status).toBe(200);
+    await prisma().ask.deleteMany({});
+
+    expect((await put(0)).status).toBe(200);
+    const off = await ask(child, emma.id, { about: "rule", ruleId: bedtime.id, minutes: 30 });
+    expect(off.status).toBe(409);
+    expect(await errorCode(off)).toBe("not_blocked");
   });
 
   it("takes a parent's Not now, and the child asks again only after the household's wait", async () => {

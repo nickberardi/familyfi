@@ -184,7 +184,20 @@ export function AlertsCard({
  * they can ask again. Each saves when it is chosen. A server before asks leaves both out (`undefined`),
  * and the card is not shown.
  */
-export function AsksCard({ timeout, wait, mutate, disabled }: { timeout: number; wait: number; mutate: Mutate; disabled?: boolean }) {
+export function AsksCard({
+  timeout,
+  wait,
+  ahead,
+  mutate,
+  disabled,
+}: {
+  timeout: number;
+  wait: number;
+  /** The heads-up's lead; servers before API 2.1.0 leave it out, and the field is not shown. */
+  ahead?: number;
+  mutate: Mutate;
+  disabled?: boolean;
+}) {
   const ui = useUI();
   const text = useText();
   const COPY = ASKS_CARD_COPY;
@@ -214,6 +227,22 @@ export function AsksCard({ timeout, wait, mutate, disabled }: { timeout: number;
             testID="settings-ask-wait"
           />
         </FormField>
+        {ahead !== undefined ? (
+          <>
+            <FormField label={COPY.ahead}>
+              <ui.Select
+                label={COPY.ahead}
+                value={String(ahead)}
+                options={askWaitChoices("ahead", ahead).map((choice) => ({ value: String(choice.value), label: choice.label }))}
+                onChange={(next) => void setAskWait(mutate, { askAheadMinutes: Number(next) })}
+                disabled={disabled}
+                variant="field"
+                testID="settings-ask-ahead"
+              />
+            </FormField>
+            <Text style={[text(14, 20, "muted"), styles.asksNote]}>{COPY.aheadNote}</Text>
+          </>
+        ) : null}
       </View>
     </Card>
   );

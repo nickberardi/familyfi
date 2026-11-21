@@ -88,6 +88,8 @@ export type DaySubject = {
   ask?: DayAsk;
   /** Rules that block all internet all the time (an always-on internet rule); `allowed` while a parent lifted one until a time. */
   always?: { label: string; allowed?: { by?: string; until: Clock } }[];
+  /** How many minutes before a window starts the child can ask (the household's `askAheadMinutes`); 0 is never. */
+  askAhead?: number;
 };
 
 /** The words that differ between this phone (your apps) and a Thing (it). */
@@ -352,6 +354,8 @@ export type GroupDay = {
   alwaysOn: { ruleId: string; name: string; kind: "internet" | "category" | "app" | "domain"; allowed: { by: string | null; until: string } | null }[];
   /** The group's latest ask for more time (`Group.ask`), with who answered by name. */
   ask?: (Omit<GroupAsk, "by"> & { by: string | null }) | null;
+  /** The household's heads-up lead, also how early the child can ask (`askAheadMinutes`); absent from servers before API 2.1.0. */
+  askAheadMinutes?: number;
 };
 
 /**
@@ -370,6 +374,7 @@ export function groupDayOf(
   rules: Rule[],
   timezone: string,
   now: Date,
+  askAheadMinutes?: number,
 ): GroupDay {
   const name = (by: Actor) => by?.name ?? null;
   // How long a rule is lifted for this group, for everyone or for it alone: the later end, null when
@@ -395,6 +400,7 @@ export function groupDayOf(
       }),
     alwaysOn: own.filter((rule) => rule.mode === "always").map((rule) => ({ ruleId: rule.id, name: rule.name, kind: rule.kind, allowed: allowedOf(liftOf(rule) ?? undefined) })),
     ask: group.ask ? { ...group.ask, by: name(group.ask.by ?? null) } : null,
+    ...(askAheadMinutes !== undefined ? { askAheadMinutes } : {}),
   };
 
   // A Thing whose Block button rule (Video on TV) blocks it now reads Blocked, as its card does, and
@@ -456,7 +462,17 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
       : me.windows.some((window) => window.ruleId === ask.ruleId && !window.allowed && isWindowActive(window, now, me.timezone)));
   // An ask about something, or in a state, this build does not know is not told.
   const ask = me.ask && knownAsk(me.ask) && stillOn(me.ask) ? answerNow(me.ask) : undefined;
-  return { subject: { windows, ...(pause ? { pause } : {}), ...(always.length ? { always } : {}), ...(ask ? { ask } : {}) }, now: minutes, clock };
+  return {
+    subject: {
+      windows,
+      ...(pause ? { pause } : {}),
+      ...(always.length ? { always } : {}),
+      ...(ask ? { ask } : {}),
+      ...(me.askAheadMinutes !== undefined ? { askAhead: me.askAheadMinutes } : {}),
+    },
+    now: minutes,
+    clock,
+  };
 
   // A yes is told only while what it gave is still so, and as long as it is now: the group's pause
   // and its rules' lifts are what hold, not what was asked for. A pause set again after a yes is a
@@ -819,8 +835,9 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     // In the heads-up's last minutes before a window starts (familyfi issue 457), the child can already ask
     // for more time on it, as FamilyFi takes it (`askableWindows`); not on one a parent already lifted.
     // One starting at midnight is tomorrow's, which `next` (today's) leaves out.
-    const ahead = next ?? firstWindowFrom(subject.windows, now, now + ASK_AHEAD_MINUTES + 1);
-    const soon = ahead && !ahead.allowed && ahead.from > now && ahead.from - now <= ASK_AHEAD_MINUTES;
+    const lead = subject.askAhead ?? ASK_AHEAD_MINUTES;
+    const ahead = next ?? firstWindowFrom(subject.windows, now, now + lead + 1);
+    const soon = ahead && !ahead.allowed && ahead.from > now && ahead.from - now <= lead;
     const current = soon && ask?.state !== "yes" && ask?.minutes ? ask : undefined;
     items = [soon ? withAskFor(current, open, true) : open, ...(next ? [windowItem(next)] : [])];
     day = { kind: "open", next };

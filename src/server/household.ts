@@ -26,6 +26,7 @@ async function publicHousehold(household: Household) {
     alertsRelay: household.alertsRelayEnabled,
     askTimeoutMinutes: household.askTimeoutMinutes,
     askWaitMinutes: household.askWaitMinutes,
+    askAheadMinutes: household.askAheadMinutes,
   };
 }
 
@@ -40,6 +41,7 @@ export async function updateHouseholdSettings(input: {
   alertsRelay?: boolean;
   askTimeoutMinutes?: number;
   askWaitMinutes?: number;
+  askAheadMinutes?: number;
 }) {
   if (input.timezone) {
     try {
@@ -54,6 +56,7 @@ export async function updateHouseholdSettings(input: {
     ...(input.alertsRelay !== undefined ? { alertsRelayEnabled: input.alertsRelay } : {}),
     ...(input.askTimeoutMinutes !== undefined ? { askTimeoutMinutes: input.askTimeoutMinutes } : {}),
     ...(input.askWaitMinutes !== undefined ? { askWaitMinutes: input.askWaitMinutes } : {}),
+    ...(input.askAheadMinutes !== undefined ? { askAheadMinutes: input.askAheadMinutes } : {}),
   };
   // The same switch as the built-in quarantine rule's: turning it off ends a pause on it.
   const household =
@@ -72,6 +75,15 @@ export async function updateHouseholdSettings(input: {
 }
 
 /** The household's time zone, which every caller may read, a Watch included, which may not read household settings. */
+/**
+ * The household's time zone, and how long before a block FamilyFi Me's heads-up comes (and the
+ * person can ask), as a session reads them.
+ */
+export async function sessionHousehold(): Promise<{ timezone: string; askAheadMinutes: number }> {
+  const household = await prisma().household.findUnique({ where: { id: currentHouseholdId() }, select: { timezone: true, askAheadMinutes: true } });
+  return { timezone: householdTimezone(household), askAheadMinutes: household?.askAheadMinutes ?? 5 };
+}
+
 export async function currentTimezone() {
   const household = await prisma().household.findUnique({ where: { id: currentHouseholdId() }, select: { timezone: true } });
   return householdTimezone(household);

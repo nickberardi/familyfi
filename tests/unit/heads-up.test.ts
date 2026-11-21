@@ -68,6 +68,14 @@ describe("the heads-up before a block starts or ends", () => {
     expect(first).toMatchObject({ kind: "start", title: "Your extra time ends in 5 minutes", body: "Bedtime is back on. Your apps pause at 9:30 PM." });
   });
 
+  it("comes as long before as the household chose, and not at all when it is off", () => {
+    const blocks = headsUpBlocks(me({ windows: [bedtime()] }), MONDAY_EVENING, 1);
+    const [first] = headsUpNotices(blocks, MONDAY_EVENING, ZONE, "apps", 10);
+    expect(first).toMatchObject({ title: "Bedtime starts in 10 minutes" });
+    expect(first!.at.toISOString()).toBe("2026-11-17T01:50:00.000Z");
+    expect(headsUpNotices(blocks, MONDAY_EVENING, ZONE, "apps", 0)).toEqual([]);
+  });
+
   it("gives nothing for a start already passed, and only the end of a pause", () => {
     const blocks = headsUpBlocks(me({ pause: { by: "Nick", until: "2026-11-17T01:30:00Z" } }), MONDAY_EVENING, 1);
     const notices = headsUpNotices(blocks, MONDAY_EVENING, ZONE, "apps");

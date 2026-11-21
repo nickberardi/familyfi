@@ -187,18 +187,24 @@ export const ASKS_CARD_COPY = {
   timeout: "An ask waits for an answer",
   timeoutNote: "Then it closes, and they can ask again.",
   wait: "After Not now, they can ask again",
+  ahead: "Heads-up before a block",
+  aheadNote: "FamilyFi Me tells them this long before a block starts or ends, and they can ask for more time from then.",
 } as const;
 
 /** The waits the asks card offers for an unanswered ask, in minutes (the server takes 5 to 1440). */
 export const ASK_TIMEOUT_CHOICES = [5, 15, 30, 60, 120, 240, 1440] as const;
 /** The waits the asks card offers after Not now, in minutes (the server takes 0 to 1440). */
 export const ASK_WAIT_CHOICES = [0, 15, 30, 60, 120] as const;
+/** How long before a block the heads-up comes, in minutes (the server takes 0, off, to 30). */
+export const ASK_AHEAD_CHOICES = [0, 2, 5, 10, 15] as const;
 
 /**
  * A wait as Settings lists it: "Right away", "For 15 minutes", "For an hour", "For a day". A value
  * set elsewhere that is not a choice is listed too, so the menu shows what is set.
  */
-export function askWaitLabel(minutes: number, kind: "timeout" | "wait"): string {
+export function askWaitLabel(minutes: number, kind: "timeout" | "wait" | "ahead"): string {
+  // The heads-up: "Off", "5 minutes before".
+  if (kind === "ahead") return minutes === 0 ? "Off" : `${minutesText(minutes)} before`;
   if (minutes === 0) return kind === "wait" ? "Right away" : "Never";
   // The wait reads with its label: "After Not now, they can ask again after 30 minutes".
   const lead = kind === "wait" ? "After" : "For";
@@ -208,8 +214,8 @@ export function askWaitLabel(minutes: number, kind: "timeout" | "wait"): string 
 }
 
 /** Settings' choices for one of the waits, with the value set now among them. */
-export function askWaitChoices(kind: "timeout" | "wait", current: number | undefined): { value: number; label: string }[] {
-  const values: number[] = [...(kind === "timeout" ? ASK_TIMEOUT_CHOICES : ASK_WAIT_CHOICES)];
+export function askWaitChoices(kind: "timeout" | "wait" | "ahead", current: number | undefined): { value: number; label: string }[] {
+  const values: number[] = [...(kind === "timeout" ? ASK_TIMEOUT_CHOICES : kind === "ahead" ? ASK_AHEAD_CHOICES : ASK_WAIT_CHOICES)];
   if (current !== undefined && !values.includes(current)) values.push(current);
   return values.sort((a, b) => a - b).map((value) => ({ value, label: askWaitLabel(value, kind) }));
 }

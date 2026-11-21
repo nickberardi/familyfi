@@ -103,7 +103,7 @@ export async function fileAsk(session: SignedInSession, groupId: string, input: 
     const { rule } = link;
     if (rule.mode === RuleMode.always) throw new ApiError(409, "always_on", "You can't ask for more time on this one.");
     // A window on now, or one starting within the heads-up's five minutes (familyfi issue 457).
-    const window = askableWindows(ruleInternetWindows(rule), now, household.timezone);
+    const window = askableWindows(ruleInternetWindows(rule), now, household.timezone, household.askAheadMinutes);
     if (!rule.enabled || lifted(rule, now) || lifted(link, now) || !window?.end) {
       throw new ApiError(409, "not_blocked", thing ? `That rule isn't blocking ${thing} right now.` : "That rule isn't blocking you right now.");
     }

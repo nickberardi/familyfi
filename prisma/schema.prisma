@@ -170,6 +170,9 @@ model Household {
   /// and how long after a parent's Not now the child can ask again. Minutes.
   askTimeoutMinutes      Int       @default(60)
   askWaitMinutes         Int       @default(30)
+  /// How long before a block starts or ends FamilyFi Me gives its heads-up, which is also how early
+  /// a person can ask for more time on a window about to start. 0 turns both off. Minutes.
+  askAheadMinutes        Int       @default(5)
   revision               Int       @default(0)
   createdAt              DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime  @updatedAt @db.Timestamptz(3)
