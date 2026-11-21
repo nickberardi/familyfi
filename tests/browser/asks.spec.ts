@@ -80,8 +80,9 @@ test("a child's ask shows on their card and page, and Not now answers it", async
   const declined = await withWaitingAsk(page, group);
 
   await page.goto("/family");
-  const line = page.getByTestId(`group-ask-${group.id}`);
-  await expect(line).toHaveText("Asked to be unpaused");
+  // A strip under the card's header: what was asked and when, and Answer.
+  await expect(page.getByTestId(`group-ask-line-${group.id}`)).toHaveText(/^Asked to be unpaused · \d{1,2}:\d\d [AP]M$/);
+  await expect(page.getByTestId(`group-ask-${group.id}`)).toHaveText("Answer");
   await shot(page, "family-ask-line");
   await expectAccessible(page, "the family card with an ask");
 
@@ -206,7 +207,7 @@ test("a child's ask for time off a rule offers what they asked, the window's end
   try {
     await withWaitingAsk(page, group, { about: "rule", ruleId, minutes: 30 });
     await page.goto(`/family/${group.id}`);
-    await expect(page.getByTestId(`group-ask-${group.id}`)).toHaveText("Asked for 30 minutes off Browser bedtime");
+    await expect(page.getByTestId(`group-ask-line-${group.id}`)).toHaveText(/^Asked for 30 minutes off Browser bedtime · /);
     await page.getByTestId(`group-ask-${group.id}`).click();
     const sheet = page.getByRole("dialog", { name: "Cassie asked for 30 minutes off Browser bedtime" });
     await expect(sheet.getByRole("button", { name: /^Allow 30 minutes/ })).toBeVisible();

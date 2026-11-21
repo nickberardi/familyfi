@@ -1,7 +1,7 @@
 # Group states
 
 What a group card shows and what its button does. Read this before changing a group's badge,
-status line, Block/Unblock button, More time link, ask line or dropdown on any client. It has three parts:
+status line, Block/Unblock button, dropdown (with More time) or ask strip on any client. It has three parts:
 
 1. **User stories**: what a parent needs from the card.
 2. **Design**: the state a group can be in, what the card shows, and a diagram of how the button
@@ -56,9 +56,9 @@ case 6).
 | **Badge** | Does the group have the internet? (Blocked or Online.) With a default: is that rule on? (Blocked, Unblocked or Online.) |
 | **Status line** | Why it is in that state, and until when. Red means someone blocked the group, green means someone unblocked it, and grey means the rules are running as set up. |
 | **Button** | The one thing a parent most likely wants to do next: Block, Unblock or Resume. |
-| **More time** | Extends whatever is timed. |
-| **Dropdown** | Every other choice: Block internet, Unblock <rule>, and Block <rule> again. |
-| **Ask line** | A child's phone (FamilyFi Me) is waiting for an answer: "Asked to be unpaused", "Asked for 30 minutes off Bedtime". It opens the answer sheet. |
+| **More time** | Extends whatever is timed. The first choice in the dropdown, never on the card itself. |
+| **Dropdown** | Every other choice: More time, Block internet, Unblock <rule>, and Block <rule> again. |
+| **Ask strip** | A child's phone (FamilyFi Me) is waiting for an answer: "Asked to be unpaused · 9:40 PM", "Asked for 30 minutes off Bedtime · 9:40 PM". Its Answer opens the answer sheet. |
 
 ### How the button decides
 
@@ -182,13 +182,14 @@ The first matching case wins.
 The Edit sheet's choices, the button's sheets, the status line and the dropdown name the default by
 the rule's own name ("TV video"), since one rule can block several categories.
 
-### 3.5a Ask line
+### 3.5a Ask strip
 
 While the group's latest ask (`Group.ask`) is `waiting` and its `expiresAt` is ahead, the card,
-open or closed, and the group's page show one accent line under the status line
-(`groupAskLine` in `src/lib/group-ask.ts`): "Asked to be unpaused", or "Asked for 30 minutes off
-Bedtime" (time off the rule, as the alert says). It never changes the badge, the status line or the
-button, which still read Block, Unblock or Resume. Tapping it opens the answer sheet
+open or closed, and the group's page show a strip under the header (`AskStrip`; its words are
+`groupAskLine` in `src/lib/group-ask.ts`, then when it was asked): "Asked to be unpaused · 9:40 PM",
+or "Asked for 30 minutes off Bedtime · 9:40 PM" (time off the rule, as the alert says). It never
+changes the badge, the status line or the button, which still read Block, Unblock or Resume. Its
+Answer opens the answer sheet
 (`askSheetChoices`), titled "Cassie asked …" with when it was asked and when it closes:
 
 | Asked about | Choices, in order |

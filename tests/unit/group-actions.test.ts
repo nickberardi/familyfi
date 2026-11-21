@@ -59,7 +59,7 @@ describe("groupCardControls", () => {
     const onRun = vi.fn();
     const controls = groupCardControls(group({ suspension: { active: true, until: null, by: null } }), [downtime, video], TZ, NOW, onRun);
     expect(controls.action).toMatchObject({ label: "Unblock", strong: true, testID: "group-action-unblock-g1" });
-    expect(controls.more).toBeNull();
+    expect(controls.menu.map((item) => item.label)).not.toContain("More time");
     controls.action.onPress();
     expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([{ kind: "header", run: "unblock" }]);
   });
@@ -93,6 +93,16 @@ describe("groupCardControls", () => {
       { kind: "rule", run: "pause", ruleIds: ["r-tiktok"], name: "No TikTok", wording: "unblock" },
       { kind: "rule", run: "resume", ruleIds: ["r-video"], name: "TV video evenings", wording: "unblock", liftedUntil: null },
     ]);
+  });
+
+  it("leads the dropdown with More time while a block has an end, on the card and the page", () => {
+    const onRun = vi.fn();
+    const controls = groupCardControls(group({ suspension: { active: true, until: "2026-06-01T20:00:00.000Z", by: null } }), [downtime, video], TZ, NOW, onRun);
+    expect(controls.action).toMatchObject({ label: "Unblock" });
+    expect(controls.menu[0]).toMatchObject({ label: "More time", strong: false, testID: "group-action-moreBlock-g1" });
+    expect(controls.pageMenu.map((item) => item.label)).toEqual(["More time"]);
+    controls.menu[0]!.onPress();
+    expect(onRun.mock.calls.map(([tap]) => tap)).toEqual([{ kind: "header", run: "moreBlock" }]);
   });
 
   it("disables the button and its dropdown while the view is stale", () => {

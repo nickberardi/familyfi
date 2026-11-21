@@ -9,13 +9,13 @@ import type { AskAction, ZoneAction } from "./CardActions";
 
 /**
  * A group's one button, as every client draws it: Block, Unblock or Resume (with a Block button
- * default, Block and Unblock act on that rule), with More time while
- * a timed block or unblock lasts, and, while a category, app or website rule blocks the group or is
- * lifted for it, a dropdown (`menu`): Block internet, and unblock or block again one rule for the group. Each
+ * default, Block and Unblock act on that rule), and a dropdown (`menu`): More time first while a timed
+ * block or unblock lasts, then, while a category, app or website rule blocks the group or is lifted
+ * for it, Block internet, and unblock or block again one rule for the group. Each
  * tap goes to `onRun` (`runGroupCardAction`); `enabled` is false while the view is stale or a write
  * is in flight. The group's page lists each rule with its own Pause or Resume (`GroupSchedule`), so its
- * dropdown (`pageMenu`) holds only Block internet. While a child's ask waits, its line (`ask`) opens
- * the answer sheet.
+ * dropdown (`pageMenu`) holds only More time and Block internet. While an ask from FamilyFi Me waits,
+ * its strip (`ask`: what was asked and when) has Answer, which opens the answer sheet.
  */
 export function groupCardControls(
   group: Group,
@@ -24,7 +24,7 @@ export function groupCardControls(
   now: Date,
   onRun: (tap: GroupCardRun) => void,
   enabled = true,
-): { action: ZoneAction; more: ZoneAction | null; menu: ZoneAction[]; pageMenu: ZoneAction[]; ask: AskAction | null } {
+): { action: ZoneAction; menu: ZoneAction[]; pageMenu: ZoneAction[]; ask: AskAction | null } {
   const header = groupHeaderActions(group, rules, timezone, now);
   const liftedUntil = (ruleIds: string[]) => {
     const rule = rules.find((candidate) => candidate.id === ruleIds[0]);
@@ -55,16 +55,22 @@ export function groupCardControls(
   );
   const pageMenu = menu.filter((_, index) => header.menu[index]!.run === "blockInternet");
   // More time leads the dropdown, so the header keeps one control.
-  const more = header.more ? { ...asHeader(header.more, false), testID: `group-action-${header.more.run}-${group.id}` } : null;
+  const more = header.more ? asHeader(header.more, false) : null;
   const askLine = groupAskLine(group, rules, now);
   const asked = waitingAsk(group, now);
   const ask: AskAction | null =
     askLine && asked
-      ? { label: askLine, at: formatClock(new Date(asked.at), timezone), disabled: !enabled, onPress: () => onRun({ kind: "ask" }), testID: `group-ask-${group.id}` }
+      ? {
+          label: askLine,
+          at: formatClock(new Date(asked.at), timezone),
+          disabled: !enabled,
+          onPress: () => onRun({ kind: "ask" }),
+          testID: `group-ask-${group.id}`,
+          lineTestID: `group-ask-line-${group.id}`,
+        }
       : null;
   return {
     action: asHeader(header.action, true),
-    more,
     menu: more ? [more, ...menu] : menu,
     pageMenu: more ? [more, ...pageMenu] : pageMenu,
     ask,

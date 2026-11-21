@@ -86,7 +86,7 @@ export function GroupDetail({ kind, id, demo = false }: { kind: "family" | "thin
           {header.ask ? (
             <div className="mb-3 flex items-center gap-3 border-y border-[var(--ff-line)] bg-[var(--ff-accent-wash)] px-4 py-2.5">
               <Icon name="hand-waving" size={17} color="var(--ff-accent)" />
-              <p className="min-w-0 flex-1 text-[14px] text-[var(--ff-ink)]">
+              <p data-testid={header.ask.lineTestID} className="min-w-0 flex-1 text-[14px] text-[var(--ff-ink)]">
                 <span className="font-semibold">{header.ask.label}</span>
                 <span className="text-[var(--ff-ink-2)]"> · {header.ask.at}</span>
               </p>
