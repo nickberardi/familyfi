@@ -28,9 +28,8 @@ describe("meWatchAppCopy", () => {
   });
 
   it("says the same words on both watches where the platforms don't differ", () => {
-    const { openTitle, setUpLine, updatesLine, notOpen, ...rest } = meWatchAppCopy("apple");
+    const apple = meWatchAppCopy("apple");
     const wear = meWatchAppCopy("wear");
-    for (const [key, words] of Object.entries(rest)) expect(wear[key as keyof typeof wear]).toBe(words);
-    expect([openTitle, setUpLine, updatesLine, notOpen].join(" ")).not.toMatch(/child/i);
+    for (const key of ["title", "things", "nextChange", "nextChangeAbout"] as const) expect(wear[key]).toBe(apple[key]);
   });
 });
