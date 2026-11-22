@@ -575,6 +575,20 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   const lifted = subject.always?.filter((rule) => rule.allowed && now < rule.allowed.until).sort((a, b) => a.allowed!.until - b.allowed!.until)[0];
   // A pause's break is the pause, in the voice's word: "Paused again", "Blocked again".
   const liftedAlways = lifted?.pause ? { ...lifted, label: voice.pauseWord, source: voice.pauseWord } : lifted;
+  // Another lifted always-on rule, the next to come back after that one: told once it has.
+  const comeBack = subject.always?.filter((rule) => rule !== lifted && rule.allowed && now < rule.allowed.until).sort((a, b) => a.allowed!.until - b.allowed!.until)[0];
+  const comeBackItem = (at: Clock, title: string) =>
+    later({
+      time: clock(at),
+      tone: comeBack!.pause ? "paused" : "window",
+      sign: comeBack!.pause ? "pause" : "window",
+      title,
+      detail: comeBack!.to !== undefined ? `Until ${clock(comeBack!.to)}` : comeBack!.open ? NO_END_TIME : "For the rest of today",
+    });
+  // Only once a break's pause is over is the other rule the one to tell; until then the first lifted rule is.
+  const pauseOver = (at: Clock) => Boolean(liftedAlways?.pause) && againTo !== undefined && againTo <= at;
+  const comeBackBy = (at: Clock) => comeBack !== undefined && pauseOver(at) && comeBack.allowed!.until <= at;
+  const comeBackLabel = () => (comeBack!.pause ? voice.pauseWord : comeBack!.label);
   // When it blocks again until: the pause's end, else (an always-on rule, or a pause with no end) the rest of today.
   const againTo = liftedAlways?.to;
   const window =
@@ -623,11 +637,12 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   const onwards = (start: Clock, again?: DayWindow): DayItem[] => {
     // An always-on internet rule still on (after a pause) blocks from then, whatever the windows.
     if (blockingAlways) return [later({ time: clock(start), tone: "window", sign: "window", title: blockingAlways.label, detail: "For the rest of today" })];
+    if (comeBackBy(start)) return [comeBackItem(start, comeBackLabel())];
     const items: DayItem[] = [];
     let at = start;
     // Past midnight: tomorrow morning is free, unless a lifted always-on rule has come back by then.
     const morning = () =>
-      liftedAlways && againTo === undefined ? items : [...items, later({ time: clock(at), tone: "on", sign: "morning", title: "Not blocked", detail: "Tomorrow morning" })];
+      (liftedAlways && againTo === undefined) || (comeBack && pauseOver(at)) ? items : [...items, later({ time: clock(at), tone: "on", sign: "morning", title: "Not blocked", detail: "Tomorrow morning" })];
     for (let step = 0; step <= 3 * subject.windows.length; step++) {
       const covering = subject.windows.find((candidate) => inWindow(candidate, at) && !(candidate.allowed && at < candidate.allowed.until));
       if (!covering) {
@@ -671,8 +686,12 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     }
     if (at >= 1440) return morning();
     if (backBy(at)) return [...items, ...blocksAgain(at)];
+    if (comeBackBy(at)) return [...items, comeBackItem(at, comeBackLabel())];
     const next = nextWindow(at);
     if (backBefore(at) && (!next || back! < next.from)) return [...items, notBlocked(at, undefined, clock(back!)), ...blocksAgain(back!)];
+    const returns = comeBack?.allowed!.until;
+    if (returns !== undefined && pauseOver(at) && at < returns && returns < 1440 && (!next || returns < next.from))
+      return [...items, notBlocked(at, undefined, clock(returns)), comeBackItem(returns, `${comeBackLabel()} again`)];
     return [...items, notBlocked(at, next), ...(next ? [windowItem(next)] : [])];
   };
   const afterWindow = () => onwards(windowEnd);
@@ -816,6 +835,17 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     const kind = pauseBreak ? "pause" : "window";
     // Back only after midnight: nothing more of it today.
     if (back! < 1440) bands.push({ kind, from: back!, to: to ?? 1440, label, source: liftedAlways.source ?? "No internet", times: to === undefined ? `from ${clock(back!)}` : `until ${clock(to)}` });
+    // Another lifted rule told back once the break's pause is over blocks from then too.
+    const otherFrom = comeBack && pauseBreak && to !== undefined ? Math.max(comeBack.allowed!.until, to) : 1440;
+    if (otherFrom < 1440)
+      bands.push({
+        kind: comeBack!.pause ? "pause" : "window",
+        from: otherFrom,
+        to: 1440,
+        label: comeBackLabel(),
+        source: comeBack!.pause ? voice.pauseWord : (comeBack!.source ?? "No internet"),
+        times: `from ${clock(otherFrom)}`,
+      });
     items = [
       { time: "Now", now: true, tone: "on", sign: "allowed", title: `Allowed until ${clock(until)}`, detail: by ? `${by} said yes` : pauseBreak ? voice.unpausedByNoOne.replace(/\.$/, "") : `${label} is off for now` },
       ...(then ? onwards(then.from) : back! < 1440 ? blocksAgain(back!) : []),
