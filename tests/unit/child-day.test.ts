@@ -821,6 +821,12 @@ describe("a child's day on the household's clock", () => {
       expect(after.items).toEqual([expect.objectContaining({ title: "Allowed until 1 AM", detail: "Nick said yes" })]);
       expect(topAnswer(after).sentence).toBe(`Nick said yes. ${voice.pauseWord} again at 1 AM.`);
     }
+    // Once the break and the pause are both over, the yes is not told as the pause ended.
+    const over = { ...late, suspension: { active: false, until: null, by: null }, allowance: { active: false, until: null, by: null } };
+    const done = meDaySubject(groupDayOf(over as never, [], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
+    const afterAll = tellDay(done.subject, done.now, PHONE_VOICE, done.clock);
+    expect(afterAll.day.kind).not.toBe("unpaused");
+    expect(afterAll.items[0]?.status).toBeUndefined();
     // Once the break is over, the pause is told again (FamilyFi reports it active).
     expect(groupDayOf({ ...computers, suspension: { ...computers.suspension, resumesAt: "2026-11-17T03:00:00Z" } } as never, [], ZONE, MONDAY_NIGHT).pauseBreak).toBeUndefined();
   });
