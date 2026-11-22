@@ -840,7 +840,8 @@ describe("a child's day on the household's clock", () => {
     const { subject, now, clock: on } = meDaySubject(day, MONDAY_NIGHT);
     const story = tellDay(subject, now, THING_VOICE, on);
     expect(story.items[0]).toMatchObject({ title: "Allowed until 11 PM", detail: "Nick said yes" });
-    expect(story.items[1]).toMatchObject({ time: "11 PM", title: "Blocked again" });
+    // The pause ends after midnight: blocked again until then, told by its time.
+    expect(story.items[1]).toMatchObject({ time: "11 PM", title: "Blocked again", detail: "Until 12:39 AM" });
     // A pause ending today: blocked again until its end, then not blocked.
     const ending = { ...computers, suspension: { ...computers.suspension, until: "2026-11-17T04:30:00Z" } };
     const short = meDaySubject(groupDayOf(ending as never, [], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
