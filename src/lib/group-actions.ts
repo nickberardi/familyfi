@@ -241,8 +241,8 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
   const blocking = rulesToUnblock(group, rules, timezone, now);
   const internet = blocking.find((rule) => rule.kind === "internet");
   // A pause's break, from a yes to a child's ask for a length: unblocked until then, then the pause
-  // again; an internet window on meanwhile still blocks, and is told first.
-  if (onBreak(group, now) && !internet) {
+  // again; any rule blocking meanwhile is told first, as the button's Unblock is for it.
+  if (onBreak(group, now) && !blocking.length) {
     const detail = `unblocked ${until(group.suspension.resumesAt!, "")}${by(group.allowance.by)}, then blocked again`;
     return online("on", `Online · ${detail}`, detail, "unblocked", "unblocked");
   }

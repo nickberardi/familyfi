@@ -778,6 +778,8 @@ describe("a child's day on the household's clock", () => {
       ["10 PM", "Bedtime", "Until 11 PM"],
       ["11 PM", "Not blocked", "For the rest of today"],
     ]);
+    // The pause comes back in the paused ink on the timeline, as the list's row does.
+    expect(tellDay({ windows: [], always: [pauseBreak] } as never, 19 * 60, PHONE_VOICE).bands).toContainEqual(expect.objectContaining({ kind: "pause", from: 21 * 60, to: 22 * 60 }));
     // A Thing's pause with no end, answered by no one named.
     const story = tellDay({ windows: [], always: [{ label: "Paused", pause: true, open: true, allowed: { until: 21 * 60 } }] } as never, 19 * 60, THING_VOICE);
     expect(story.items.map((item) => [item.time, item.title, item.detail])).toEqual([

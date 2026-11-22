@@ -807,7 +807,9 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     // A pause's break blocks again only until the pause's own end, then on as any day goes.
     const to = againTo;
     const pauseBreak = liftedAlways.pause;
-    bands.push({ kind: "window", from: back!, to: to ?? 1440, label, source: liftedAlways.source ?? "No internet", times: to === undefined ? `from ${clock(back!)}` : `until ${clock(to)}` });
+    // A pause comes back in the paused ink, a Thing's category or app rule as a rule, all internet as a window.
+    const kind = pauseBreak ? "pause" : liftedAlways.source ? "category" : "window";
+    bands.push({ kind, from: back!, to: to ?? 1440, label, source: liftedAlways.source ?? "No internet", times: to === undefined ? `from ${clock(back!)}` : `until ${clock(to)}` });
     items = [
       { time: "Now", now: true, tone: "on", sign: "allowed", title: `Allowed until ${clock(until)}`, detail: by ? `${by} said yes` : pauseBreak ? voice.unpausedByNoOne.replace(/\.$/, "") : `${label} is off for now` },
       ...(then ? onwards(then.from) : blocksAgain(back!)),
