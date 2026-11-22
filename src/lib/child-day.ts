@@ -518,10 +518,12 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
     if (ask.state !== "yes") return dayAsk(ask, minutesOf);
     // A yes that ended a pause is told for the rest of the day it was answered on, never after.
     if (ask.about === "pause") {
-      // A yes for a length gave a break (or lifted a Thing's Block button rule), never an end: told
-      // only while that lasts, as the lifted block, and not at all once it is over.
-      if (ask.minutes && !me.pauseBreak && !me.alwaysOn.some((rule) => rule.button && rule.allowed)) return undefined;
       const answered = minutesOf(ask.answeredAt ?? ask.at);
+      // A yes for a length that gave a break (or lifted a Thing's Block button rule) is told as that
+      // lift while it lasts, and not at all once its time is over: it never ended the pause. Before
+      // then, with no lift on, the parent ended the pause outright (Unblock), which is told as such.
+      const lifting = me.pauseBreak || me.alwaysOn.some((rule) => rule.button && rule.allowed);
+      if (ask.minutes && !lifting && minutes >= answered + ask.minutes) return undefined;
       return !me.pause && answered >= 0 && answered <= minutes ? dayAsk(ask, minutesOf) : undefined;
     }
     const allowed = me.windows.find((window) => window.ruleId === ask.ruleId && window.allowed)?.allowed;
