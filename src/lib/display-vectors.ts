@@ -7,6 +7,7 @@ import * as apiCompat from "./api-compat";
 import * as blockSwitchModule from "./block-switch";
 import * as groupActionsModule from "./group-actions";
 import * as display from "./display";
+import * as familyNext from "./family-next";
 import * as groupAsk from "./group-ask";
 import * as groupSchedule from "./group-schedule";
 import * as pauseSheet from "./pause-sheet";
@@ -113,10 +114,12 @@ export const RUNNERS: Record<string, (input: Input) => unknown> = {
   quickSettingsTileCopy: () => blockSwitchModule.quickSettingsTileCopy(),
   // The watches decide from `/health` whether to show the household, so each ports the check.
   apiCompatibility: (i) => apiCompat.apiCompatibility(i.health, i.client),
+  // A parent's watch face, Smart Stack card and Tile: what changes next across the family.
+  familyTimeline: (i) => familyNext.familyTimeline(i.groups as Group[], i.rules as Rule[], i.timeZone, at(i.now), i.hours),
 };
 
 /** The modules whose every exported function must have a vector, or a reason in `EXCLUDED`. */
-export const MODULES = { apiCompat, blockSwitch: blockSwitchModule, display, groupActions: groupActionsModule, groupAsk, groupSchedule, pauseSheet, ruleActions, ruleWindows, watchApp };
+export const MODULES = { apiCompat, blockSwitch: blockSwitchModule, display, familyNext, groupActions: groupActionsModule, groupAsk, groupSchedule, pauseSheet, ruleActions, ruleWindows, watchApp };
 
 /** Exported functions with no vector, each with the reason. */
 export const EXCLUDED: Record<string, string> = {
