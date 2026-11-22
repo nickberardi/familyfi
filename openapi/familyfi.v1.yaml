@@ -3012,7 +3012,8 @@ paths:
         `clientType: me-watch` and no other: the Watch holds `me:askOnly` and signs in for the
         phone's family group, never as an account, and the phone is its parent, so revoking the
         phone or deleting the group revokes it. Only a signed-in `me` device whose group is still
-        there may make one (403 `me_phone_required` otherwise); its Watch may not.
+        there may make one: a browser is refused (403 `paired_phone_required`), as is the Watch
+        itself (403 `me_scope`), and a parent's app gets 400.
 
         An agent invite is refused through remote access (403 `agent_remote`).
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
