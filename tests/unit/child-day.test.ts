@@ -821,8 +821,12 @@ describe("a child's day on the household's clock", () => {
       expect(after.items).toEqual([expect.objectContaining({ title: "Allowed until 1 AM", detail: "Nick said yes" })]);
       expect(topAnswer(after).sentence).toBe(`Nick said yes. ${voice.pauseWord} again at 1 AM.`);
     }
-    // Once the break and the pause are both over, the yes is not told as the pause ended.
-    const over = { ...late, suspension: { active: false, until: null, by: null }, allowance: { active: false, until: null, by: null } };
+    // A yes for 2 hours with no pause left and no break: the parent ended the pause outright, and the day says so.
+    const ended = { ...late, suspension: { active: false, until: null, by: null }, allowance: { active: false, until: null, by: null } };
+    const outright = meDaySubject(groupDayOf(ended as never, [], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
+    expect(tellDay(outright.subject, outright.now, PHONE_VOICE, outright.clock).items[0]?.status?.text).toBe("Nick unpaused your apps at 10:30 PM.");
+    // Once a break's time is over and the pause has ended too, the yes is not told as the pause ended.
+    const over = { ...ended, ask: { ...ended.ask, minutes: 60, at: "2026-11-17T00:55:00Z", answeredAt: "2026-11-17T01:00:00Z" } };
     const done = meDaySubject(groupDayOf(over as never, [], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
     const afterAll = tellDay(done.subject, done.now, PHONE_VOICE, done.clock);
     expect(afterAll.day.kind).not.toBe("unpaused");
