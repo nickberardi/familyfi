@@ -759,6 +759,33 @@ describe("a child's day on the household's clock", () => {
     expect(thingTile(story)).toEqual({ word: "Allowed", line: "Until 11:30 PM", tone: "on" });
   });
 
+  it("tells a break in a pause ending today around the windows of the day, in the voice's words", () => {
+    const tell = (subject: unknown, voice = PHONE_VOICE) => tellDay(subject as never, 19 * 60, voice).items.map((item) => [item.time, item.title, item.detail]);
+    // A break until 9 PM in a pause until 10 PM, on a family member's phone.
+    const pauseBreak = { label: "Paused", pause: true, allowed: { by: "Nick", until: 21 * 60 }, to: 22 * 60 };
+    // A window during the break: told, then the break's rest, then the pause again until its end.
+    expect(tell({ windows: [{ label: "Homework", from: 20 * 60, to: 20 * 60 + 30 }], always: [pauseBreak] })).toEqual([
+      ["Now", "Allowed until 8 PM", "Nick said yes"],
+      ["8 PM", "Homework", "Until 8:30 PM"],
+      ["8:30 PM", "Not blocked", "Until 9 PM"],
+      ["9 PM", "Paused again", "Until 10 PM"],
+      ["10 PM", "Not blocked", "For the rest of today"],
+    ]);
+    // A window already on when the pause ends carries on.
+    expect(tell({ windows: [{ label: "Bedtime", from: 21 * 60 + 30, to: 23 * 60 }], always: [pauseBreak] })).toEqual([
+      ["Now", "Allowed until 9 PM", "Nick said yes"],
+      ["9 PM", "Paused again", "Until 10 PM"],
+      ["10 PM", "Bedtime", "Until 11 PM"],
+      ["11 PM", "Not blocked", "For the rest of today"],
+    ]);
+    // A Thing's pause with no end, answered by no one named.
+    const story = tellDay({ windows: [], always: [{ label: "Paused", pause: true, open: true, allowed: { until: 21 * 60 } }] } as never, 19 * 60, THING_VOICE);
+    expect(story.items.map((item) => [item.time, item.title, item.detail])).toEqual([
+      ["Now", "Allowed until 9 PM", "It is unblocked"],
+      ["9 PM", "Blocked again", "No end time"],
+    ]);
+  });
+
   it("tells a pause's break as allowed until it ends, then blocked again", () => {
     const computers = {
       id: "t2",
