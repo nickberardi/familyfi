@@ -1,7 +1,7 @@
 import { RuleLiftKind } from "@prisma/client";
 import { standingRule } from "@/lib/group-actions";
 import { COUNTRIES_RULE_ID } from "@/lib/rules";
-import { blockButtonRuleOf, blockRuleOf, type GroupWithRules, lifted } from "./groups";
+import { blockButtonRuleOf, blockRuleOf, type GroupWithRules, lifted, pauseOf } from "./groups";
 import { activeWindowsEnd, isLockDnsRule, ruleInternetWindows } from "./rules";
 
 /**
@@ -14,7 +14,8 @@ import { activeWindowsEnd, isLockDnsRule, ruleInternetWindows } from "./rules";
  */
 export function unblockTargets(group: GroupWithRules, now: Date, timezone: string) {
   const block = blockRuleOf(group);
-  const blockedByPause = Boolean(block?.enabled && (block.expiresAt === null || now < block.expiresAt));
+  // A pause on a break blocks nothing until the break ends.
+  const blockedByPause = pauseOf(block, now).blocking;
   const links = group.rules.filter(({ rule }) => rule.systemGroupId === null && !isLockDnsRule(rule) && rule.id !== COUNTRIES_RULE_ID);
   const buttonRuleId = blockButtonRuleOf(group)?.id;
   // A rule paused for everyone, or paused for this group, is not blocking it. One this group is

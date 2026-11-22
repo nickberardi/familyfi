@@ -131,7 +131,9 @@ export function applyRulePause(mutate: Mutate, rule: Pick<Rule, "id" | "name">, 
  * opens its sheet (`openSheet`), and whatever that sheet lifts answers the ask yes on the server.
  * Yes to time off a rule is the rule's `allow` for the group, as the child asked or until a time of
  * the parent's own (`now` is the tap), with the ask's `askId`, so the ask closes as yes, by this
- * parent; Not now is the ask's `decline`.
+ * parent; Not now is the ask's `decline`. Yes for the length a child asked to be unblocked for
+ * (`unblockFor`) is a break in a pause that alone blocks (`resume` on `internet` with `askId` and
+ * `until`), or the card's Unblock sheet's own write for that length, without opening it.
  */
 export function answerAsk(
   mutate: Mutate,
@@ -141,6 +143,8 @@ export function answerAsk(
   ruleName: string | undefined,
   now: Date = new Date(),
   openSheet: (target: GroupSheetTarget) => void = () => undefined,
+  /** The household's, for the notice a yes for the child's length shows. */
+  timezone = "UTC",
 ) {
   const answered = (state: GroupAsk["state"]) => (lists: { groups: Group[]; devices: Device[] }) => ({
     ...lists,
@@ -153,6 +157,25 @@ export function answerAsk(
       optimistic: answered("no"),
       feedback: { notice: `You said not now to ${ask.from?.name ?? group.name}.` },
     });
+  }
+  if (request.kind === "unblockFor" && request.run === "unblockNow") {
+    // A break in the pause for the child's length, by the ask's id: it blocks again after.
+    const to = new Date(now.getTime() + request.minutes * 60_000).toISOString();
+    return mutate((send) => send(`${internetRulePath(group)}/resume`, { method: "POST", body: { askId: ask.id, until: to } }), {
+      groupId: group.id,
+      optimistic: answered("yes"),
+      feedback: { notice: `${group.name} unblocked until ${formatClock(new Date(to), timezone)}, then blocked again.` },
+    });
+  }
+  if (request.kind === "unblockFor") {
+    // The card's Unblock sheet, answered with the child's length: the Block button rule paused for the
+    // group, or the group's unblock, until then. Either answers the ask yes once nothing it is about blocks.
+    const lift = { kind: "pauseFor" as const, minutes: request.minutes };
+    const target: GroupPauseSheetTarget =
+      request.run === "pauseRule" && request.ruleId
+        ? { kind: "rule", ruleIds: [request.ruleId], name: request.name ?? "", mode: "pause", wording: "unblock" }
+        : { kind: "unblock", mode: "pause" };
+    return applyGroupSheet(mutate, group, target, lift, timezone, now);
   }
   if (request.kind === "unblock") {
     const rule = request.ruleId ? { ruleId: request.ruleId, name: request.name ?? "" } : {};

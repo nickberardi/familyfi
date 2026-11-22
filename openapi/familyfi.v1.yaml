@@ -1093,7 +1093,7 @@ paths:
       description: |
         A child's ask, from FamilyFi Me on its own group or on a Things group shared with children
         (`kidsCanAsk`) (404 for any other; 403 `child_only` for anyone but a child's phone): `pause`
-        to be unblocked, while the group is paused or, on a Thing, its Block button default blocks it, or `rule` for `minutes` in the window of one of the group's rules that is
+        to be unblocked, optionally for `minutes`, while the group is paused or, on a Thing, its Block button default blocks it, or `rule` for `minutes` in the window of one of the group's rules that is
         blocking it now or starts within the household's `askAheadMinutes` (the heads-up's countdown), whose time then counts from the window's start. Parents with alerts on are told (`ask.new`), and the ask shows as the group's
         `ask` until answered, with `from` naming the child on a Thing. It waits until a parent
         answers, the household's `askTimeoutMinutes` pass, or the block it asks about ends,
@@ -1119,6 +1119,11 @@ paths:
                   required: [about]
                   properties:
                     about: { type: string, enum: [pause] }
+                    minutes:
+                      type: integer
+                      minimum: 5
+                      maximum: 240
+                      description: How long the child asks to be unblocked for. Optional; a parent's yes may still end the block outright.
                 - type: object
                   additionalProperties: false
                   required: [about, ruleId, minutes]
@@ -1908,7 +1913,7 @@ paths:
       tags: [Groups, Rules]
       summary: Resume a rule for one group
       description: |
-        Ends a pause for one group alone. 404 when the group does not have the rule. On `internet`, `askId` answers yes to the group's waiting ask to be unblocked (`GroupAsk`, `about: pause`) while only its pause blocks it: an administrator alone (403 `administrator_required` for a Watch, the app's controls or an agent), 409 `ask_closed` when it is no longer waiting, 409 `still_blocked` while a Thing's Block button default blocks it too (the yes is then the card's Unblock). The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it.
+        Ends a pause for one group alone. 404 when the group does not have the rule. On `internet`, `askId` answers yes to the group's waiting ask to be unblocked (`GroupAsk`, `about: pause`) while only its pause blocks it: an administrator alone (403 `administrator_required` for a Watch, the app's controls or an agent), 409 `ask_closed` when it is no longer waiting, 409 `still_blocked` while a Thing's Block button default blocks it too (the yes is then the card's Unblock). With `askId`, `until` answers it for the time the child asked: the pause takes a break, blocking nothing until then and blocking again after, until its own end (`Suspension.resumesAt`); at or past that end it simply ends. `until` without `askId`, or on any rule but `internet`, is 400 `invalid_request`: a parent's own resume always ends the pause. The same verb as the rule-wide route, with the same meaning: only whose devices are affected differs. Its devices leave the rule's policies; a policy left with no other device stays disabled with its devices so ending the lift does not recreate it.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
@@ -1939,6 +1944,10 @@ paths:
                 askId:
                   type: string
                   description: The child's ask this answers yes; only with the reserved `internet`.
+                until:
+                  type: string
+                  format: date-time
+                  description: With `askId` on `internet` only, the end of the pause's break.
       responses:
         "200":
           description: Done
@@ -4564,11 +4573,17 @@ components:
       type: object
       additionalProperties: false
       required: [active, until, by]
-      description: Read-only, derived from the group's built-in `internet` rule. A pause blocks all internet for the group until `until`, or until resumed when null.
+      description: |
+        Read-only, derived from the group's built-in `internet` rule. A pause blocks all internet for the group until `until`, or until resumed when null.
+        While a parent's yes to a child's ask gives it a break, `active` is false, `until` and `by` still name the pause, `resumesAt` is when it blocks again, and the group's `allowance` is active until then.
       properties:
         active: { type: boolean }
         until: { type: [string, "null"], format: date-time }
         by: { $ref: "#/components/schemas/Actor" }
+        resumesAt:
+          type: string
+          format: date-time
+          description: Only during a pause's break, when the pause blocks again. Ending the unblock (`/groups/{id}/unblock/end`) brings it back at once; resume ends the pause.
     Allowance:
       type: object
       additionalProperties: false
@@ -4651,7 +4666,7 @@ components:
             groupId: { type: string }
             name: { type: string }
         ruleId: { type: string, description: "The rule asked about, for `rule`." }
-        minutes: { type: integer, minimum: 1, description: "The minutes asked for, for `rule`." }
+        minutes: { type: integer, minimum: 1, description: "The minutes asked for: for `rule` always, for `pause` when the child chose a length." }
         state:
           type: string
           x-extensible-enum: [waiting, "yes", "no", timedOut, ended]

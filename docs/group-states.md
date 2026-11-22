@@ -190,6 +190,7 @@ the rule's own name ("TV video"), since one rule can block several categories.
 While the group's latest ask (`Group.ask`) is `waiting` and its `expiresAt` is ahead, the card,
 open or closed, and the group's page show a strip under the header (`AskStrip`; its words are
 `groupAskLine` in `src/lib/group-ask.ts`, then when it was asked): "Asked to be unpaused · 9:40 PM",
+"Cassie asked to unblock it for 2 hours · 9:40 PM" when the child chose a length,
 or "Asked for 30 minutes off Bedtime · 9:40 PM" (time off the rule, as the alert says). It never
 changes the badge, the status line or the button, which still read Block, Unblock or Resume. Its
 Answer opens the answer sheet
@@ -197,9 +198,15 @@ Answer opens the answer sheet
 
 | Asked about | Choices, in order |
 | --- | --- |
-| A pause, or a Thing's Block button default | **Unblock**: the card's own Unblock button, as if the parent tapped it. With only the pause blocking it ends the pause at once ("ends the block now"); otherwise it opens the button's sheet, "Unblock Video for TV?" (B1) or the group's unblock sheet, and the time the parent picks there is the answer ("lifts Video, for as long as you choose"). The ask closes yes once nothing it is about blocks the group. **Not now** |
+| A pause, or a Thing's Block button default | **Unblock**: the card's own Unblock button, as if the parent tapped it. With only the pause blocking it ends the pause at once ("ends the block now"); otherwise it opens the button's sheet, "Unblock Video for TV?" (B1) or the group's unblock sheet, and the time the parent picks there is the answer ("lifts Video, for as long as you choose"). The ask closes yes once nothing it is about blocks the group. When the child chose a length, **Allow 2 hours** comes first: with only the pause blocking, the pause's break ("blocks again at 11:00 PM"; `resume` on `internet` with `askId` and `until`), left out when the pause ends first; otherwise that sheet's own write for that length without opening it ("lifts Video until 11:41 PM"). **Not now** |
 | A rule's window that is on | **Allow 30 minutes** (the rule's `allow` for the group with `askId`, as the child asked), **Until Bedtime ends** when that is longer, **For…** and **Until…**, **Not now** |
 | A rule's window no longer on | **Not now** |
+
+During a pause's break the group reads not paused, with `suspension.resumesAt`, and its allowance
+is active until then: the badge says Unblocked and the line "Unblocked until 11:00 PM by Nick, then
+blocked again", and the button is **Resume**, which ends the unblock (`/unblock/end`) and so the
+break: the pause blocks again at once. A break offers no **More time** (2026-11-22): its length is the
+one the person asked for, and the person asks again for more. A parent's own Unblock never gives a break; it ends the pause.
 
 A time past the window's end stops at the end, as the server caps it. **Not now** is the ask's
 `decline`, with when the child can ask again (the household's `askWaitMinutes`). An answer takes

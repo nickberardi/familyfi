@@ -200,8 +200,8 @@ and never sent by the server.
 - Each alert is a short JSON envelope, `{"v":1,"i":"<event id>","t":<unix seconds>,"k":"<kind>","d":{...}}`,
   with no sentence in it: the phone writes the words from `k` and `d` (`src/lib/alert-copy.ts`).
   `device.new` carries `n`, the number of new devices, and `h`, the hostname when `n` is 1.
-  `ask.new` carries `g` and `n`, the group's id and name, `a` (`pause` or `rule`), and for a rule
-  `r`, its name, and `m`, the minutes asked for; a tap opens the group. `me.protection` and
+  `ask.new` carries `g` and `n`, the group's id and name, `a` (`pause` or `rule`), for a rule
+  `r`, its name, and `m`, the minutes asked for (for `pause` only when the child chose a length); a tap opens the group. `me.protection` and
   `me.quiet` carry `p`, the phone's name, and `g` and `n`, its family member's group id and name; a
   tap opens that family member. Readers
   ignore keys they do not know; `v` rises only for an incompatible envelope.
@@ -329,7 +329,7 @@ turning the switch off hides it again at once.
 #### Asking for more time
 
 FamilyFi Me asks on its own group with `POST /groups/{id}/asks`: `{ "about": "pause" }` to be
-unblocked (while the group is paused, or a Thing's Block button default blocks it), or `{ "about": "rule", "ruleId", "minutes" }` (5 to 240) for time in the window of one of
+unblocked, with an optional `minutes` (5 to 240) for how long (while the group is paused, or a Thing's Block button default blocks it), or `{ "about": "rule", "ruleId", "minutes" }` (5 to 240) for time in the window of one of
 the group's rules that is blocking it now, or that starts within the household's `askAheadMinutes` (5 unless
 changed, 0 for never; asked from the heads-up's countdown; a yes counts from the window's start). A child's phone
 reads `askAheadMinutes` from `GET /auth/session`, beside `timezone`; an administrator sets it with
@@ -343,7 +343,7 @@ and about an always-on rule 409 `always_on`; after a no that child waits the hou
 hour from one child about one group is 429 `too_many_asks`.
 
 No route says yes: a parent answers with the verb that lifts what the ask is about, adding its
-`askId`. An ask to unblock (`pause`) is answered by what the group card's Unblock button sends, as if the parent tapped it: `POST /groups/{id}/unblock`, or, while the Block button default alone blocks, that rule's `POST /groups/{id}/rules/{ruleId}/pause`, each for the time the parent picks on the card's own sheet. Those carry no `askId`: the ask is answered yes once nothing it is about blocks the group (`POST /groups/{id}/rules/internet/resume` with `askId` answers it by id while only a pause is behind it, and is 409 `still_blocked` while a Thing's Block button default blocks it too); `POST
+`askId`. An ask to unblock (`pause`) is answered by what the group card's Unblock button sends, as if the parent tapped it: `POST /groups/{id}/unblock`, or, while the Block button default alone blocks, that rule's `POST /groups/{id}/rules/{ruleId}/pause`, each for the time the parent picks on the card's own sheet, or for the `minutes` the child asked when the ask carries them. Those carry no `askId`: the ask is answered yes once nothing it is about blocks the group (`POST /groups/{id}/rules/internet/resume` with `askId` answers it by id while only a pause is behind it, and is 409 `still_blocked` while a Thing's Block button default blocks it too; adding `until`, the time the child asked, gives the pause a break instead of ending it: the group reads `suspension.active` false with `resumesAt`, and `allowance` active until then, and the pause blocks again after, until its own end, or ends if that comes first; `POST /groups/{id}/unblock/end` ends the break at once; `until` on resume without `askId`, or on any rule but `internet`, is 400); `POST
 /groups/{id}/rules/{ruleId}/allow` lifts the rule for the group for the minutes asked, from now (from the window's start when the
 ask came in the five minutes before it), or until the parent's own `until`, and never past the end of that window
 (409 `not_in_window` once it is neither on nor starting within `askAheadMinutes`). Only an administrator answers by `askId`, as only one declines (403 `administrator_required` for a Watch, the app's controls or an agent). The ask is taken

@@ -136,6 +136,84 @@ describe("asking for more time", () => {
     expect((await readGroup(child, emma.id)).ask).toMatchObject({ state: "yes", by: { name: "Household admin" } });
   });
 
+  it("asks to be unpaused for a length, and a parent's resume with its id and that time gives the pause a break", async () => {
+    await prisma().household.update({ where: { id: "default" }, data: { alertsRelayEnabled: true } });
+    const phone = (await pairPhone(admin)).device.id;
+    await registerPush({ deviceId: phone }, phone, { platform: "ios", channel: "release", token: "t", key: randomBytes(32).toString("base64"), format: 1, kinds: ["ask.new"] });
+    const pauseEnd = new Date(Date.now() + 3 * 60 * MINUTE);
+    expect((await verb(pauseRoute, "pause", admin, emma.id, "internet", { until: pauseEnd.toISOString() })).status).toBe(200);
+    const waiting = await askOf(await ask(child, emma.id, { about: "pause", minutes: 30 }));
+    expect(waiting).toMatchObject({ about: "pause", state: "waiting", minutes: 30 });
+    const alerts = await prisma().alertEvent.findMany({ where: { kind: "ask.new" } });
+    expect(alerts.map((alert) => alert.detail)).toEqual([{ g: emma.id, n: "Emma", a: "pause", m: 30 }]);
+    // Outside the limits a window's ask has.
+    expect(await errorCode(await ask(child, emma.id, { about: "pause", minutes: 1 }))).toBe("invalid_request");
+
+    // A parent's own resume never takes a time: only a yes to an ask does.
+    const breakEnd = new Date(Date.now() + 30 * MINUTE).toISOString();
+    expect(await errorCode(await verb(resumeRoute, "resume", admin, emma.id, "internet", { until: breakEnd }))).toBe("invalid_request");
+    const yes = await verb(resumeRoute, "resume", admin, emma.id, "internet", { askId: waiting.id, until: breakEnd });
+    expect(yes.status).toBe(200);
+    const group = ((await yes.json()) as { group: Group }).group;
+    // On a break: not paused, allowed until then, and the pause blocks again after until its own end.
+    expect(group.suspension).toMatchObject({ active: false, until: pauseEnd.toISOString(), resumesAt: breakEnd, by: { name: "Household admin" } });
+    expect(group.allowance).toMatchObject({ active: true, until: breakEnd });
+    expect(group.access).toBe("allowed");
+    expect(group.ask).toMatchObject({ id: waiting.id, state: "yes" });
+    const block = await prisma().rule.findUniqueOrThrow({ where: { systemGroupId: emma.id } });
+    expect(block).toMatchObject({ enabled: true, pauseActive: true, pauseUntil: new Date(breakEnd), expiresAt: pauseEnd });
+    // The child reads the break too.
+    expect((await readGroup(child, emma.id)).suspension).toMatchObject({ active: false, resumesAt: breakEnd });
+
+    // The card's Resume (ending the unblock) puts the pause back at once.
+    const { POST: endRoute } = await import("@/app/api/v1/groups/[id]/unblock/end/route");
+    expect((await endRoute(post(`/api/v1/groups/${emma.id}/unblock/end`, admin), groupParams(emma.id))).status).toBe(200);
+    const back = await readGroup(admin, emma.id);
+    expect(back.suspension).toMatchObject({ active: true, until: pauseEnd.toISOString() });
+    expect(back.suspension.resumesAt).toBeUndefined();
+  });
+
+  it("ends the pause when the time asked runs past it, and keeps a break when the pause has no end", async () => {
+    const pauseEnd = new Date(Date.now() + 20 * MINUTE);
+    expect((await verb(pauseRoute, "pause", admin, emma.id, "internet", { until: pauseEnd.toISOString() })).status).toBe(200);
+    const first = await askOf(await ask(child, emma.id, { about: "pause", minutes: 60 }));
+    const past = await verb(resumeRoute, "resume", admin, emma.id, "internet", { askId: first.id, until: new Date(Date.now() + 60 * MINUTE).toISOString() });
+    expect(past.status).toBe(200);
+    expect(((await past.json()) as { group: Group }).group.suspension).toEqual({ active: false, until: null, by: null });
+
+    // A pause with no end: the break ends and the pause blocks again, until a parent ends it.
+    await prisma().ask.deleteMany();
+    expect((await verb(pauseRoute, "pause", admin, emma.id, "internet", {})).status).toBe(200);
+    const second = await askOf(await ask(child, emma.id, { about: "pause", minutes: 30 }));
+    const breakEnd = new Date(Date.now() + 30 * MINUTE);
+    expect((await verb(resumeRoute, "resume", admin, emma.id, "internet", { askId: second.id, until: breakEnd.toISOString() })).status).toBe(200);
+    expect((await readGroup(admin, emma.id)).suspension).toMatchObject({ active: false, until: null, resumesAt: breakEnd.toISOString() });
+    // Past the break, the pause reads as blocking again.
+    await prisma().rule.update({ where: { systemGroupId: emma.id }, data: { pauseUntil: new Date(Date.now() - MINUTE) } });
+    expect((await readGroup(admin, emma.id)).suspension).toMatchObject({ active: true, until: null });
+    // A new pause leaves no break behind.
+    await prisma().rule.update({ where: { systemGroupId: emma.id }, data: { pauseUntil: breakEnd } });
+    expect((await verb(pauseRoute, "pause", admin, emma.id, "internet", {})).status).toBe(200);
+    expect(await prisma().rule.findUniqueOrThrow({ where: { systemGroupId: emma.id } })).toMatchObject({ enabled: true, pauseActive: false, pauseUntil: null });
+  });
+
+  it("refuses a time on any resume but a group's internet", async () => {
+    const homework = await windowRule(emma.id);
+    const until = new Date(Date.now() + 30 * MINUTE).toISOString();
+    expect(await errorCode(await verb(resumeRoute, "resume", admin, emma.id, homework.id, { until }))).toBe("invalid_request");
+  });
+
+  it("asks to unblock a Thing for a length, which the Thing's Unblock gives", async () => {
+    const tv = await prisma().group.create({ data: { kind: GroupKind.things, name: "TV", kidsCanAsk: true } });
+    const video = await prisma().rule.create({ data: { name: "Video", kind: RuleKind.category, mode: RuleMode.always, targetIds: [4], groups: { create: { groupId: tv.id } } } });
+    await prisma().group.update({ where: { id: tv.id }, data: { blockButtonRuleId: video.id } });
+    const waiting = await askOf(await ask(child, tv.id, { about: "pause", minutes: 120 }));
+    expect(waiting).toMatchObject({ about: "pause", minutes: 120, from: { name: "Emma" } });
+    const yes = await verb(pauseRoute, "pause", admin, tv.id, video.id, { until: new Date(Date.now() + 120 * MINUTE).toISOString() });
+    expect(yes.status).toBe(200);
+    expect((await readGroup(admin, tv.id)).ask).toMatchObject({ id: waiting.id, state: "yes", minutes: 120 });
+  });
+
   it("asks for minutes in a window, and a yes lifts the rule for the group that long, never past the window's end", async () => {
     const homework = await windowRule(emma.id);
     const waiting = await askOf(await ask(child, emma.id, { about: "rule", ruleId: homework.id, minutes: 30 }));
@@ -346,6 +424,18 @@ describe("asking for more time", () => {
     const after = await prisma().ask.findUniqueOrThrow({ where: { id: waiting.id } });
     expect(after).toMatchObject({ state: "waiting", endsWithBlock: true });
     expect(after.expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(5 * MINUTE);
+  });
+
+  it("tells a window on during a pause's break as blocking, never as allowed", async () => {
+    await windowRule(emma.id);
+    await verb(pauseRoute, "pause", admin, emma.id, "internet");
+    const waiting = await askOf(await ask(child, emma.id, { about: "pause", minutes: 30 }));
+    const breakEnd = new Date(Date.now() + 30 * MINUTE).toISOString();
+    expect((await verb(resumeRoute, "resume", admin, emma.id, "internet", { askId: waiting.id, until: breakEnd })).status).toBe(200);
+    const group = await readGroup(admin, emma.id);
+    expect(group.suspension).toMatchObject({ active: false, resumesAt: breakEnd });
+    expect(group.allowance.active).toBe(false);
+    expect(group.access).not.toBe("allowed");
   });
 
   it("answers an ask to be unpaused with the group's unblock, the card's Unblock while a window blocks it too", async () => {

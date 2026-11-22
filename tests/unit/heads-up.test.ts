@@ -86,6 +86,20 @@ describe("the heads-up before a block starts or ends", () => {
     expect(headsUpNotices(blocks, MONDAY_EVENING, ZONE, "apps", 0)).toEqual([]);
   });
 
+  it("tells the end of a pause's break, and the pause's own end after it", () => {
+    // Paused until 9 PM; a parent said yes to 30 minutes at 8 PM, so the pause is back at 8:30.
+    const day = me({ pauseBreak: { by: "Nick", until: "2026-11-17T01:30:00Z", pauseUntil: "2026-11-17T02:00:00Z" } });
+    const blocks = headsUpBlocks(day, MONDAY_EVENING, 1);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ name: "Paused", pause: true, afterExtraTime: true, to: new Date("2026-11-17T02:00:00Z") });
+    expect(blocks[0]!.from.toISOString()).toBe("2026-11-17T01:30:00.000Z");
+    const notices = headsUpNotices(blocks, MONDAY_EVENING, ZONE, "apps");
+    expect(notices.map(({ kind, title, body }) => [kind, title, body])).toEqual([
+      ["start", "Your extra time ends in 5 minutes", "Your pause is back on. Your apps pause at 8:30 PM."],
+      ["end", "Your pause ends in 5 minutes", "Your apps are back at 9 PM."],
+    ]);
+  });
+
   it("gives nothing for a start already passed, and only the end of a pause", () => {
     const blocks = headsUpBlocks(me({ pause: { by: "Nick", until: "2026-11-17T01:30:00Z" } }), MONDAY_EVENING, 1);
     const notices = headsUpNotices(blocks, MONDAY_EVENING, ZONE, "apps");

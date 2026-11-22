@@ -65,12 +65,13 @@ function pauseTimes(pause: DayPause, to = pause.to): string {
 export type AskLength = number;
 /**
  * A request and its answer: `at` is when it was sent, `answeredAt` when a parent answered, `by`
- * who. `minutes` is the length asked for during a window; a request to end a pause has none.
+ * who. `minutes` is the length asked for during a window; a request to end a pause has none, and
+ * `unblockFor` is how long it asked to be unblocked for, when the child chose a length.
  * After a no, `againAt` is when the child can ask again (FamilyFi's household wait). A request no
  * one answered in time is `timedOut`; one whose block ended first is `ended`.
  */
 export type DayAsk =
-  | { state: "waiting"; at: Clock; minutes?: AskLength }
+  | { state: "waiting"; at: Clock; minutes?: AskLength; unblockFor?: AskLength }
   | {
       state: "yes" | "no";
       at: Clock;
@@ -87,7 +88,9 @@ export type DaySubject = {
   windows: DayWindow[];
   ask?: DayAsk;
   /** Rules that block all internet all the time (an always-on internet rule); `allowed` while a parent lifted one until a time. */
-  always?: { label: string; allowed?: { by?: string; until: Clock } }[];
+  /** `to`: when it stops blocking again today, for a pause's break; absent: the rest of today. `ends`: a break's pause that ends after midnight, told by its time. */
+  /** `pause` marks a pause's break or a Thing's lifted Block button rule, `open` when that pause has no end (a yes to the child's ask for a length): told in the voice's own words, blocked again until `to`. */
+  always?: { label: string; allowed?: { by?: string; until: Clock }; source?: string; to?: Clock; ends?: Clock; pause?: true; open?: true }[];
   /** How many minutes before a window starts the child can ask (the household's `askAheadMinutes`); 0 is never. */
   askAhead?: number;
 };
@@ -143,6 +146,8 @@ export type Day =
       by?: string;
       /** Another window that starts at `until`, cutting the allowed time short. */
       then?: DayWindow;
+      /** A pause's break: the pause blocks again at `until`. */
+      pause?: true;
     }
   | { kind: "open"; next?: DayWindow }
   /** A rule blocks all internet all the time: `label` is its name. */
@@ -348,10 +353,13 @@ export type GroupDay = {
   timezone: string;
   /** `since`, when known, is when the pause was last set (started, or extended), not when it began: it places the band, and no start is told; without it the band starts now. `until` null: until a parent ends it. */
   pause: { by: string | null; since?: string; until: string | null } | null;
+  /** A pause on a break, given by a yes to the child's ask for a length: open until `until`, then blocked again. */
+  pauseBreak?: { by: string | null; until: string; pauseUntil: string | null };
   allowance: { by: string | null; until: string | null } | null;
   /** `allowed`: the window's rule is lifted for this group until a time (an allowance, or a rule paused or allowed). */
   windows: { ruleId: string; ruleName: string; name: string; days: number[]; start: string; end: string; allowed: { by: string | null; until: string } | null }[];
-  alwaysOn: { ruleId: string; name: string; kind: "internet" | "category" | "app" | "domain"; allowed: { by: string | null; until: string } | null }[];
+  /** `button`: a Thing's Block button rule (Video on TV), which the child asks to unblock. */
+  alwaysOn: { ruleId: string; name: string; kind: "internet" | "category" | "app" | "domain"; allowed: { by: string | null; until: string } | null; button?: true }[];
   /** The group's latest ask for more time (`Group.ask`), with who answered by name. */
   ask?: (Omit<GroupAsk, "by"> & { by: string | null }) | null;
   /** The household's heads-up lead, also how early the child can ask (`askAheadMinutes`); absent from servers before API 2.1.0. */
@@ -391,6 +399,9 @@ export function groupDayOf(
     group: { id: group.id, name: group.name },
     timezone,
     pause: group.suspension.active ? { by: name(group.suspension.by), until: group.suspension.until } : buttonBlock(),
+    ...(group.suspension.resumesAt && Date.parse(group.suspension.resumesAt) > now.getTime()
+      ? { pauseBreak: { by: name(group.allowance.by), until: group.suspension.resumesAt, pauseUntil: group.suspension.until } }
+      : {}),
     allowance: group.allowance.active ? { by: name(group.allowance.by), until: group.allowance.until } : null,
     windows: own
       .filter((rule) => rule.kind === "internet" && rule.mode === "scheduled")
@@ -398,7 +409,15 @@ export function groupDayOf(
         const allowed = allowedOf(liftOf(rule) ?? undefined);
         return (rule.windows ?? []).map((window) => ({ ruleId: rule.id, ruleName: rule.name, name: window.name, days: [...window.days].sort((a, b) => a - b), start: window.start, end: window.end, allowed }));
       }),
-    alwaysOn: own.filter((rule) => rule.mode === "always").map((rule) => ({ ruleId: rule.id, name: rule.name, kind: rule.kind, allowed: allowedOf(liftOf(rule) ?? undefined) })),
+    alwaysOn: own
+      .filter((rule) => rule.mode === "always")
+      .map((rule) => ({
+        ruleId: rule.id,
+        name: rule.name,
+        kind: rule.kind,
+        allowed: allowedOf(liftOf(rule) ?? undefined),
+        ...(group.kind === "things" && rule.id === group.blockButtonRuleId ? { button: true as const } : {}),
+      })),
     ask: group.ask ? { ...group.ask, by: name(group.ask.by ?? null) } : null,
     ...(askAheadMinutes !== undefined ? { askAheadMinutes } : {}),
   };
@@ -446,14 +465,31 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
         ...(me.pause.until ? { to: minutesOf(me.pause.until) } : { to: 1440, open: true }),
       }
     : undefined;
-  const always = me.alwaysOn
-    .filter((rule) => rule.kind === "internet")
+  // A Thing's Block button rule lifted until a time is told as the Thing's block is: allowed until
+  // then, and "Blocked again" after, in the voice's word, never by the rule's name.
+  const always: NonNullable<DaySubject["always"]> = me.alwaysOn
+    .filter((rule) => rule.kind === "internet" || (rule.button && rule.allowed))
     .map((rule) => ({
       label: rule.name,
+      ...(rule.kind === "internet" ? {} : { source: "Blocked", pause: true as const }),
       ...(rule.allowed ? { allowed: { ...(rule.allowed.by ? { by: rule.allowed.by } : {}), until: minutesOf(rule.allowed.until) } } : {}),
     }))
     // Lifted for the rest of today: nothing to tell today.
     .filter((rule) => !rule.allowed || rule.allowed.until < 1440);
+  // A pause's break is told as a block lifted until then: allowed now, blocked again after, after
+  // midnight too (never as the pause ended).
+  if (me.pauseBreak) {
+    const until = minutesOf(me.pauseBreak.until);
+    // Blocked again until the pause's own end, when that is today.
+    const end = me.pauseBreak.pauseUntil ? minutesOf(me.pauseBreak.pauseUntil) : 1440;
+    always.push({
+      label: "Paused",
+      pause: true,
+      allowed: { ...(me.pauseBreak.by ? { by: me.pauseBreak.by } : {}), until },
+      ...(end < 1440 ? { to: end } : me.pauseBreak.pauseUntil ? { ends: end } : {}),
+      ...(me.pauseBreak.pauseUntil ? {} : { open: true as const }),
+    });
+  }
   // A request no one answered is told only while what it asked about still blocks.
   const stillOn = (ask: NonNullable<GroupDay["ask"]>) =>
     ask.state !== "timedOut" ||
@@ -483,6 +519,11 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
     // A yes that ended a pause is told for the rest of the day it was answered on, never after.
     if (ask.about === "pause") {
       const answered = minutesOf(ask.answeredAt ?? ask.at);
+      // A yes for a length that gave a break (or lifted a Thing's Block button rule) is told as that
+      // lift while it lasts, and not at all once its time is over: it never ended the pause. Before
+      // then, with no lift on, the parent ended the pause outright (Unblock), which is told as such.
+      const lifting = me.pauseBreak || me.alwaysOn.some((rule) => rule.button && rule.allowed);
+      if (ask.minutes && !lifting && minutes >= answered + ask.minutes) return undefined;
       return !me.pause && answered >= 0 && answered <= minutes ? dayAsk(ask, minutesOf) : undefined;
     }
     const allowed = me.windows.find((window) => window.ruleId === ask.ruleId && window.allowed)?.allowed;
@@ -504,14 +545,16 @@ function knownAsk(ask: NonNullable<GroupDay["ask"]>): ask is KnownAsk {
 /** FamilyFi's ask as the day tells it; a parent FamilyFi has no name for goes unnamed. */
 function dayAsk(ask: KnownAsk, minutesOf: (iso: string) => Clock): DayAsk {
   const at = minutesOf(ask.at);
-  const minutes = ask.minutes !== undefined ? { minutes: ask.minutes } : {};
-  if (ask.state === "waiting" || ask.state === "timedOut" || ask.state === "ended") return { state: ask.state, at, ...minutes };
+  // `minutes` tells a window's request from a pause's: a pause's length is told apart.
+  const minutes = ask.minutes === undefined ? {} : ask.about === "pause" ? { unblockFor: ask.minutes } : { minutes: ask.minutes };
+  if (ask.state === "waiting") return { state: ask.state, at, ...minutes };
+  if (ask.state === "timedOut" || ask.state === "ended") return { state: ask.state, at, ...(ask.about === "rule" ? minutes : {}) };
   return {
     state: ask.state,
     at,
     answeredAt: ask.answeredAt ? minutesOf(ask.answeredAt) : at,
     ...(ask.by ? { by: ask.by } : {}),
-    ...minutes,
+    ...(ask.about === "rule" ? minutes : {}),
     ...(ask.askAgainAt ? { againAt: minutesOf(ask.askAgainAt) } : {}),
   };
 }
@@ -529,7 +572,25 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   // When every one is lifted, the one whose lift ends first is the one to tell.
   const liftEnd = (candidate: DayWindow) => Math.min(candidate.allowed?.until ?? now, endOf(candidate, now));
   const blockingAlways = subject.always?.find((rule) => !rule.allowed || now >= rule.allowed.until);
-  const liftedAlways = subject.always?.filter((rule) => rule.allowed && now < rule.allowed.until).sort((a, b) => a.allowed!.until - b.allowed!.until)[0];
+  const lifted = subject.always?.filter((rule) => rule.allowed && now < rule.allowed.until).sort((a, b) => a.allowed!.until - b.allowed!.until)[0];
+  // A pause's break is the pause, in the voice's word: "Paused again", "Blocked again".
+  const liftedAlways = lifted?.pause ? { ...lifted, label: voice.pauseWord, source: voice.pauseWord } : lifted;
+  // Another lifted always-on rule, the next to come back after that one: told once it has.
+  const comeBack = subject.always?.filter((rule) => rule !== lifted && rule.allowed && now < rule.allowed.until).sort((a, b) => a.allowed!.until - b.allowed!.until)[0];
+  const comeBackItem = (at: Clock, title: string) =>
+    later({
+      time: clock(at),
+      tone: comeBack!.pause ? "paused" : "window",
+      sign: comeBack!.pause ? "pause" : "window",
+      title,
+      detail: comeBack!.to !== undefined ? `Until ${clock(comeBack!.to)}` : comeBack!.open ? NO_END_TIME : "For the rest of today",
+    });
+  // Only once a break's pause is over is the other rule the one to tell; until then the first lifted rule is.
+  const pauseOver = (at: Clock) => Boolean(liftedAlways?.pause) && againTo !== undefined && againTo <= at;
+  const comeBackBy = (at: Clock) => comeBack !== undefined && pauseOver(at) && comeBack.allowed!.until <= at;
+  const comeBackLabel = () => (comeBack!.pause ? voice.pauseWord : comeBack!.label);
+  // When it blocks again until: the pause's end, else (an always-on rule, or a pause with no end) the rest of today.
+  const againTo = liftedAlways?.to;
   const window =
     blocking.find((candidate) => !(candidate.allowed && now < candidate.allowed.until)) ??
     [...blocking].sort((a, b) => liftEnd(a) - liftEnd(b))[0];
@@ -559,17 +620,29 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   // An always-on internet rule a parent lifted until `back`: from then it blocks for the rest of today.
   const back = liftedAlways?.allowed?.until;
   const alwaysAgain = (at: Clock) =>
-    later({ time: clock(at), tone: "window", sign: "window", title: `${liftedAlways!.label} again`, detail: "For the rest of today" });
+    later({
+      time: clock(at),
+      tone: liftedAlways!.pause ? "paused" : "window",
+      sign: liftedAlways!.pause ? "pause" : "window",
+      title: `${liftedAlways!.label} again`,
+      detail: againTo !== undefined ? `Until ${clock(againTo)}` : liftedAlways!.ends !== undefined ? `Until ${clock(liftedAlways!.ends)}` : liftedAlways!.open ? NO_END_TIME : "For the rest of today",
+    });
+  // A lifted rule blocks again from `at`; a pause's break only until the pause's end, and what comes after is told on.
+  const blocksAgain = (at: Clock): DayItem[] => [alwaysAgain(at), ...(againTo !== undefined ? onwards(againTo) : [])];
+  // Whether the lifted rule has come back by `at` (a break's pause is over again at its end).
+  const backBy = (at: Clock) => back !== undefined && back <= at && (againTo === undefined || at < againTo);
+  const backBefore = (at: Clock) => back !== undefined && at < back && (againTo === undefined || back < againTo);
   // What comes from `start` on: a window on then carries on to its end (and any window overlapping
   // it after that), then nothing blocks until the next window or tomorrow morning.
   const onwards = (start: Clock, again?: DayWindow): DayItem[] => {
     // An always-on internet rule still on (after a pause) blocks from then, whatever the windows.
     if (blockingAlways) return [later({ time: clock(start), tone: "window", sign: "window", title: blockingAlways.label, detail: "For the rest of today" })];
+    if (comeBackBy(start)) return [comeBackItem(start, comeBackLabel())];
     const items: DayItem[] = [];
     let at = start;
     // Past midnight: tomorrow morning is free, unless a lifted always-on rule has come back by then.
     const morning = () =>
-      liftedAlways ? items : [...items, later({ time: clock(at), tone: "on", sign: "morning", title: "Not blocked", detail: "Tomorrow morning" })];
+      (liftedAlways && againTo === undefined) || (comeBack && pauseOver(at)) ? items : [...items, later({ time: clock(at), tone: "on", sign: "morning", title: "Not blocked", detail: "Tomorrow morning" })];
     for (let step = 0; step <= 3 * subject.windows.length; step++) {
       const covering = subject.windows.find((candidate) => inWindow(candidate, at) && !(candidate.allowed && at < candidate.allowed.until));
       if (!covering) {
@@ -612,9 +685,13 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       at = end;
     }
     if (at >= 1440) return morning();
-    if (back !== undefined && back <= at) return [...items, alwaysAgain(at)];
+    if (backBy(at)) return [...items, ...blocksAgain(at)];
+    if (comeBackBy(at)) return [...items, comeBackItem(at, comeBackLabel())];
     const next = nextWindow(at);
-    if (back !== undefined && (!next || back < next.from)) return [...items, notBlocked(at, undefined, clock(back)), alwaysAgain(back)];
+    if (backBefore(at) && (!next || back! < next.from)) return [...items, notBlocked(at, undefined, clock(back!)), ...blocksAgain(back!)];
+    const returns = comeBack?.allowed!.until;
+    if (returns !== undefined && pauseOver(at) && at < returns && returns < 1440 && (!next || returns < next.from))
+      return [...items, notBlocked(at, undefined, clock(returns)), comeBackItem(returns, `${comeBackLabel()} again`)];
     return [...items, notBlocked(at, next), ...(next ? [windowItem(next)] : [])];
   };
   const afterWindow = () => onwards(windowEnd);
@@ -632,9 +709,10 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   // the window is allowed until then, and carries on after if it is still on.
   const lift = window?.allowed && now < window.allowed.until ? window.allowed : undefined;
   // The Now block: askable with no request, else the request's state under it.
-  const withAskFor = (request: DayAsk | undefined, item: DayItem, withLength: boolean): DayItem => {
+  // A pause's ask has a length too, but keeps its own words: "Ask to unblock".
+  const withAskFor = (request: DayAsk | undefined, item: DayItem, withLength: boolean, label = withLength ? ASK_FOR_MORE_TIME : voice.endAsk): DayItem => {
     const ask = request;
-    const askable = { withLength, label: withLength ? ASK_FOR_MORE_TIME : voice.endAsk };
+    const askable = { withLength, label };
     if (!ask) return { ...item, ask: askable };
     // No one answered in time: the child can ask again. Nobody said no, so it is not drawn as one.
     if (ask.state === "timedOut" || ask.state === "ended")
@@ -647,6 +725,9 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
           text:
             withLength && ask.minutes
               ? `You asked for ${lengthText(ask.minutes)} at ${clock(ask.at)}. Waiting for an answer.`
+              : // Unblocked for a time, not more of it: "2 hours".
+                withLength && ask.unblockFor
+                ? `You asked for ${minutesText(ask.unblockFor)} at ${clock(ask.at)}. Waiting for an answer.`
               : voice.endWaiting(clock(ask.at)),
         },
       };
@@ -707,7 +788,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       times: pauseTimes(pause),
     });
     const next = pause.open ? undefined : nextWindow(pause.to);
-    // Only a request to unpause (no length) belongs to a pause; a window's request does not.
+    // Only a request to unpause (no window's length) belongs to a pause; a window's request does not.
     const current = ask?.minutes ? undefined : ask;
     story = current;
     items = [
@@ -721,7 +802,8 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
           title: pause.by ? `${voice.pauseWord} by ${pause.by}` : voice.pauseWord,
           detail: pauseUntil(pause),
         },
-        false,
+        true,
+        voice.endAsk,
       ),
       // A window already on when the pause ends carries on; otherwise nothing blocks until the next.
       // A pause with no end has no later today to tell.
@@ -746,12 +828,29 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     const sooner = resumes && (!upcoming || resumes.from <= upcoming.from) ? resumes : upcoming;
     const then = sooner && sooner.from < back! ? sooner : undefined;
     const until = then ? then.from : back!;
-    bands.push({ kind: "window", from: back!, to: 1440, label, source: "No internet", times: `from ${clock(back!)}` });
+    // A pause's break blocks again only until the pause's own end, then on as any day goes.
+    const to = againTo;
+    const pauseBreak = liftedAlways.pause;
+    // A pause, or a Thing's Block button block, comes back in the paused ink; all internet as a window.
+    const kind = pauseBreak ? "pause" : "window";
+    // Back only after midnight: nothing more of it today.
+    if (back! < 1440) bands.push({ kind, from: back!, to: to ?? 1440, label, source: liftedAlways.source ?? "No internet", times: to === undefined ? `from ${clock(back!)}` : `until ${clock(to)}` });
+    // Another lifted rule told back once the break's pause is over blocks from then too.
+    const otherFrom = comeBack && pauseBreak && to !== undefined ? Math.max(comeBack.allowed!.until, to) : 1440;
+    if (otherFrom < 1440)
+      bands.push({
+        kind: comeBack!.pause ? "pause" : "window",
+        from: otherFrom,
+        to: 1440,
+        label: comeBackLabel(),
+        source: comeBack!.pause ? voice.pauseWord : (comeBack!.source ?? "No internet"),
+        times: `from ${clock(otherFrom)}`,
+      });
     items = [
-      { time: "Now", now: true, tone: "on", sign: "allowed", title: `Allowed until ${clock(until)}`, detail: by ? `${by} said yes` : `${label} is off for now` },
-      ...(then ? onwards(then.from) : [alwaysAgain(back!)]),
+      { time: "Now", now: true, tone: "on", sign: "allowed", title: `Allowed until ${clock(until)}`, detail: by ? `${by} said yes` : pauseBreak ? voice.unpausedByNoOne.replace(/\.$/, "") : `${label} is off for now` },
+      ...(then ? onwards(then.from) : back! < 1440 ? blocksAgain(back!) : []),
     ];
-    day = { kind: "extended", window: { label, from: 0, to: 1440 }, until, end: 1440, ...(by ? { by } : {}), ...(then ? { then } : {}) };
+    day = { kind: "extended", window: { label, from: 0, to: 1440 }, until, end: 1440, ...(by ? { by } : {}), ...(then ? { then } : {}), ...(pauseBreak ? { pause: true as const } : {}) };
   } else if (window && ((ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil) || lift)) {
     const asked = ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil ? { ...ask, minutes: ask.minutes } : undefined;
     const allowedTo = asked ? allowedUntil! : Math.min(lift!.until, windowEnd);
@@ -921,8 +1020,14 @@ export function topAnswer({ day, voice }: DayStory): TopAnswer {
         sign: "allowed",
         tone: "on",
         title: `Allowed until ${clock(day.until)}`,
-        sentence: `${extendedSentence(day)}${
-          day.then ? ` ${day.then.label} starts at ${clock(day.until)}.` : day.until < day.end ? ` ${day.window.label} starts again at ${clock(day.until)}.` : ""
+        sentence: `${extendedSentence(day, voice)}${
+          day.then
+            ? ` ${day.then.label} starts at ${clock(day.until)}.`
+            : day.pause
+              ? ` ${voice.pauseWord} again at ${clock(day.until)}.`
+              : day.until < day.end
+                ? ` ${day.window.label} starts again at ${clock(day.until)}.`
+                : ""
         }`,
       };
     case "always":
@@ -938,8 +1043,8 @@ export function topAnswer({ day, voice }: DayStory): TopAnswer {
 }
 
 /** "Dad said yes to 30 more minutes.", "Dad said yes.", or with no name "Bedtime is off for now." */
-function extendedSentence(day: Extract<Day, { kind: "extended" }>): string {
-  if (!day.by) return `${day.window.label} is off for now.`;
+function extendedSentence(day: Extract<Day, { kind: "extended" }>, voice: DayVoice): string {
+  if (!day.by) return day.pause ? voice.unpausedByNoOne : `${day.window.label} is off for now.`;
   return day.minutes ? `${day.by} said yes to ${lengthText(day.minutes)}.` : `${day.by} said yes.`;
 }
 

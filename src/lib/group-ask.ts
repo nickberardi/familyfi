@@ -19,11 +19,14 @@ import type { Group, GroupAsk } from "./types";
  * What a choice on the answer sheet does: `asked` gives what the child asked for; `for` and `until`
  * lift the rule for another time (resolved at the tap, so a sheet left open never sends an end
  * already passed); `decline` is Not now. `unblock` is the group card's own Unblock button
- * (`groupHeaderActions`), run as if the parent tapped it (`answerAsk`).
+ * (`groupHeaderActions`), run as if the parent tapped it (`answerAsk`); `unblockFor` is that
+ * button's answer for the length the child asked: a break in a pause that alone blocks, or the
+ * button's sheet answered with that length.
  */
 export type AskSheetRequest =
   | { kind: "asked" }
   | { kind: "unblock"; run: GroupRun; ruleId?: string; name?: string }
+  | { kind: "unblockFor"; run: "pauseRule" | "unblock" | "unblockNow"; ruleId?: string; name?: string; minutes: number }
   | { kind: "for"; minutes: number } | { kind: "until"; until: string } | { kind: "decline" };
 
 export type AskSheetOption = { label: string; note: string; request: AskSheetRequest };
@@ -47,9 +50,12 @@ function ruleOf<R extends Pick<Rule, "id">>(ask: GroupAsk, rules: R[]): R | unde
  * its name, or "it" on its own card): "to unblock TV".
  */
 function askedFor(ask: GroupAsk, rules: Pick<Rule, "id" | "name">[], thing?: string): string {
-  if (ask.about === "pause") return thing ? `to unblock ${thing}` : "to be unpaused";
-  const name = ruleOf(ask, rules)?.name;
   const length = ask.minutes ? minutesText(ask.minutes) : null;
+  if (ask.about === "pause") {
+    const what = thing ? `to unblock ${thing}` : "to be unpaused";
+    return length ? `${what} for ${length}` : what;
+  }
+  const name = ruleOf(ask, rules)?.name;
   // Time off the rule's block, never "of" it, as the alert says.
   if (length && name) return `for ${length} off ${name}`;
   if (name) return `for time off ${name}`;
@@ -114,10 +120,25 @@ export function askSheetOptions(
     const { action } = groupHeaderActions(group, rules, timezone, now);
     if (action.label !== "Unblock") return [];
     const request: AskSheetRequest = { kind: "unblock", run: action.run, ...(action.ruleId ? { ruleId: action.ruleId, name: action.name ?? "" } : {}) };
-    if (action.run === "unblockNow") return [{ label: "Unblock", note: "ends the block now", request }];
+    if (action.run === "unblockNow") {
+      const endsNow: AskSheetOption = { label: "Unblock", note: "ends the block now", request };
+      if (!ask.minutes) return [endsNow];
+      // A yes for the child's length gives the block a break, and it blocks again after, until its own end.
+      const back = new Date(now.getTime() + ask.minutes * 60_000);
+      const end = group.suspension.until ? Date.parse(group.suspension.until) : null;
+      if (end !== null && back.getTime() >= end) return [endsNow];
+      const asked: AskSheetRequest = { kind: "unblockFor", run: "unblockNow", minutes: ask.minutes };
+      return [{ label: `Allow ${minutesText(ask.minutes)}`, note: `blocks again at ${formatClock(back, timezone)}`, request: asked }, endsNow];
+    }
     const what = action.run === "pauseRule" ? (action.name ?? "") : listNames(rulesToUnblock(group, rules, timezone, now).map((rule) => rule.name));
     const lifts = group.suspension.active ? `ends the block and lifts ${what}` : `lifts ${what}`;
-    return [{ label: "Unblock", note: `${lifts}, for as long as you choose`, request }];
+    const choose: AskSheetOption = { label: "Unblock", note: `${lifts}, for as long as you choose`, request };
+    // What the child asked for first: the card's own sheet answered with their length.
+    if (!ask.minutes || (action.run !== "pauseRule" && action.run !== "unblock")) return [choose];
+    const until = formatClock(new Date(now.getTime() + ask.minutes * 60_000), timezone);
+    const rule = action.ruleId ? { ruleId: action.ruleId, name: action.name ?? "" } : {};
+    const asked: AskSheetRequest = { kind: "unblockFor", run: action.run, ...rule, minutes: ask.minutes };
+    return [{ label: `Allow ${minutesText(ask.minutes)}`, note: `${lifts} until ${until}`, request: asked }, choose];
   }
   const rule = ruleOf(ask, rules);
   // The window on now, or the one starting within five minutes, whose time counts from its start.

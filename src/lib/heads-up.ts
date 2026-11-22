@@ -79,6 +79,8 @@ export function headsUpBlocks(day: GroupDay, now: Date, days: number = HEADS_UP_
   };
 
   if (day.pause) add(PAUSE_NAME, true, start, day.pause.until ? new Date(day.pause.until).getTime() : Infinity);
+  // A pause's break (a yes to an ask for a length): the pause blocks again when the extra time runs out.
+  if (day.pauseBreak) add(PAUSE_NAME, true, start, day.pauseBreak.pauseUntil ? new Date(day.pauseBreak.pauseUntil).getTime() : Infinity, day.pauseBreak.until);
   for (const rule of day.alwaysOn) if (rule.kind === "internet") add(rule.name, false, start, Infinity, rule.allowed?.until);
   for (const window of day.windows) {
     const name = window.name || window.ruleName;
@@ -169,7 +171,11 @@ function startWords(block: HeadsUpBlock, timeZone: string, voice: HeadsUpVoice, 
   const lead = minutesText(minutes);
   const at = timeAt(block.from, timeZone);
   const stops = voice === "apps" ? `Your apps pause at ${at}.` : `Your internet pauses at ${at}.`;
-  if (block.afterExtraTime) return { title: `Your extra time ends in ${lead}`, lateTitle: `Your extra time ends at ${at}`, body: `${block.name} is back on. ${stops}` };
+  if (block.afterExtraTime) {
+    // A pause's break ends as the pause: "Your pause is back on."
+    const back = block.pause ? "Your pause" : block.name;
+    return { title: `Your extra time ends in ${lead}`, lateTitle: `Your extra time ends at ${at}`, body: `${back} is back on. ${stops}` };
+  }
   return { title: `${block.name} starts in ${lead}`, lateTitle: `${block.name} starts at ${at}`, body: `Save your game and finish your messages. ${stops}` };
 }
 

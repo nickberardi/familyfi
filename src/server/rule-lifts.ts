@@ -41,7 +41,8 @@ export type LiftAction = "pause" | "resume" | "extend" | "allow" | "disallow";
 export type LiftBody = { until?: string | null; minutes?: number; askId?: string };
 
 const UntilBody = z.object({ until: z.string().datetime().nullable().optional(), askId: z.string().min(1).optional() });
-const ResumeBody = z.object({ askId: z.string().min(1).optional() });
+// `until` gives a group's pause a break, answering a child's ask (`liftGroupInternet`).
+const ResumeBody = z.object({ askId: z.string().min(1).optional(), until: z.string().datetime().optional() });
 const ExtendBody = z.object({ minutes: z.number().int().positive() });
 
 export const CLEARED = { pauseActive: false, pauseUntil: null, pauseKind: RuleLiftKind.pause, pausedByAccountId: null, pausedByName: null };
@@ -60,6 +61,8 @@ export async function liftRule(
 ) {
   // An ask is answered on its group's own verbs (liftGroupRule), which take askId off first.
   if (body.askId) throw new ApiError(400, "invalid_request", "askId answers an ask on its group's resume or allow.");
+  // A time on resume is a pause's break, given only to a group's own pause (liftGroupInternet).
+  if (action === "resume" && body.until !== undefined) throw new ApiError(400, "invalid_request", "Resume takes a time only on a group's internet, answering a child's ask.");
   const rule = await prisma().rule.findUnique({ where: { id: target.ruleId }, include: ruleInclude });
   if (!rule || rule.systemGroupId) throw new ApiError(404, "not_found", "Rule not found.");
   const quarantine = isQuarantineRule(rule);
@@ -184,7 +187,7 @@ export async function readLiftBody(
     return { ok: true, body: parsed.data };
   }
   if (action === "resume") {
-    // No body, or an askId when a group's resume answers a child's ask.
+    // No body, or an askId (and the break's `until`) when a group's resume answers a child's ask.
     let value: unknown = {};
     try {
       value = await request.json();

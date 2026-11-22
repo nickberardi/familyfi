@@ -29,6 +29,23 @@ export function blockRuleOf(group: Pick<GroupWithRules, "rules">) {
   return group.rules.map((link) => link.rule).find((rule) => rule.systemGroupId !== null);
 }
 
+type BlockRule = NonNullable<ReturnType<typeof blockRuleOf>>;
+
+/**
+ * The group's pause now: `set` while its block rule is on and not past its end; `onBreak` while a
+ * parent's timed yes to a child's ask lifts it (the block rule paused until `pauseUntil`, which the
+ * gateway sees as its policy disabled), after which it blocks again until its own end; `blocking`
+ * when set and not on a break.
+ */
+export function pauseOf(block: BlockRule | undefined, now: Date) {
+  const set = Boolean(block?.enabled && (block.expiresAt === null || now < block.expiresAt));
+  const onBreak = set && lifted(block!, now);
+  return { set, onBreak, blocking: set && !onBreak };
+}
+
+/** What ends a pause's break, with the pause or to put the pause back at once. */
+export const BREAK_CLEARED = { pauseActive: false, pauseUntil: null, pausedByAccountId: null, pausedByName: null };
+
 /**
  * The windows of the group's enabled internet rules, in rule then window order, leaving out
  * a rule that is paused or allowed, for everyone or for this group alone.
@@ -77,18 +94,34 @@ export function groupAccess(group: GroupWithRules, now: Date, timezone: string):
  */
 function internetGroup(group: GroupWithRules, now: Date, timezone: string) {
   const block = blockRuleOf(group);
-  const blocking = Boolean(block?.enabled && (block.expiresAt === null || now < block.expiresAt));
+  const { blocking, onBreak } = pauseOf(block, now);
   const links = internetLinks(group).filter(({ rule }) => rule.enabled);
   const allows = links.filter(({ link }) => link.pauseKind === "allow" && lifted(link, now));
   const stillBlocked = internetWindows(group, now).some((window) => isWindowActive(window, now, timezone));
   const allowed = allows.length > 0 && !stillBlocked;
   const ends = allows.map(({ link }) => link.pauseUntil).filter((end): end is Date => end !== null);
   const first = allows[0]?.link;
+  // A pause on a break reads as not paused, with when it blocks again, and, while no internet window
+  // blocks the group either, as allowed until then: a client that does not know the break still
+  // tells the time open truly. A window on during the break still blocks, and is told as it is.
+  if (onBreak && !stillBlocked) {
+    return {
+      suspension: {
+        active: false,
+        until: block!.expiresAt?.toISOString() ?? null,
+        by: actor(block!.blockedByAccountId, block!.blockedByName),
+        resumesAt: block!.pauseUntil!.toISOString(),
+      },
+      allowance: { active: true, until: block!.pauseUntil!.toISOString(), by: actor(block!.pausedByAccountId, block!.pausedByName) },
+    };
+  }
+  const resumes = onBreak ? { resumesAt: block!.pauseUntil!.toISOString() } : {};
   return {
     suspension: {
       active: blocking,
-      until: blocking ? (block!.expiresAt?.toISOString() ?? null) : null,
-      by: blocking ? actor(block!.blockedByAccountId, block!.blockedByName) : null,
+      until: blocking || onBreak ? (block!.expiresAt?.toISOString() ?? null) : null,
+      by: blocking || onBreak ? actor(block!.blockedByAccountId, block!.blockedByName) : null,
+      ...resumes,
     },
     allowance: {
       active: allowed,

@@ -63,13 +63,13 @@ describe("a child's day", () => {
     expect(waiting.items[0]!.status?.text).toBe("You asked for 30 more minutes at 8:56 PM. Waiting for an answer.");
   });
 
-  it("asks to unpause during a pause, with no length", () => {
+  it("asks to unpause during a pause, for a length", () => {
     const story = tellDay(paused, NOW, PHONE_VOICE);
     expect(story.day.kind).toBe("paused");
     expect(story.items[0]).toMatchObject({
       now: true,
       title: "Paused by Dad",
-      ask: { withLength: false, label: "Ask to unpause" },
+      ask: { withLength: true, label: "Ask to unpause" },
     });
     expect(topAnswer(story)).toMatchObject({
       title: "Paused until 5 PM",
@@ -77,7 +77,8 @@ describe("a child's day", () => {
     });
   });
 
-  // familyfi's unblock ends a pause (docs/group-states.md): a yes is never "30 minutes, then paused again".
+  // familyfi's unblock ends a pause (docs/group-states.md): a yes to an ask with no length is never
+  // "30 minutes, then paused again"; a yes for a length gives a break (below).
   it("ends the pause on a yes", () => {
     const story = tellDay(
       {
@@ -217,7 +218,7 @@ describe("a child's day", () => {
     expect(declined.items[0]?.ask).toBeUndefined();
     const lapsed = tellDay({ ...paused, ask: { state: "timedOut", at: NOW - 60 } }, NOW, PHONE_VOICE);
     expect(lapsed.items[0]?.status?.text).toBe("No one answered in time. You can ask again.");
-    expect(lapsed.items[0]?.ask).toMatchObject({ withLength: false, label: "Ask to unpause" });
+    expect(lapsed.items[0]?.ask).toMatchObject({ withLength: true, label: "Ask to unpause" });
     const ended = tellDay({ ...paused, ask: { state: "ended", at: NOW - 60 } }, NOW, PHONE_VOICE);
     expect(ended.ask).toBeUndefined();
     expect(ended.items[0]?.status).toBeUndefined();
@@ -291,7 +292,7 @@ describe("a child's day", () => {
     const later = tellDay(subject, NOW + 30, PHONE_VOICE);
     expect(later.ask).toBeUndefined();
     expect(later.items[0]).toMatchObject({
-      ask: { withLength: false, label: "Ask to unpause" },
+      ask: { withLength: true, label: "Ask to unpause" },
     });
   });
 
@@ -358,7 +359,7 @@ describe("a child's day", () => {
     };
     const paused = tellDay(pauseInWindow, 21 * 60 + 30, PHONE_VOICE);
     expect(paused.day.kind).toBe("paused");
-    expect(paused.items[0]?.ask).toMatchObject({ withLength: false });
+    expect(paused.items[0]?.ask).toMatchObject({ withLength: true, label: "Ask to unpause" });
 
     const waitingToUnpause = tellDay(
       {
@@ -728,6 +729,148 @@ describe("a child's day on the household's clock", () => {
     expect(groupDayOf({ ...tv, kind: "family" as const }, [video], ZONE, MONDAY_NIGHT).pause).toBeNull();
   });
 
+  it("asks to unblock a Thing for a length, and tells a yes for it until it ends", () => {
+    const video = {
+      id: "r3",
+      name: "Video",
+      kind: "category",
+      scope: "group",
+      groupIds: ["t1"],
+      enabled: true,
+      builtIn: null,
+      mode: "always",
+      windows: [],
+      targetIds: [],
+      pause: { active: false, until: null, kind: "pause", by: null },
+      groupPauses: [],
+    } as unknown as Rule;
+    const tv = { id: "t1", name: "TV", kind: "things" as const, blockButtonRuleId: "r3", suspension: { active: false, until: null, by: null }, allowance: { active: false, until: null, by: null } };
+    // Asked for 2 hours at 10:25 PM: the ask shows its length while it waits.
+    const asked = { ...tv, ask: { id: "a1", about: "pause" as const, minutes: 120, state: "waiting" as const, at: "2026-11-17T03:25:00Z", expiresAt: "2026-11-17T04:25:00Z" } };
+    const waiting = meDaySubject(groupDayOf(asked, [video], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
+    const told = tellDay(waiting.subject, waiting.now, THING_VOICE, waiting.clock);
+    expect(told.items[0]?.status?.text).toBe("You asked for 2 hours at 10:25 PM. Waiting for an answer.");
+    // A yes: Video paused for TV until 11:30 PM. Allowed until then, then blocked again, as the Thing says it.
+    const yes = { ...asked.ask, state: "yes" as const, answeredAt: "2026-11-17T03:30:00Z", by: { name: "Nick" } };
+    const lifted = { ...video, groupPauses: [{ groupId: "t1", pause: { active: true, until: "2026-11-17T04:30:00Z", kind: "pause", by: { name: "Nick" } } }] } as unknown as Rule;
+    const day = meDaySubject(groupDayOf({ ...tv, ask: yes } as never, [lifted], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
+    const story = tellDay(day.subject, day.now, THING_VOICE, day.clock);
+    expect(story.items[0]).toMatchObject({ title: "Allowed until 11:30 PM", detail: "Nick said yes" });
+    expect(story.items[1]).toMatchObject({ time: "11:30 PM", title: "Blocked again", detail: "For the rest of today" });
+    expect(topAnswer(story).sentence).toBe("Nick said yes. Blocked again at 11:30 PM.");
+    expect(thingTile(story)).toEqual({ word: "Allowed", line: "Until 11:30 PM", tone: "on" });
+  });
+
+  it("tells a break in a pause ending today around the windows of the day, in the voice's words", () => {
+    const tell = (subject: unknown, voice = PHONE_VOICE) => tellDay(subject as never, 19 * 60, voice).items.map((item) => [item.time, item.title, item.detail]);
+    // A break until 9 PM in a pause until 10 PM, on a family member's phone.
+    const pauseBreak = { label: "Paused", pause: true, allowed: { by: "Nick", until: 21 * 60 }, to: 22 * 60 };
+    // A window during the break: told, then the break's rest, then the pause again until its end.
+    expect(tell({ windows: [{ label: "Homework", from: 20 * 60, to: 20 * 60 + 30 }], always: [pauseBreak] })).toEqual([
+      ["Now", "Allowed until 8 PM", "Nick said yes"],
+      ["8 PM", "Homework", "Until 8:30 PM"],
+      ["8:30 PM", "Not blocked", "Until 9 PM"],
+      ["9 PM", "Paused again", "Until 10 PM"],
+      ["10 PM", "Not blocked", "For the rest of today"],
+    ]);
+    // A window already on when the pause ends carries on.
+    expect(tell({ windows: [{ label: "Bedtime", from: 21 * 60 + 30, to: 23 * 60 }], always: [pauseBreak] })).toEqual([
+      ["Now", "Allowed until 9 PM", "Nick said yes"],
+      ["9 PM", "Paused again", "Until 10 PM"],
+      ["10 PM", "Bedtime", "Until 11 PM"],
+      ["11 PM", "Not blocked", "For the rest of today"],
+    ]);
+    // Another always-on rule a parent lifted until after the break comes back too, and is told: blocked from then on.
+    const video = { label: "Video", allowed: { by: "Nick", until: 21 * 60 + 30 } };
+    expect(tell({ windows: [], always: [pauseBreak, video] })).toEqual([
+      ["Now", "Allowed until 9 PM", "Nick said yes"],
+      ["9 PM", "Paused again", "Until 10 PM"],
+      ["10 PM", "Video", "For the rest of today"],
+    ]);
+    // One that comes back after the pause has ended: not blocked until then.
+    const later = { ...video, allowed: { by: "Nick", until: 22 * 60 + 30 } };
+    expect(tell({ windows: [], always: [pauseBreak, later] })).toEqual([
+      ["Now", "Allowed until 9 PM", "Nick said yes"],
+      ["9 PM", "Paused again", "Until 10 PM"],
+      ["10 PM", "Not blocked", "Until 10:30 PM"],
+      ["10:30 PM", "Video again", "For the rest of today"],
+    ]);
+    // One that comes back during a window on after the pause, or past midnight, blocks from that window's end; no free morning.
+    const quarter = { ...video, allowed: { by: "Nick", until: 22 * 60 + 15 } };
+    expect(tell({ windows: [{ label: "Reading", from: 22 * 60, to: 22 * 60 + 30 }], always: [pauseBreak, quarter] }).at(-1)).toEqual(["10:30 PM", "Video", "For the rest of today"]);
+    const eleven = { ...video, allowed: { by: "Nick", until: 23 * 60 } };
+    expect(tell({ windows: [{ label: "Bedtime", from: 22 * 60, to: 60 }], always: [pauseBreak, eleven] }).at(-1)).toEqual(["10 PM", "Bedtime", "Until 1 AM"]);
+    // Past midnight, one still lifted then leaves no free morning either.
+    const late = { ...video, allowed: { by: "Nick", until: 24 * 60 + 90 } };
+    expect(tell({ windows: [{ label: "Bedtime", from: 22 * 60, to: 60 }], always: [pauseBreak, late] }).at(-1)).toEqual(["10 PM", "Bedtime", "Until 1 AM"]);
+    // The timeline shows it as the list tells it.
+    expect(tellDay({ windows: [], always: [pauseBreak, video] } as never, 19 * 60, PHONE_VOICE).bands).toContainEqual(expect.objectContaining({ kind: "window", from: 22 * 60, to: 1440, label: "Video" }));
+    // A Thing's lifted Block button rule comes back in the paused ink, in the list and on the timeline alike.
+    const games = { label: "Games block", source: "Blocked", pause: true, allowed: { by: "Nick", until: 21 * 60 + 30 } };
+    const thing = tellDay({ windows: [], always: [pauseBreak, games] } as never, 19 * 60, THING_VOICE);
+    expect(thing.items.at(-1)).toMatchObject({ time: "10 PM", title: "Blocked", tone: "paused" });
+    expect(thing.bands).toContainEqual(expect.objectContaining({ kind: "pause", from: 22 * 60, to: 1440, label: "Blocked" }));
+    // The rule whose lift ends first is the one told back, whichever comes back after it.
+    const homework = { label: "Homework", from: 18 * 60, to: 21 * 60 + 30 };
+    const videoFirst = { label: "Video", allowed: { by: "Nick", until: 20 * 60 } };
+    expect(tell({ windows: [homework], always: [videoFirst, pauseBreak] }).at(-1)).toEqual(["9:30 PM", "Video again", "For the rest of today"]);
+    expect(tell({ windows: [homework], always: [videoFirst, { label: "Games", allowed: { by: "Nick", until: 20 * 60 + 30 } }] }).at(-1)).toEqual(["9:30 PM", "Video again", "For the rest of today"]);
+    // The pause comes back in the paused ink on the timeline, as the list's row does.
+    expect(tellDay({ windows: [], always: [pauseBreak] } as never, 19 * 60, PHONE_VOICE).bands).toContainEqual(expect.objectContaining({ kind: "pause", from: 21 * 60, to: 22 * 60 }));
+    // A Thing's pause with no end, answered by no one named.
+    const story = tellDay({ windows: [], always: [{ label: "Paused", pause: true, open: true, allowed: { until: 21 * 60 } }] } as never, 19 * 60, THING_VOICE);
+    expect(story.items.map((item) => [item.time, item.title, item.detail])).toEqual([
+      ["Now", "Allowed until 9 PM", "It is unblocked"],
+      ["9 PM", "Blocked again", "No end time"],
+    ]);
+  });
+
+  it("tells a pause's break as allowed until it ends, then blocked again", () => {
+    const computers = {
+      id: "t2",
+      name: "Computers",
+      kind: "things" as const,
+      // Blocked until 12:39 AM, with a break until 11 PM from a yes to a 30 minute ask.
+      suspension: { active: false, until: "2026-11-17T05:39:00Z", by: { name: "Nick" }, resumesAt: "2026-11-17T04:00:00Z" },
+      allowance: { active: true, until: "2026-11-17T04:00:00Z", by: { name: "Nick" } },
+    };
+    const day = groupDayOf(computers as never, [], ZONE, MONDAY_NIGHT);
+    expect(day.pause).toBeNull();
+    expect(day.pauseBreak).toEqual({ by: "Nick", until: "2026-11-17T04:00:00Z", pauseUntil: "2026-11-17T05:39:00Z" });
+    const { subject, now, clock: on } = meDaySubject(day, MONDAY_NIGHT);
+    const story = tellDay(subject, now, THING_VOICE, on);
+    expect(story.items[0]).toMatchObject({ title: "Allowed until 11 PM", detail: "Nick said yes" });
+    // The pause ends after midnight: blocked again until then, told by its time.
+    expect(story.items[1]).toMatchObject({ time: "11 PM", title: "Blocked again", detail: "Until 12:39 AM" });
+    // A pause ending today: blocked again until its end, then not blocked.
+    const ending = { ...computers, suspension: { ...computers.suspension, until: "2026-11-17T04:30:00Z" } };
+    const short = meDaySubject(groupDayOf(ending as never, [], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
+    const told = tellDay(short.subject, short.now, THING_VOICE, short.clock);
+    expect(told.items[1]).toMatchObject({ time: "11 PM", title: "Blocked again", detail: "Until 11:30 PM" });
+    expect(told.items[2]).toMatchObject({ time: "11:30 PM" });
+    expect(told.items[2]?.title).not.toContain("again");
+    // A break past midnight is still a break, never the pause ended: allowed until then, nothing more today.
+    const late = { ...computers, ask: { id: "a1", about: "pause" as const, minutes: 120, state: "yes" as const, at: "2026-11-17T03:25:00Z", answeredAt: "2026-11-17T03:30:00Z", expiresAt: "2026-11-17T04:25:00Z", by: { name: "Nick" } }, suspension: { ...computers.suspension, until: "2026-11-17T12:00:00Z", resumesAt: "2026-11-17T06:00:00Z" }, allowance: { ...computers.allowance, until: "2026-11-17T06:00:00Z" } };
+    for (const voice of [PHONE_VOICE, THING_VOICE]) {
+      const night = meDaySubject(groupDayOf(late as never, [], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
+      const after = tellDay(night.subject, night.now, voice, night.clock);
+      expect(after.items).toEqual([expect.objectContaining({ title: "Allowed until 1 AM", detail: "Nick said yes" })]);
+      expect(topAnswer(after).sentence).toBe(`Nick said yes. ${voice.pauseWord} again at 1 AM.`);
+    }
+    // A yes for 2 hours with no pause left and no break: the parent ended the pause outright, and the day says so.
+    const ended = { ...late, suspension: { active: false, until: null, by: null }, allowance: { active: false, until: null, by: null } };
+    const outright = meDaySubject(groupDayOf(ended as never, [], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
+    expect(tellDay(outright.subject, outright.now, PHONE_VOICE, outright.clock).items[0]?.status?.text).toBe("Nick unpaused your apps at 10:30 PM.");
+    // Once a break's time is over and the pause has ended too, the yes is not told as the pause ended.
+    const over = { ...ended, ask: { ...ended.ask, minutes: 60, at: "2026-11-17T00:55:00Z", answeredAt: "2026-11-17T01:00:00Z" } };
+    const done = meDaySubject(groupDayOf(over as never, [], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
+    const afterAll = tellDay(done.subject, done.now, PHONE_VOICE, done.clock);
+    expect(afterAll.day.kind).not.toBe("unpaused");
+    expect(afterAll.items[0]?.status).toBeUndefined();
+    // Once the break is over, the pause is told again (FamilyFi reports it active).
+    expect(groupDayOf({ ...computers, suspension: { ...computers.suspension, resumesAt: "2026-11-17T03:00:00Z" } } as never, [], ZONE, MONDAY_NIGHT).pauseBreak).toBeUndefined();
+  });
+
   it("tells a yes as the group's pause and lifts stand now, not as it was asked", () => {
     const at = "2026-11-17T03:00:00Z"; // 10 PM
     const answeredAt = "2026-11-17T03:05:00Z";
@@ -832,7 +975,9 @@ describe("a length of the child's own", () => {
     type Spec = { paths: Record<string, { post: { requestBody: { content: { "application/json": { schema: { oneOf: { properties: { minutes?: { minimum: number; maximum: number } } }[] } } } } } }> };
     const spec = YAML.parse(readFileSync(path.resolve(__dirname, "../../openapi/familyfi.v1.yaml"), "utf8")) as Spec;
     const bodies = spec.paths["/api/v1/groups/{id}/asks"].post.requestBody.content["application/json"].schema.oneOf;
-    const minutes = bodies.map((body) => body.properties.minutes).find(Boolean);
-    expect(minutes).toEqual({ type: "integer", minimum: ASK_MINUTES.min, maximum: ASK_MINUTES.max });
+    // Both asks take a length: a window's always, an ask to unblock when the child chose one.
+    const minutes = bodies.map((body) => body.properties.minutes);
+    expect(minutes).toHaveLength(2);
+    for (const length of minutes) expect(length).toMatchObject({ type: "integer", minimum: ASK_MINUTES.min, maximum: ASK_MINUTES.max });
   });
 });

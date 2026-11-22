@@ -27,7 +27,8 @@ export const ASKS_PER_HOUR = 6;
 const HOUR_MS = 60 * 60_000;
 
 export const AskBody = z.discriminatedUnion("about", [
-  z.object({ about: z.literal("pause") }).strict(),
+  // How long the child asks to be unblocked for, optional: a parent's yes may still end the block outright.
+  z.object({ about: z.literal("pause"), minutes: z.number().int().min(ASK_MINUTES.min).max(ASK_MINUTES.max).optional() }).strict(),
   z
     .object({ about: z.literal("rule"), ruleId: z.string().min(1), minutes: z.number().int().min(ASK_MINUTES.min).max(ASK_MINUTES.max) })
     .strict(),
@@ -133,7 +134,7 @@ export async function fileAsk(session: SignedInSession, groupId: string, input: 
         deviceId: session.deviceId,
         about: input.about,
         ruleId: input.about === "rule" ? input.ruleId : null,
-        minutes: input.about === "rule" ? input.minutes : null,
+        minutes: input.minutes ?? null,
         createdAt: now,
         expiresAt: endsWithBlock ? blockEnd! : timeout,
         endsWithBlock,

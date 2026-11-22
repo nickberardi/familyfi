@@ -233,7 +233,7 @@ async function tick(owner: string): Promise<boolean> {
   // A group's own pause ends: its built-in block rule is switched off, and its policies go.
   await prisma().rule.updateMany({
     where: { systemGroupId: { not: null }, enabled: true, expiresAt: { not: null, lte: now } },
-    data: { enabled: false, expiresAt: null, blockedByAccountId: null, blockedByName: null },
+    data: { enabled: false, expiresAt: null, blockedByAccountId: null, blockedByName: null, pauseActive: false, pauseUntil: null, pausedByAccountId: null, pausedByName: null },
   });
   await prisma().rule.updateMany({
     where: { pauseActive: true, pauseUntil: { not: null, lte: now } },
