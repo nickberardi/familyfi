@@ -79,6 +79,8 @@ export function headsUpBlocks(day: GroupDay, now: Date, days: number = HEADS_UP_
   };
 
   if (day.pause) add(PAUSE_NAME, true, start, day.pause.until ? new Date(day.pause.until).getTime() : Infinity);
+  // A pause's break (a yes to an ask for a length): the pause blocks again when the extra time runs out.
+  if (day.pauseBreak) add(PAUSE_NAME, true, start, day.pauseBreak.pauseUntil ? new Date(day.pauseBreak.pauseUntil).getTime() : Infinity, day.pauseBreak.until);
   for (const rule of day.alwaysOn) if (rule.kind === "internet") add(rule.name, false, start, Infinity, rule.allowed?.until);
   for (const window of day.windows) {
     const name = window.name || window.ruleName;

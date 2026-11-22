@@ -89,7 +89,8 @@ export type DaySubject = {
   ask?: DayAsk;
   /** Rules that block all internet all the time (an always-on internet rule); `allowed` while a parent lifted one until a time. */
   /** `to`: when it stops blocking again today, for a pause's break; absent: the rest of today. */
-  always?: { label: string; allowed?: { by?: string; until: Clock }; source?: string; to?: Clock }[];
+  /** `pause` marks a pause's break, `open` when that pause has no end (a yes to the child's ask for a length): told in the voice's own words, blocked again until `to`. */
+  always?: { label: string; allowed?: { by?: string; until: Clock }; source?: string; to?: Clock; pause?: true; open?: true }[];
   /** How many minutes before a window starts the child can ask (the household's `askAheadMinutes`); 0 is never. */
   askAhead?: number;
 };
@@ -145,6 +146,8 @@ export type Day =
       by?: string;
       /** Another window that starts at `until`, cutting the allowed time short. */
       then?: DayWindow;
+      /** A pause's break: the pause blocks again at `until`. */
+      pause?: true;
     }
   | { kind: "open"; next?: DayWindow }
   /** A rule blocks all internet all the time: `label` is its name. */
@@ -464,7 +467,7 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
     : undefined;
   // A Thing's Block button rule lifted until a time is told as an always-on rule is: allowed until
   // then, and blocked again after. While it blocks, it is the Thing's block (`pause`).
-  const always = me.alwaysOn
+  const always: NonNullable<DaySubject["always"]> = me.alwaysOn
     .filter((rule) => rule.kind === "internet" || (rule.button && rule.allowed))
     .map((rule) => ({
       label: rule.name,
@@ -479,7 +482,13 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
     // Blocked again until the pause's own end, when that is today.
     const end = me.pauseBreak.pauseUntil ? minutesOf(me.pauseBreak.pauseUntil) : 1440;
     if (until < 1440)
-      always.push({ label: "Blocked", source: "Blocked", allowed: { ...(me.pauseBreak.by ? { by: me.pauseBreak.by } : {}), until }, ...(end < 1440 ? { to: end } : {}) });
+      always.push({
+        label: "Paused",
+        pause: true,
+        allowed: { ...(me.pauseBreak.by ? { by: me.pauseBreak.by } : {}), until },
+        ...(end < 1440 ? { to: end } : {}),
+        ...(me.pauseBreak.pauseUntil ? {} : { open: true as const }),
+      });
   }
   // A request no one answered is told only while what it asked about still blocks.
   const stillOn = (ask: NonNullable<GroupDay["ask"]>) =>
@@ -558,7 +567,11 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
   // When every one is lifted, the one whose lift ends first is the one to tell.
   const liftEnd = (candidate: DayWindow) => Math.min(candidate.allowed?.until ?? now, endOf(candidate, now));
   const blockingAlways = subject.always?.find((rule) => !rule.allowed || now >= rule.allowed.until);
-  const liftedAlways = subject.always?.filter((rule) => rule.allowed && now < rule.allowed.until).sort((a, b) => a.allowed!.until - b.allowed!.until)[0];
+  const lifted = subject.always?.filter((rule) => rule.allowed && now < rule.allowed.until).sort((a, b) => a.allowed!.until - b.allowed!.until)[0];
+  // A pause's break is the pause, in the voice's word: "Paused again", "Blocked again".
+  const liftedAlways = lifted?.pause ? { ...lifted, label: voice.pauseWord, source: voice.pauseWord } : lifted;
+  // When it blocks again until: the pause's end, else (an always-on rule, or a pause with no end) the rest of today.
+  const againTo = liftedAlways?.to;
   const window =
     blocking.find((candidate) => !(candidate.allowed && now < candidate.allowed.until)) ??
     [...blocking].sort((a, b) => liftEnd(a) - liftEnd(b))[0];
@@ -587,8 +600,19 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     });
   // An always-on internet rule a parent lifted until `back`: from then it blocks for the rest of today.
   const back = liftedAlways?.allowed?.until;
-  const alwaysAgain = (at: Clock, to?: Clock) =>
-    later({ time: clock(at), tone: "window", sign: "window", title: `${liftedAlways!.label} again`, detail: to === undefined ? "For the rest of today" : `Until ${clock(to)}` });
+  const alwaysAgain = (at: Clock) =>
+    later({
+      time: clock(at),
+      tone: liftedAlways!.pause ? "paused" : "window",
+      sign: "window",
+      title: `${liftedAlways!.label} again`,
+      detail: againTo !== undefined ? `Until ${clock(againTo)}` : liftedAlways!.open ? NO_END_TIME : "For the rest of today",
+    });
+  // A lifted rule blocks again from `at`; a pause's break only until the pause's end, and what comes after is told on.
+  const blocksAgain = (at: Clock): DayItem[] => [alwaysAgain(at), ...(againTo !== undefined ? onwards(againTo) : [])];
+  // Whether the lifted rule has come back by `at` (a break's pause is over again at its end).
+  const backBy = (at: Clock) => back !== undefined && back <= at && (againTo === undefined || at < againTo);
+  const backBefore = (at: Clock) => back !== undefined && at < back && (againTo === undefined || back < againTo);
   // What comes from `start` on: a window on then carries on to its end (and any window overlapping
   // it after that), then nothing blocks until the next window or tomorrow morning.
   const onwards = (start: Clock, again?: DayWindow): DayItem[] => {
@@ -598,7 +622,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     let at = start;
     // Past midnight: tomorrow morning is free, unless a lifted always-on rule has come back by then.
     const morning = () =>
-      liftedAlways ? items : [...items, later({ time: clock(at), tone: "on", sign: "morning", title: "Not blocked", detail: "Tomorrow morning" })];
+      liftedAlways && againTo === undefined ? items : [...items, later({ time: clock(at), tone: "on", sign: "morning", title: "Not blocked", detail: "Tomorrow morning" })];
     for (let step = 0; step <= 3 * subject.windows.length; step++) {
       const covering = subject.windows.find((candidate) => inWindow(candidate, at) && !(candidate.allowed && at < candidate.allowed.until));
       if (!covering) {
@@ -641,9 +665,9 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       at = end;
     }
     if (at >= 1440) return morning();
-    if (back !== undefined && back <= at) return [...items, alwaysAgain(at)];
+    if (backBy(at)) return [...items, ...blocksAgain(at)];
     const next = nextWindow(at);
-    if (back !== undefined && (!next || back < next.from)) return [...items, notBlocked(at, undefined, clock(back)), alwaysAgain(back)];
+    if (backBefore(at) && (!next || back! < next.from)) return [...items, notBlocked(at, undefined, clock(back!)), ...blocksAgain(back!)];
     return [...items, notBlocked(at, next), ...(next ? [windowItem(next)] : [])];
   };
   const afterWindow = () => onwards(windowEnd);
@@ -780,15 +804,15 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     const sooner = resumes && (!upcoming || resumes.from <= upcoming.from) ? resumes : upcoming;
     const then = sooner && sooner.from < back! ? sooner : undefined;
     const until = then ? then.from : back!;
-    // A pause's break blocks again only until the pause's own end, then nothing until the next window.
-    const to = liftedAlways.to;
-    const afterwards = to === undefined ? [] : [notBlocked(to, nextWindow(to)), ...(nextWindow(to) ? [windowItem(nextWindow(to)!)] : [])];
+    // A pause's break blocks again only until the pause's own end, then on as any day goes.
+    const to = againTo;
+    const pauseBreak = liftedAlways.pause;
     bands.push({ kind: "window", from: back!, to: to ?? 1440, label, source: liftedAlways.source ?? "No internet", times: to === undefined ? `from ${clock(back!)}` : `until ${clock(to)}` });
     items = [
-      { time: "Now", now: true, tone: "on", sign: "allowed", title: `Allowed until ${clock(until)}`, detail: by ? `${by} said yes` : `${label} is off for now` },
-      ...(then ? onwards(then.from) : [alwaysAgain(back!, to), ...afterwards]),
+      { time: "Now", now: true, tone: "on", sign: "allowed", title: `Allowed until ${clock(until)}`, detail: by ? `${by} said yes` : pauseBreak ? voice.unpausedByNoOne.replace(/\.$/, "") : `${label} is off for now` },
+      ...(then ? onwards(then.from) : blocksAgain(back!)),
     ];
-    day = { kind: "extended", window: { label, from: 0, to: 1440 }, until, end: 1440, ...(by ? { by } : {}), ...(then ? { then } : {}) };
+    day = { kind: "extended", window: { label, from: 0, to: 1440 }, until, end: 1440, ...(by ? { by } : {}), ...(then ? { then } : {}), ...(pauseBreak ? { pause: true as const } : {}) };
   } else if (window && ((ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil) || lift)) {
     const asked = ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil ? { ...ask, minutes: ask.minutes } : undefined;
     const allowedTo = asked ? allowedUntil! : Math.min(lift!.until, windowEnd);
@@ -958,8 +982,14 @@ export function topAnswer({ day, voice }: DayStory): TopAnswer {
         sign: "allowed",
         tone: "on",
         title: `Allowed until ${clock(day.until)}`,
-        sentence: `${extendedSentence(day)}${
-          day.then ? ` ${day.then.label} starts at ${clock(day.until)}.` : day.until < day.end ? ` ${day.window.label} starts again at ${clock(day.until)}.` : ""
+        sentence: `${extendedSentence(day, voice)}${
+          day.then
+            ? ` ${day.then.label} starts at ${clock(day.until)}.`
+            : day.pause
+              ? ` ${voice.pauseWord} again at ${clock(day.until)}.`
+              : day.until < day.end
+                ? ` ${day.window.label} starts again at ${clock(day.until)}.`
+                : ""
         }`,
       };
     case "always":
@@ -975,8 +1005,8 @@ export function topAnswer({ day, voice }: DayStory): TopAnswer {
 }
 
 /** "Dad said yes to 30 more minutes.", "Dad said yes.", or with no name "Bedtime is off for now." */
-function extendedSentence(day: Extract<Day, { kind: "extended" }>): string {
-  if (!day.by) return `${day.window.label} is off for now.`;
+function extendedSentence(day: Extract<Day, { kind: "extended" }>, voice: DayVoice): string {
+  if (!day.by) return day.pause ? voice.unpausedByNoOne : `${day.window.label} is off for now.`;
   return day.minutes ? `${day.by} said yes to ${lengthText(day.minutes)}.` : `${day.by} said yes.`;
 }
 
