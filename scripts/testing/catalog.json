@@ -1396,6 +1396,11 @@
         "schedules",
         "display"
       ]
+    },
+    "tests/unit/me-watch-app-copy.test.ts": {
+      "categories": [
+        "display"
+      ]
     }
   }
 }

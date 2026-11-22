@@ -52,3 +52,28 @@ export function watchAppCopy(platform: WatchPlatform) {
     updateServerBody: `Update it from FamilyFi on your ${phone} or computer.`,
   };
 }
+
+/**
+ * What FamilyFi Me's watch app says around the day its phone hands over, on the given platform, for
+ * familyfi-mobile-me's Apple Watch (Swift) and Wear OS (Kotlin) apps. The day's own lines come with
+ * the day; these are the words a watch shows before it has one, or around it. Each app spells them
+ * once, and familyfi-mobile-me's tests check that it spells them as here.
+ */
+export function meWatchAppCopy(platform: WatchPlatform) {
+  const watch = watchNoun(platform);
+  const phone = watchPhoneNoun(platform);
+  return {
+    title: "FamilyFi Me",
+    /** Before the phone handed a day over, or once it ran out. */
+    openTitle: `Open FamilyFi Me on your ${phone}`,
+    setUpLine: `This ${watch} sets itself up from there.`,
+    updatesLine: `This ${watch} updates from there.`,
+    /** An ask the watch can't send yet, because the phone hasn't set it up. */
+    notOpen: `Open FamilyFi Me on your ${phone} to send this.`,
+    /** Over the Things a parent shares, under the person's own day. */
+    things: "Things",
+    /** The complication's (and on Apple Watch the Smart Stack card's) name and line in the face's gallery. */
+    nextChange: "Next change",
+    nextChangeAbout: "When your next block starts or ends.",
+  };
+}
