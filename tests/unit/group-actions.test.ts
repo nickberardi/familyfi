@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { rulesBlockingGroup } from "@/lib/group-actions";
+import { groupHeaderActions, groupStatusParts, rulesBlockingGroup } from "@/lib/group-actions";
 import { runGroupCardAction } from "@/lib/group-writes";
 import type { Rule } from "@/lib/rules";
 import type { Group } from "@/lib/types";
@@ -167,6 +167,16 @@ describe("Block <rule> again from the card", () => {
 describe("the Block button rule's runs", () => {
   const tv = (overrides: Partial<Group> = {}) => group({ blockButtonRuleId: "r-video", ...overrides });
   const tap = (run: "pauseRule" | "moreRule" | "resumeRule") => ({ kind: "header" as const, run, ruleId: "r-video", name: "Video" });
+
+  it("offers Resume during a pause's break, which ends the unblock", () => {
+    const resumesAt = new Date(NOW.getTime() + 30 * 60_000).toISOString();
+    const onBreak = group({ suspension: { active: false, until: null, by: null, resumesAt }, allowance: { active: true, until: resumesAt, by: { accountId: null, name: "Sam" } } });
+    expect(groupHeaderActions(onBreak, [], TZ, NOW).action).toEqual({ label: "Resume", run: "resume" });
+    expect(groupStatusParts(onBreak, [], TZ, NOW)).toEqual({ badge: "unblocked", detail: "Unblocked until 5:00 PM by Sam, then blocked again", change: "unblocked" });
+    // A break already over reads as the pause it was.
+    const over = group({ suspension: { active: false, until: null, by: null, resumesAt: new Date(NOW.getTime() - 60_000).toISOString() } });
+    expect(groupHeaderActions(over, [], TZ, NOW).action.label).toBe("Block");
+  });
 
   it("opens the rule's unblock sheet, first or for More time", () => {
     const mutate = vi.fn(() => Promise.resolve(undefined));

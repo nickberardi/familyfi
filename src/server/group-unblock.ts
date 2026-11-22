@@ -4,7 +4,7 @@ import { extendSuspensionUntil } from "@/lib/schedule";
 import { answerAsks, endEarlierUnblockYes } from "./asks";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
-import { groupInclude, lifted, publicGroup, sessionActor } from "./groups";
+import { BREAK_CLEARED, groupInclude, lifted, publicGroup, sessionActor } from "./groups";
 import { ApiError } from "./http";
 import { CLEARED, readLiftBody, type LiftBody } from "./rule-lifts";
 import { presentRules, ruleInclude } from "./rules";
@@ -13,7 +13,7 @@ import { currentHouseholdId } from "./household-context";
 
 export type UnblockAction = "unblock" | "end" | "extend";
 
-const BLOCK_CLEARED = { enabled: false, expiresAt: null, blockedByAccountId: null, blockedByName: null };
+const BLOCK_CLEARED = { enabled: false, expiresAt: null, blockedByAccountId: null, blockedByName: null, ...BREAK_CLEARED };
 
 /**
  * Unblocks a group: whatever blocks it now stops, for this group alone, whichever kind of rule
@@ -64,11 +64,14 @@ export async function unblockGroup(
     if (blockedByPause || targets.some(({ rule }) => rule.id === existing.blockButtonRuleId)) await endEarlierUnblockYes(groupId);
     await answerAsks(session, groupId, { pause: blockedByPause || targets.length > 0, ruleIds: targets.map(({ rule }) => rule.id) });
   } else if (action === "end") {
+    if (body.until !== undefined) throw new ApiError(400, "invalid_request", "Ending an unblock takes no time.");
     const ended = await prisma().ruleGroup.updateMany({
       where: { groupId, rule: { systemGroupId: null }, ruleId: { notIn: [LOCK_DNS_RULE_ID, COUNTRIES_RULE_ID] }, pauseActive: true, pauseKind: RuleLiftKind.allow },
       data: CLEARED,
     });
-    if (ended.count) await endEarlierUnblockYes(groupId);
+    // A pause's break (a yes to a child's ask) ends too: the pause blocks again at once.
+    const unbroken = await prisma().rule.updateMany({ where: { systemGroupId: groupId, enabled: true, pauseActive: true }, data: BREAK_CLEARED });
+    if (ended.count || unbroken.count) await endEarlierUnblockYes(groupId);
   } else {
     if (allowances.length === 0) throw new ApiError(409, "not_unblocked", "Extend requires an active unblock.");
     const timed = allowances.filter((link) => link.pauseUntil !== null);

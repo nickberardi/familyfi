@@ -106,9 +106,18 @@ function AskSheet({ group, timezone, onOpen, onClose }: { group: Group; timezone
       // Resolved when it is tapped, so a sheet left open never sends an end already passed.
       custom={(choice) => askSheetCustom(choice, ask, rules, timezone, new Date(), household?.askAheadMinutes)}
       onPick={(option) =>
-        answerAsk(store.mutate, group, ask, option, ruleName, new Date(), (target) => {
-          next.current = target;
-        }).then(() => undefined)
+        answerAsk(
+          store.mutate,
+          group,
+          ask,
+          option,
+          ruleName,
+          new Date(),
+          (target) => {
+            next.current = target;
+          },
+          timezone,
+        ).then(() => undefined)
       }
       onCustom={() => undefined}
       onClose={() => (next.current ? onOpen(next.current) : onClose())}

@@ -13,7 +13,8 @@ export type Group = {
   familyRole: "child" | "teen" | "adult" | null;
   deviceCount: number;
   /** A pause blocks all internet until `until`, or until resumed. */
-  suspension: { active: boolean; until: string | null; by: Actor };
+  /** `resumesAt`: during a pause's break (a yes to a child's ask for a length), when it blocks again. */
+  suspension: { active: boolean; until: string | null; by: Actor; resumesAt?: string };
   /** An allowance lifts the group's internet-rule windows until `until`. */
   allowance: { active: boolean; until: string | null; by: Actor };
   /** The group's internet rules; empty when nothing limits its internet. */

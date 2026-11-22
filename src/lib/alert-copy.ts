@@ -47,9 +47,12 @@ export function alertText(kind: string, data: Record<string, unknown>): AlertTex
       const who = text(n) ?? "Your child";
       // On a shared Thing: what the child asked to use.
       const thing = text(t);
-      if (a === "pause") return { title: thing ? `${who} asked to unblock ${thing}` : `${who} asked to be unpaused`, body: "Open FamilyFi to answer." };
-      const rule = text(r);
       const length = typeof m === "number" && Number.isInteger(m) && m > 0 ? minutesText(m) : null;
+      if (a === "pause") {
+        const title = thing ? `${who} asked to unblock ${thing}` : `${who} asked to be unpaused`;
+        return { title: length ? `${title} for ${length}` : title, body: "Open FamilyFi to answer." };
+      }
+      const rule = text(r);
       // Time off the rule's block, never "of" it: the child wants out of Bedtime, not more of it.
       const body = length && rule ? `${length} off ${rule}.` : rule ? `Time off ${rule}.` : length ? `${length} more.` : "Open FamilyFi to answer.";
       return { title: thing ? `${who} asked for more time on ${thing}` : `${who} asked for more time`, body };

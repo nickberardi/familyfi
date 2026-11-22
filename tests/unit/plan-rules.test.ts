@@ -84,6 +84,8 @@ describe("planRulePolicies", () => {
     // Off, it has no policy at all, unlike an ordinary rule that is switched off.
     expect(plan([{ ...block, enabled: false }]).policies).toEqual([]);
     expect(plan([{ ...block, system: false, enabled: false }]).policies).toHaveLength(1);
+    // On a break (a yes to a child's ask for a length), its policy stays, disabled, and blocks again after.
+    expect(plan([{ ...block, paused: true }]).policies).toEqual([{ ...policy, enabled: false }]);
   });
 
   it("disables a paused rule even when its group is also lifted", () => {

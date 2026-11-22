@@ -83,7 +83,8 @@ describe("openapi contract", () => {
       "Group.ask", // only when a child's phone asked in the last day
       "GroupAsk.from", // only for an ask on a shared Thing
       "GroupAsk.ruleId", // only for an ask about a rule
-      "GroupAsk.minutes", // only for an ask about a rule
+      "GroupAsk.minutes", // for an ask about a rule, and an ask to unblock with a length
+      "Suspension.resumesAt", // only during a pause's break
       "GroupAsk.expiresAt", // only while waiting
       "GroupAsk.answeredAt", // only for yes and no
       "GroupAsk.by", // only for yes and no
