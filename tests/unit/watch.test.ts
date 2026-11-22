@@ -106,6 +106,16 @@ describe("watch", () => {
     ]);
   });
 
+  it("sets up FamilyFi Me's Watch from FamilyFi Me", async () => {
+    const sent: unknown[] = [];
+    const request = (async (_path: string, init?: unknown) => {
+      sent.push(init);
+      return {};
+    }) as never;
+    await enrollWatch(request, "ME-1", undefined, "me-watch");
+    expect(sent).toEqual([{ method: "POST", body: { clientType: "me-watch", clientId: "me-1" } }]);
+  });
+
   it("words the Watch screen for the phone's platform", () => {
     const apple = watchCopy("apple");
     const wear = watchCopy("wear");
