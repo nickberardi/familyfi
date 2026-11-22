@@ -1,4 +1,4 @@
-import { groupDayOf } from "./child-day";
+import { groupDayOf, NO_END_TIME } from "./child-day";
 import { formatClock, relativeDayLabel } from "./display";
 import { HEADS_UP_DAYS, headsUpBlocks, type HeadsUpBlock } from "./heads-up";
 import type { Rule } from "./rules";
@@ -42,15 +42,16 @@ export type FamilyEntry = {
   from: string;
   now: FamilyItem[];
   next: (FamilyItem & { kind: "start" | "end" }) | null;
-  /** The big line: "Bedtime", "Block", or "Nothing planned". */
+  /** The big line: "Bedtime", "Block", or "Nothing planned"; with a block on that has no end and nothing after it, that block. */
   title: string;
   /** "Abby and Cassie", or "" with nothing next. */
   who: string;
-  /** "Starts at 9:00 PM", "Ends tomorrow at 7:00 AM", "Starts Sat at 10:00 AM", or "" with nothing next. */
+  /** "Starts at 9:00 PM", "Ends tomorrow at 7:00 AM", "Starts Sat at 10:00 AM", "No end time", or "" with nothing at all. */
   line: string;
   /**
    * The inline complication's words before its relative time: "Bedtime for Abby in", "Bedtime ends
-   * for Abby in", "Block ends for Abby in"; with nothing next the whole line, "Nothing planned".
+   * for Abby in", "Block ends for Abby in"; with a block on that has no end, "Block for Abby"; with nothing
+   * at all, "Nothing planned".
    */
   short: string;
   /** The same without names, for the face while the wrist is down: "Bedtime in", "Bedtime ends in". */
@@ -65,6 +66,10 @@ export const FAMILY_NEXT_WORDS = {
   next: "Next",
   block: "Block",
   nothingPlanned: "Nothing planned",
+  /** "Nothing planned" where a face has room for one short word (Wear's short text, a corner). */
+  nothingShort: "None",
+  /** "Not up to date" where a face has room for one short word. */
+  unknownShort: "Update",
   unknownTitle: "Not up to date",
   unknownLine: "Open FamilyFi to update",
 } as const;
@@ -107,6 +112,9 @@ function entryAt(blocks: GroupBlock[], at: number, nextAt: number | null, timeZo
   const first = changes[0];
   const next = first ? { ...gather(changes.filter((change) => change.kind === first.kind && change.name === first.name && change.pause === first.pause))[0]!, kind: first.kind } : null;
   const base = { from: new Date(at).toISOString(), now, next, unknown: false };
+  // A block with no end and nothing after it is told as itself: "Block for Abby", "No end time".
+  const on = now[0];
+  if (!next && on) return { ...base, title: on.name, who: on.who, line: NO_END_TIME, short: `${on.name} for ${on.who}`, privateShort: on.name };
   if (!next) return { ...base, title: FAMILY_NEXT_WORDS.nothingPlanned, who: "", line: "", short: FAMILY_NEXT_WORDS.nothingPlanned, privateShort: FAMILY_NEXT_WORDS.nothingPlanned };
   // "Starts at 9:00 PM" today, "Ends tomorrow at 7:00 AM", "Starts Sat at 10:00 AM".
   const when = new Date(next.at!);
