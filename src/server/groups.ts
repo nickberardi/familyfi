@@ -101,9 +101,10 @@ function internetGroup(group: GroupWithRules, now: Date, timezone: string) {
   const allowed = allows.length > 0 && !stillBlocked;
   const ends = allows.map(({ link }) => link.pauseUntil).filter((end): end is Date => end !== null);
   const first = allows[0]?.link;
-  // A pause on a break reads as not paused, with when it blocks again, and as allowed until then:
-  // a client that does not know the break still tells the time open truly.
-  if (onBreak) {
+  // A pause on a break reads as not paused, with when it blocks again, and, while no internet window
+  // blocks the group either, as allowed until then: a client that does not know the break still
+  // tells the time open truly. A window on during the break still blocks, and is told as it is.
+  if (onBreak && !stillBlocked) {
     return {
       suspension: {
         active: false,
@@ -114,11 +115,13 @@ function internetGroup(group: GroupWithRules, now: Date, timezone: string) {
       allowance: { active: true, until: block!.pauseUntil!.toISOString(), by: actor(block!.pausedByAccountId, block!.pausedByName) },
     };
   }
+  const resumes = onBreak ? { resumesAt: block!.pauseUntil!.toISOString() } : {};
   return {
     suspension: {
       active: blocking,
-      until: blocking ? (block!.expiresAt?.toISOString() ?? null) : null,
-      by: blocking ? actor(block!.blockedByAccountId, block!.blockedByName) : null,
+      until: blocking || onBreak ? (block!.expiresAt?.toISOString() ?? null) : null,
+      by: blocking || onBreak ? actor(block!.blockedByAccountId, block!.blockedByName) : null,
+      ...resumes,
     },
     allowance: {
       active: allowed,

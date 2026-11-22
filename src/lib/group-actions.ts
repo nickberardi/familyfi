@@ -238,14 +238,14 @@ function fullStatus(group: Group, rules: Rule[], timezone: string, now: Date): F
       ? blocked("paused", `Blocked ${until(end, "")}${by(who)}`, `${until(end, "")}${by(who)}`, "blocked")
       : blocked("paused", `Blocked${by(who)} until you unblock`, who ? `until you unblock, by ${who.name}` : "until you unblock", "blocked");
   }
-  // A pause's break, from a yes to a child's ask for a length: unblocked until then, then the pause again.
-  const { resumesAt } = group.suspension;
-  if (resumesAt && Date.parse(resumesAt) > now.getTime()) {
-    const detail = `unblocked ${until(resumesAt, "")}${by(group.allowance.by)}, then blocked again`;
-    return online("on", `Online · ${detail}`, detail, "unblocked", "unblocked");
-  }
   const blocking = rulesToUnblock(group, rules, timezone, now);
   const internet = blocking.find((rule) => rule.kind === "internet");
+  // A pause's break, from a yes to a child's ask for a length: unblocked until then, then the pause
+  // again; an internet window on meanwhile still blocks, and is told first.
+  if (onBreak(group, now) && !internet) {
+    const detail = `unblocked ${until(group.suspension.resumesAt!, "")}${by(group.allowance.by)}, then blocked again`;
+    return online("on", `Online · ${detail}`, detail, "unblocked", "unblocked");
+  }
   if (internet) {
     const detail = `${internet.name} ${until(internet.until, "· always")}`;
     return blocked("off", `Blocked · ${detail}`, detail);
@@ -344,6 +344,12 @@ export function groupDetailColor(change: GroupStatusParts["change"]): string {
   return "var(--ff-ink-2)";
 }
 
+/** Whether the group's pause is on a break now (a yes to a child's ask for a length). */
+function onBreak(group: Pick<Group, "suspension">, now: Date): boolean {
+  const { resumesAt } = group.suspension;
+  return resumesAt !== undefined && Date.parse(resumesAt) > now.getTime();
+}
+
 /**
  * The group's one header button, its More time while a timed block or unblock lasts (the clients' dropdown leads with it), and its
  * dropdown (`groupMenu`). Unblock shows whenever anything blocks the group now but its standing
@@ -371,7 +377,8 @@ export function groupHeaderActions(
     return header({ label: "Unblock", run: blocking.length ? "unblock" : "unblockNow" }, group.suspension.until ? { label: "More time", run: "moreBlock" } : null);
   }
   // A pause on a break (a yes to a child's ask): Resume ends the break, and the pause blocks again.
-  if (group.suspension.resumesAt && Date.parse(group.suspension.resumesAt) > now.getTime()) return header({ label: "Resume", run: "resume" }, null);
+  // While a window blocks the group too, its Unblock comes first, as for any rule blocking it.
+  if (onBreak(group, now) && !rulesToUnblock(group, rules, timezone, now).length) return header({ label: "Resume", run: "resume" }, null);
   const button = blockButtonRule(group, rules);
   // The button acts on the Block button rule alone only while nothing else (an internet rule or a
   // scheduled rule) blocks the group: then Unblock lifts all of them, the default's rule included.
