@@ -84,13 +84,20 @@ export type WatchEnrollment = {
  * Enrolls the Watch the phone can reach as its own paired device, in one call: the phone invites and
  * claims it. The Watch's id is its own; enrolling the same Watch again replaces its earlier record.
  * `displayName` is the watch's own name where the platform tells the phone one (a Wear OS watch's
- * model); without it the household names it "Apple Watch".
+ * model); without it the household names it "Apple Watch", or "Watch" for FamilyFi Me's.
+ * `clientType` is the app's Watch (`app-watch`) from the FamilyFi app, and FamilyFi Me's (`me-watch`)
+ * from FamilyFi Me on a person's phone.
  */
-export function enrollWatch(request: ApiRequest, watchId: string, displayName?: string): Promise<WatchEnrollment> {
+export function enrollWatch(
+  request: ApiRequest,
+  watchId: string,
+  displayName?: string,
+  clientType: "app-watch" | "me-watch" = "app-watch",
+): Promise<WatchEnrollment> {
   const name = displayName?.trim();
   return request<WatchEnrollment>("/api/v1/paired/invites?claim=true", {
     method: "POST",
-    body: { clientType: "app-watch", clientId: watchId.toLowerCase(), ...(name ? { displayName: name } : {}) },
+    body: { clientType, clientId: watchId.toLowerCase(), ...(name ? { displayName: name } : {}) },
   });
 }
 

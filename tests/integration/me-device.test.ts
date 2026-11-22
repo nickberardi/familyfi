@@ -12,6 +12,8 @@ import { GET as groups } from "@/app/api/v1/groups/route";
 import { GET as oneGroup } from "@/app/api/v1/groups/[id]/route";
 import { GET as listRules } from "@/app/api/v1/rules/route";
 import { POST as invite } from "@/app/api/v1/paired/invites/route";
+import { POST as fileAsk } from "@/app/api/v1/groups/[id]/asks/route";
+import { POST as pauseGroup } from "@/app/api/v1/groups/[id]/rules/[ruleId]/pause/route";
 import { DELETE as unpair, GET as pairedDevice, PATCH as updateDevice } from "@/app/api/v1/paired/devices/[id]/route";
 import { groupDayOf, meDaySubject, tellDay, PHONE_VOICE, type GroupDay } from "@/lib/child-day";
 import type { Rule } from "@/lib/rules";
@@ -21,9 +23,12 @@ import { deleteAccount } from "@/server/accounts";
 import { removeAccountDevices, revokeDevice } from "@/server/connection";
 import { deleteGroup } from "@/server/groups";
 import { exportHousehold, importHousehold } from "@/server/household-export";
+import { deviceTokenAppVersion } from "@/server/device-token";
+import { readSessionFromRequest } from "@/server/auth";
+import { claimMeWatch, meWatchHost } from "@/server/pairing";
 import { resetDatabase } from "../helpers/db";
 import { request, type SessionAuth } from "../helpers/http";
-import { bearer, claimInvite, homeRoute, issuedInvite, pairingAdmin, pairingAdminAuth, pairPhone, type Claim } from "../helpers/pairing";
+import { bearer, claimInvite, claimWatchRequest, homeRoute, issuedInvite, pairingAdmin, pairingAdminAuth, pairPhone, type Claim } from "../helpers/pairing";
 
 const json = { "content-type": "application/json" };
 
@@ -40,12 +45,12 @@ async function childGroup(name = "Emma") {
 }
 
 /** A child's phone paired the way FamilyFi Me does it: an administrator invites it for a group, and it claims the code. */
-async function pairMe(admin: SessionAuth, groupId: string): Promise<Claim & { session: { kind: string; displayName: string } }> {
+async function pairMe(admin: SessionAuth, groupId: string, appVersion?: string): Promise<Claim & { session: { kind: string; displayName: string } }> {
   const created = await inviteMe(admin, { endpointId: (await homeRoute()).id, personId: groupId });
   expect(created.status).toBe(201);
   const issued = await issuedInvite(created);
   expect(issued.payload.clientType).toBe("me");
-  const claimed = await claimInvite(issued, "iPhone");
+  const claimed = await claimInvite(issued, "iPhone", {}, appVersion ? { appVersion } : {});
   expect(claimed.status).toBe(200);
   return (await claimed.json()) as Claim & { session: { kind: string; displayName: string } };
 }
@@ -353,3 +358,115 @@ describe("FamilyFi Me on a child's phone", () => {
     expect((await claimInvite(waiting, "iPhone")).status).toBe(200);
   });
 });
+
+describe("FamilyFi Me's Watch", () => {
+  let admin: SessionAuth;
+
+  beforeEach(async () => {
+    await resetDatabase();
+    admin = await pairingAdminAuth();
+  });
+
+  const WATCH_ID = "0c3f7a52-8a4e-4c1b-9d55-7f1e2b6a9c10";
+
+  function setUpWatch(auth: SessionAuth, body: Record<string, unknown> = {}) {
+    return claimWatchRequest(auth, { clientType: "me-watch", clientId: WATCH_ID, ...body });
+  }
+
+  async function pairWatch(phone: Claim): Promise<Claim & { session: { kind: string; displayName: string; personId?: string } }> {
+    const response = await setUpWatch(bearer(phone.token));
+    expect(response.status).toBe(201);
+    return (await response.json()) as Claim & { session: { kind: string; displayName: string; personId?: string } };
+  }
+
+  it("is set up by its phone for the same person, as no account, with its manifest", async () => {
+    const emma = await childGroup();
+    const phone = await pairMe(admin, emma.id);
+    const watch = await pairWatch(phone);
+    expect(watch.device).toMatchObject({ clientType: "me-watch", scope: "me:askOnly", displayName: "Watch" });
+    expect(watch.session).toMatchObject({ kind: "person", displayName: "Emma", personId: emma.id });
+    expect(watch.connection?.manifest.signature).toBeTruthy();
+    const device = await prisma().pairedDevice.findUniqueOrThrow({ where: { id: watch.device.id } });
+    expect(device).toMatchObject({ accountId: null, groupId: emma.id, parentDeviceId: phone.device.id });
+    const listed = await pairedDevice(request(`/api/v1/paired/devices/${watch.device.id}`, { auth: admin }), params(watch.device.id));
+    expect(((await listed.json()) as { device: { person: unknown; actsAs: unknown } }).device).toMatchObject({ person: { id: emma.id, name: "Emma" }, actsAs: null });
+  });
+
+  it("reads its person's day and nothing else, and asks for more time itself", async () => {
+    const emma = await childGroup();
+    const sam = await childGroup("Sam");
+    const watch = await pairWatch(await pairMe(admin, emma.id));
+    expect((await meDay(bearer(watch.token), emma.id)).status).toBe(200);
+    expect((await meDay(bearer(watch.token), sam.id)).status).toBe(404);
+    const listed = await groups(request("/api/v1/groups", { auth: bearer(watch.token) }));
+    expect(((await listed.json()) as { groups: Group[] }).groups.map((item) => item.id)).toEqual([emma.id]);
+    const until = new Date(Date.now() + 3 * 60 * 60_000).toISOString();
+    const paused = await pauseGroup(request(`/api/v1/groups/${emma.id}/rules/internet/pause`, { method: "POST", auth: admin, headers: json, body: JSON.stringify({ until }) }), { params: Promise.resolve({ id: emma.id, ruleId: "internet" }) });
+    expect(paused.status).toBe(200);
+    const asked = await fileAsk(request(`/api/v1/groups/${emma.id}/asks`, { method: "POST", auth: bearer(watch.token), headers: json, body: JSON.stringify({ about: "pause" }) }), params(emma.id));
+    expect(asked.status).toBe(200);
+    expect(((await asked.json()) as { group: Group }).group.ask).toMatchObject({ about: "pause", state: "waiting" });
+  });
+
+  it("takes its phone's app version and keeps it through its own refreshes", async () => {
+    const emma = await childGroup();
+    const watch = await pairWatch(await pairMe(admin, emma.id, "1.1.0"));
+    expect(deviceTokenAppVersion(watch.token)).toBe("1.1.0");
+    // The Watch refreshes on its own, naming no version.
+    const renewed = await refresh(request("/api/v1/auth/refresh", { method: "POST", headers: json, body: JSON.stringify({ refreshToken: watch.refreshToken }) }));
+    expect(renewed.status).toBe(200);
+    expect(deviceTokenAppVersion(((await renewed.json()) as { token: string }).token)).toBe("1.1.0");
+  });
+
+  it("sets up nothing for a phone revoked after its request was signed in", async () => {
+    const emma = await childGroup();
+    const phone = await pairMe(admin, emma.id);
+    const session = await readSessionFromRequest(request("/api/v1/paired/invites?claim=true", { auth: bearer(phone.token) }));
+    const host = await meWatchHost(session!);
+    await revokeDevice(phone.device.id);
+    await expect(claimMeWatch(host, { clientId: WATCH_ID }, null)).rejects.toMatchObject({ status: 403, code: "me_phone_required" });
+    expect(await prisma().pairedDevice.count({ where: { clientType: "me-watch" } })).toBe(0);
+  });
+
+  it("sets up no Watch of its own and reports no Screen Time permission", async () => {
+    const emma = await childGroup();
+    const watch = await pairWatch(await pairMe(admin, emma.id));
+    const again = await setUpWatch(bearer(watch.token), { clientId: "5d1b7c30-2b0e-4f3a-a3f1-6c9e1d2b4a77" });
+    expect([again.status, await errorCode(again)]).toEqual([403, "me_scope"]);
+    const told = await updateDevice(request(`/api/v1/paired/devices/${watch.device.id}`, { method: "PATCH", auth: bearer(watch.token), headers: json, body: JSON.stringify({ protection: "on" }) }), params(watch.device.id));
+    expect(told.status).toBe(403);
+  });
+
+  it("is set up only by FamilyFi Me, and FamilyFi Me sets up nothing else", async () => {
+    const emma = await childGroup();
+    const phone = await pairMe(admin, emma.id);
+    // FamilyFi Me sets up only its Watch.
+    const app = await setUpWatch(bearer(phone.token), { clientType: "app-watch" });
+    expect(app.status).toBe(400);
+    // Neither a browser nor the FamilyFi app sets up a FamilyFi Me Watch.
+    expect((await setUpWatch(admin)).status).toBe(403);
+    const parent = await pairPhone(admin);
+    expect((await setUpWatch(bearer(parent.token))).status).toBe(400);
+  });
+
+  it("replaces the Watch it set up before, and is revoked with its phone and with its person", async () => {
+    const emma = await childGroup();
+    const phone = await pairMe(admin, emma.id);
+    const first = await pairWatch(phone);
+    const second = await pairWatch(phone);
+    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: first.device.id } })).revokedAt).not.toBeNull();
+    await revokeDevice(phone.device.id);
+    expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(second.token) }))).status).toBe(401);
+
+    // Another person's phone cannot take this Watch over.
+    const sam = await childGroup("Sam");
+    const taken = await setUpWatch(bearer((await pairMe(admin, sam.id)).token));
+    expect(taken.status).toBe(409);
+
+    const otherPhone = await pairMe(admin, emma.id);
+    const third = await pairWatch(otherPhone);
+    await deleteGroup(emma.id);
+    expect((await prisma().pairedDevice.findUniqueOrThrow({ where: { id: third.device.id } })).revokedAt).not.toBeNull();
+  });
+});
+

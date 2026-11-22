@@ -36,6 +36,8 @@ export const MIN_API_VERSION_BY_CLIENT: Record<ClientType, string> = {
   "app-watch": MIN_WATCH_API_VERSION,
   "app-controls": MIN_WATCH_API_VERSION,
   me: MIN_ME_API_VERSION,
+  // FamilyFi Me's Watch app ships inside FamilyFi Me, so it is served from the same floor.
+  "me-watch": MIN_ME_API_VERSION,
 };
 
 /** The versions `GET /api/v1/health` reports. A server from before API 0.41.0 sends only `version`. */

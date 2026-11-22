@@ -99,7 +99,7 @@ paths:
           description: |
             The caller's client type. The response then adds `minApiVersion`, the oldest API version this
             server serves that client type: `x-min-app` for `app` and `agent`, `x-min-app-watch` for
-            `app-watch` and `app-controls`, `x-min-me` for `me`. A client type the server does not know
+            `app-watch` and `app-controls`, `x-min-me` for `me` and `me-watch`. A client type the server does not know
             gets no `minApiVersion`, and neither does a server before 2.0.0.
           schema: { $ref: "#/components/schemas/ClientType" }
       responses:
@@ -2973,7 +2973,7 @@ paths:
     post:
       operationId: createPairedInvite
       tags: [Paired]
-      summary: Invite a device to join, or (claim=true) invite and claim an app's Watch or its controls' sign-in
+      summary: Invite a device to join, or (claim=true) invite and claim a Watch or an app's controls' sign-in
       description: |
         Every paired device joins with an invite. An administrator invites a phone (over a
         published route, five minutes) or an agent (on the home network, fifteen minutes) and gets
@@ -3007,6 +3007,13 @@ paths:
         run outside the app and cannot share its rotating refresh token. It holds the Watch's
         list, the app is its parent, and the app keeps one `clientId` for it, so setting it up
         again replaces the earlier record. Only an `app:full` device may make either.
+
+        FamilyFi Me on a person's phone (`me`) sets up its own Watch the same way, with
+        `clientType: me-watch` and no other: the Watch holds `me:askOnly` and signs in for the
+        phone's family group, never as an account, and the phone is its parent, so revoking the
+        phone or deleting the group revokes it. Only a signed-in `me` device whose group is still
+        there may make one: a browser is refused (403 `paired_phone_required`), as is the Watch
+        itself (403 `me_scope`), and a parent's app gets 400.
 
         An agent invite is refused through remote access (403 `agent_remote`).
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
@@ -3084,7 +3091,7 @@ paths:
       description: An administrator sees every paired device; a paired device sees itself and the companions it vouched for (an app's Watch and its controls' sign-in). Anyone else is refused.
       security: [{ cookieAuth: [] }, { bearerAuth: [] }]
       parameters:
-        - { name: clientType, in: query, required: false, explode: true, schema: { type: array, items: { type: string, enum: [app, app-watch, app-controls, me, agent] } }, description: "Only devices of these client types. An unknown client type answers 400." }
+        - { name: clientType, in: query, required: false, explode: true, schema: { type: array, items: { type: string, enum: [app, app-watch, app-controls, me, me-watch, agent] } }, description: "Only devices of these client types. An unknown client type answers 400." }
         - { name: client, in: query, required: false, deprecated: true, x-removed-in: 2.3.0, explode: true, schema: { type: array, items: { type: string, enum: [app, phone, watch, agent] } }, description: "Deprecated, and removed in 2.3.0. The filter apps before 2.0 send, still read so their Watch screen lists only Watches: `watch` is `app-watch`, `app` and `phone` are `app` and `app-controls`, `agent` is `agent`. Use `clientType`." }
         - { name: status, in: query, required: false, schema: { type: string, enum: [active, revoked] } }
       responses:
@@ -3812,15 +3819,15 @@ components:
         source: { type: string, enum: [probe, certificate] }
     ClientType:
       type: string
-      x-extensible-enum: [app, app-watch, app-controls, me, agent]
+      x-extensible-enum: [app, app-watch, app-controls, me, me-watch, agent]
       description: |
         Which client a paired device or invite is. `app` is the FamilyFi app on a phone, tablet or
         Mac; `app-watch` its Watch; `app-controls` its Siri, Shortcuts and system controls, which run
         outside the app, so the app sets them up as their own device; `me` is FamilyFi Me on a child's
-        phone; `agent` an AI agent. `me-watch` is reserved. The invite sets it, the device keeps it,
+        phone, and `me-watch` FamilyFi Me's Watch, which that phone sets up; `agent` an AI agent. The invite sets it, the device keeps it,
         and the server reads it from the device on every signed-in call. Each client type holds only
-        its own scopes: `app` `app:full`, `app-watch` and `app-controls` `app:rulesOnly`, `me`
-        `me:askOnly`, `agent` `agent:full` or `agent:readOnly`. New client types may be added; a
+        its own scopes: `app` `app:full`, `app-watch` and `app-controls` `app:rulesOnly`, `me` and
+        `me-watch` `me:askOnly`, `agent` `agent:full` or `agent:readOnly`. New client types may be added; a
         client lists one it does not know as a paired device like any other.
     ClientScope:
       type: string
@@ -3832,8 +3839,9 @@ components:
         Shortcuts and system controls, reads its session, connection manifest, groups, rules and changes, and pauses, resumes,
         extends, allows, disallows and turns rules on and off (403 `watch_scope` for a Watch beyond
         that, 403 `app_scope` for the app's controls). `me:askOnly`, held by FamilyFi Me on a child's
-        phone, reads its session, connection manifest, its own group and the rules that cover it, asks
-        for more time on its group, and un-pairs itself; beyond that 403 `me_scope`. New scopes may be added.
+        phone and its Watch, reads its session, connection manifest, its own group and the rules that cover it, asks
+        for more time on its group, and un-pairs itself; the phone (`me`) also tells its own Screen Time
+        permission and sets up its own Watch (`me-watch`); beyond that 403 `me_scope`. New scopes may be added.
         `agent:readOnly` reads household state: groups, rules, devices, sync, changes, DNS categories
         and household settings (its timezone). `agent:full` also changes groups, rules and their
         verbs, devices and their assignment, sync and DNS categories. No agent reaches accounts,
@@ -3866,10 +3874,11 @@ components:
       description: |
         An app's Watch (`clientType: app-watch`), or its own sign-in for Siri, Shortcuts and system
         controls (`clientType: app-controls`), invited and claimed at once with `?claim=true`. Both
-        hold `app:rulesOnly`.
+        hold `app:rulesOnly`. FamilyFi Me on a person's phone sets up its own Watch the same way
+        (`clientType: me-watch`, `me:askOnly`), and only that.
       required: [clientType, clientId]
       properties:
-        clientType: { type: string, enum: [app-watch, app-controls], description: The client type to set up. }
+        clientType: { type: string, enum: [app-watch, app-controls, me-watch], description: The client type to set up. }
         clientId: { type: string, format: uuid }
         displayName: { type: string, minLength: 1, maxLength: 80 }
     HomeAddressResponse:
@@ -4048,7 +4057,7 @@ components:
             displayName: { type: string }
         person:
           type: [object, "null"]
-          description: "A child's phone (`me`) only: the person it signs in for instead of an account, `id` being their family group's. Null once the group is deleted, which revokes it."
+          description: "A child's phone (`me`) and its Watch (`me-watch`) only: the person it signs in for instead of an account, `id` being their family group's. Null once the group is deleted, which revokes it."
           additionalProperties: false
           required: [id, name]
           properties:

@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { signsInForPerson } from "@/lib/client-type";
 import { CLIENT_TYPES } from "@/lib/client-type";
 import { isMeProtection, type MeProtection } from "@/lib/me-protection";
 import { z } from "zod";
@@ -45,8 +46,8 @@ function publicPairedDevice(device: Listed) {
     clientType: device.clientType,
     scope: device.scope,
     actsAs: device.account ? { username: device.account.username, displayName: device.account.displayName } : null,
-    // A child's phone (FamilyFi Me) signs in for a person, their family group, instead of an account.
-    ...(device.clientType === "me" ? { person: device.group ? { id: device.group.id, name: device.group.name } : null } : {}),
+    // A child's phone (FamilyFi Me) and its Watch sign in for a person, their family group, instead of an account.
+    ...(signsInForPerson(device.clientType) ? { person: device.group ? { id: device.group.id, name: device.group.name } : null } : {}),
     // What it last said of its Screen Time permission, once it has (an iPhone or iPad; Android never says).
     ...(device.clientType === "me" && isMeProtection(device.protection)
       ? { protection: device.protection, protectionAt: device.protectionAt?.toISOString() ?? null }
@@ -90,7 +91,7 @@ function requireVisible(session: Viewer) {
 export async function listPairedDevices(session: Viewer, query: { clientType: string[]; status?: string }) {
   const visible = requireVisible(session);
   const filter = Filter.safeParse(query);
-  if (!filter.success) throw new ApiError(400, "invalid_request", "clientType must be app, app-watch, app-controls, me or agent, and status active or revoked.");
+  if (!filter.success) throw new ApiError(400, "invalid_request", "clientType must be app, app-watch, app-controls, me, me-watch or agent, and status active or revoked.");
   const { status } = filter.data;
   const clientTypes = filter.data.clientType;
   const devices = await prisma().pairedDevice.findMany({

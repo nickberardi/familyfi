@@ -26,6 +26,8 @@ import { currentHouseholdId } from "./household-context";
  *   and its code carries the same: route, pin or Cloudflare Access token. It signs in for the family
  *   group the invite names, never as an account, and has no parent device: it belongs to its group,
  *   so re-pairing or revoking the phone that invited it leaves it alone.
+ * - FamilyFi Me's Watch (`me-watch`) is invited and claimed at once by its child's phone, its parent,
+ *   as an app's Watch is; it signs in for the same family group, never as an account.
  *
  * An invite a paired phone makes names that phone as the new device's parent, as a Watch's does:
  * revoking a phone revokes everything paired from it. No device ever acts as the recovery account.
@@ -144,6 +146,8 @@ async function join(db: Db, input: {
     const previous = await db.pairedDevice.findUnique({ where: { clientId: input.clientId } });
     // Only the same client type is replaced: an app's Siri and shortcuts never retire a Watch, nor a Watch them.
     if (previous && (previous.clientType !== invite.clientType || previous.scope !== invite.scope)) throw new ClientIdInUseError();
+    // FamilyFi Me's Watch is replaced only for the same person: one person's phone never takes over another's.
+    if (previous && invite.clientType === "me-watch" && previous.groupId !== (signer.group?.id ?? null)) throw new ClientIdInUseError();
     if (previous) {
       await db.session.updateMany({ where: { deviceId: previous.id, revokedAt: null }, data: { revokedAt: now } });
       await db.pairedDevice.update({ where: { id: previous.id }, data: { revokedAt: now, clientId: null } });
@@ -248,8 +252,9 @@ export async function claimInvite(input: { id: string; token: string; displayNam
  */
 export type CompanionClient = Extract<ClientType, "app-watch" | "app-controls">;
 
-function isCompanion(clientType: string): clientType is CompanionClient {
-  return clientType === "app-watch" || clientType === "app-controls";
+/** A device another device sets up and claims at once: an app's companions, and FamilyFi Me's Watch. */
+function isCompanion(clientType: string): boolean {
+  return clientType === "app-watch" || clientType === "app-controls" || clientType === "me-watch";
 }
 
 /**
@@ -278,6 +283,40 @@ async function inviteAndClaimCompanion(input: { clientType: CompanionClient; par
   return { invite: joined.invite, claim: await claimResponse({ ...joined, account: input.account }, null) };
 }
 
+/**
+ * FamilyFi Me on a child's phone invites its Watch and claims it in one transaction, as an app does
+ * its own: the Watch signs in for the phone's family group with `me:askOnly`, and the phone is its
+ * parent, so revoking the phone revokes the Watch. Re-enrolling the same `clientId` retires the old record.
+ */
+async function inviteAndClaimMeWatch(input: { parentDeviceId: string; createdByAccountId: string; group: { id: string; name: string }; clientId: string; displayName: string; userAgent?: string | null; appVersion?: string | null }) {
+  const now = new Date();
+  const signer: Signer = { account: null, group: input.group };
+  const joined = await prisma().$transaction(async (db) => {
+    // As a phone's claim does: hold the group so a deletion waits and then revokes this Watch too.
+    const held = await db.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Group" WHERE "id" = ${input.group.id} FOR SHARE`;
+    if (!held.length) throw new VoidInvite();
+    // And the phone: revoking it waits for this Watch, then finds it and revokes it too; a phone revoked
+    // since its request was signed in sets up nothing.
+    const parent = await db.$queryRaw<{ id: string }[]>`SELECT "id" FROM "PairedDevice" WHERE "id" = ${input.parentDeviceId} AND "revokedAt" IS NULL FOR SHARE`;
+    if (!parent.length) throw new VoidInvite();
+    const invite = await db.pairing.create({
+      data: {
+        clientType: "me-watch",
+        scope: "me:askOnly",
+        displayName: input.displayName,
+        groupId: input.group.id,
+        createdByAccountId: input.createdByAccountId,
+        parentDeviceId: input.parentDeviceId,
+        tokenHash: sha256(randomToken()),
+        expiresAt: now,
+        claimedAt: now,
+      },
+    });
+    return { invite, ...(await join(db, { invite, signer, displayName: input.displayName, clientId: input.clientId, userAgent: input.userAgent, appVersion: input.appVersion, now })) };
+  });
+  return { invite: joined.invite, claim: await claimResponse({ ...joined, ...signer }, null) };
+}
+
 /** Ends a pending invite early. Expiring it, rather than deleting it, keeps the claim path's single check. */
 export async function cancelInvite(id: string): Promise<boolean> {
   const now = new Date();
@@ -289,7 +328,7 @@ export async function cancelInvite(id: string): Promise<boolean> {
 const RECOVERY_REFUSED = "No device signs in as the recovery admin. Choose a personal administrator, or sign in as one.";
 
 /** What a companion is called when its app names none. */
-const COMPANION_NAME = { "app-watch": "Apple Watch", "app-controls": "Shortcuts and controls" } as const;
+const COMPANION_NAME = { "app-watch": "Apple Watch", "app-controls": "Shortcuts and controls", "me-watch": "Watch" } as const;
 
 function inviteBody(invite: { id: string; expiresAt: Date }, code: string) {
   return { invite: { id: invite.id, expiresAt: invite.expiresAt.toISOString(), code } };
@@ -357,6 +396,38 @@ export function companionHost(session: SignedInSession) {
   if (!mayPairAs(session.account)) throw new ApiError(403, "personal_account_required", RECOVERY_REFUSED);
   // Its Watch and its Siri sign-in come with the app that sets them up, so they share its version.
   return { deviceId: session.device.id, account: session.account, appVersion: session.appVersion };
+}
+
+/**
+ * The child's phone FamilyFi Me's Watch is claimed by: a signed-in FamilyFi Me (`me`) whose family
+ * group is still there. Its Watch never sets up another, and no app or browser sets one up for it.
+ */
+export async function meWatchHost(session: SignedInSession) {
+  const device = session.kind === SessionKind.bearer ? session.device : null;
+  if (!device || device.clientType !== "me" || device.scope !== "me:askOnly" || session.account || !device.groupId) {
+    throw new ApiError(403, "me_phone_required", "Only FamilyFi Me on a person's phone can set up its Watch.");
+  }
+  const group = await prisma().group.findUnique({ where: { id: device.groupId }, select: { id: true, name: true, kind: true } });
+  if (!group || group.kind !== GroupKind.family) throw new ApiError(403, "me_phone_required", "Only FamilyFi Me on a person's phone can set up its Watch.");
+  // The Watch is set up by whoever paired the phone, as far as the record goes.
+  const paired = await prisma().pairing.findFirst({ where: { claimedDeviceId: device.id }, select: { createdByAccountId: true } });
+  if (!paired) throw new ApiError(403, "me_phone_required", "Only FamilyFi Me on a person's phone can set up its Watch.");
+  // The Watch ships inside FamilyFi Me, so it shares the phone's version.
+  return { deviceId: device.id, createdByAccountId: paired.createdByAccountId, group: { id: group.id, name: group.name }, appVersion: session.appVersion };
+}
+
+/** FamilyFi Me's phone sets up its Watch and claims it at once. */
+export async function claimMeWatch(host: Awaited<ReturnType<typeof meWatchHost>>, input: { clientId: string; displayName?: string }, userAgent: string | null) {
+  let joined: Awaited<ReturnType<typeof inviteAndClaimMeWatch>>;
+  try {
+    joined = await inviteAndClaimMeWatch({ parentDeviceId: host.deviceId, createdByAccountId: host.createdByAccountId, group: host.group, clientId: input.clientId, displayName: input.displayName ?? COMPANION_NAME["me-watch"], userAgent, appVersion: host.appVersion });
+  } catch (caught) {
+    if (caught instanceof ClientIdInUseError) throw new ApiError(409, "client_id_in_use", caught.message);
+    if (caught instanceof VoidInvite) throw new ApiError(403, "me_phone_required", "Only FamilyFi Me on a person's phone can set up its Watch.");
+    throw caught;
+  }
+  const { invite, claim } = joined;
+  return { invite: { id: invite.id, expiresAt: invite.expiresAt.toISOString(), status: "claimed" }, ...claim };
 }
 
 /** A paired app invites its Watch, or its own `rulesOnly` sign-in, and claims it at once. */

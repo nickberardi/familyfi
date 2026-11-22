@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isPersonDevice } from "@/lib/client-type";
 import { deleteGroup, getGroup, updateGroup } from "@/server/groups";
 import { groupForChild, requireChildReads } from "@/server/child-day";
 import { readBody, withMutation, withSession } from "@/server/guard";
@@ -19,7 +20,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(request: Request, ctx: Ctx) {
   return withSession(request, async (session) => {
     const { id } = await ctx.params;
-    if (session.device?.clientType !== "me") return Response.json({ group: await getGroup(id) });
+    if (!isPersonDevice(session.device)) return Response.json({ group: await getGroup(id) });
     // A child's phone (FamilyFi Me) reads its own group and the shared Things; any other is not there for it.
     const own = session.device.groupId;
     if (!own) throw new ApiError(404, "not_found", "Group not found.");

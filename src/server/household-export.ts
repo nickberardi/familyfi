@@ -656,7 +656,7 @@ export async function applyImport(upload: Buffer, importer: { accountId: string 
       await tx.rule.deleteMany({ where: { systemGroupId: null, id: { notIn: [QUARANTINE_RULE_ID, LOCK_DNS_RULE_ID] } } });
       // A child's phone signs in for its group: read which before the groups go, and after they are
       // made again keep it where its group came back with the same id, and sign it out where it did not.
-      const childPhones = await tx.pairedDevice.findMany({ where: { clientType: "me", revokedAt: null, groupId: { not: null } }, select: { id: true, groupId: true } });
+      const childPhones = await tx.pairedDevice.findMany({ where: { clientType: { in: ["me", "me-watch"] }, revokedAt: null, groupId: { not: null } }, select: { id: true, groupId: true } });
       const childInvites = await tx.pairing.findMany({ where: { clientType: "me", claimedAt: null, expiresAt: { gt: now }, groupId: { not: null } }, select: { id: true, groupId: true } });
       await tx.group.deleteMany({});
       // A group's Block button default names one of its rules, made below: it is set once they are.

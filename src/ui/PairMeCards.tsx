@@ -31,8 +31,8 @@ function CardHead({ title, sub }: { title: string; sub: string }) {
 }
 
 /**
- * Pair FamilyFi Me's paired devices, as every client shows them: the FamilyFi Me phones still paired
- * (`mePhones`), each drawn as Pair Device draws a phone, with whom it is for and Revoke. Pairing needs a
+ * Pair FamilyFi Me's paired devices, as every client shows them: the FamilyFi Me phones and their Watches
+ * still paired (`mePhones`), each drawn as Pair Device draws a phone, with whom it is for and Revoke. Pairing needs a
  * published route (`canPair`), so without one it says so. Until the phones have loaded it says so, and
  * a failed load offers Try again (`status`). Revoke asks first where the platform does.
  */
@@ -71,7 +71,13 @@ export function MePhonesCard({
           {!canPair ? <Text style={[text(14, 21, "muted"), styles.empty]}>{CHILD_PHONES_COPY.remoteFirst}</Text> : null}
           {paired.length === 0 ? <Text style={[text(14, 21, "muted"), styles.empty]}>{COPY.empty}</Text> : null}
           {paired.map((phone) => (
-            <PairedPhoneRow key={phone.id} phone={phone} disabled={disabled} onRevoke={() => onRevoke(phone)} />
+            <PairedPhoneRow
+              key={phone.id}
+              phone={phone}
+              parentName={phones.find((parent) => parent.id === phone.parentDeviceId)?.displayName}
+              disabled={disabled}
+              onRevoke={() => onRevoke(phone)}
+            />
           ))}
         </>
       )}
