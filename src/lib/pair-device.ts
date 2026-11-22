@@ -147,6 +147,11 @@ export function publishedRoute(tunnel: Pick<RemoteAccess, "endpointId"> | null, 
 }
 
 /** Revoking a phone also revokes the Watches, phones and agents it paired. */
+/** "Emma's" when the device knows whose it is, else "their". */
+function whose(phone: Partial<Pick<PairedPhone, "person">>): string {
+  return phone.person ? `${phone.person.name}'s` : "their";
+}
+
 export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<Pick<PairedPhone, "clientType" | "person">>) {
   const kind = phone.clientType ? { clientType: phone.clientType } : null;
   // Nothing pairs an app's Siri and shortcuts again: the app sets them up itself when it next opens.
@@ -156,13 +161,13 @@ export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<
   if (phone.clientType === "me") {
     return {
       title: `Revoke ${phone.displayName}?`,
-      message: `FamilyFi Me on it signs out now and can't show ${phone.person ? `${phone.person.name}'s` : "their"} rules or ask for more time until it is paired again. Its Watch, if it has one, signs out too.`,
+      message: `FamilyFi Me on it signs out now and can't show ${whose(phone)} rules or ask for more time until it is paired again. Its Watch, if it has one, signs out too.`,
       confirmLabel: PAIR_COPY.revoke,
     };
   }
   // FamilyFi Me sets its Watch up again itself, from the phone.
   if (phone.clientType === "me-watch") {
-    return { title: `Revoke ${phone.displayName}?`, message: "FamilyFi Me on it signs out now, until FamilyFi Me on the phone sets it up again.", confirmLabel: PAIR_COPY.revoke };
+    return { title: `Revoke ${phone.displayName}?`, message: `FamilyFi Me on it signs out now and can't show ${whose(phone)} rules or ask for more time until FamilyFi Me is next opened on ${whose(phone)} phone. The phone stays paired.`, confirmLabel: PAIR_COPY.revoke };
   }
   const paired = kind && isApp(kind) ? " Its shortcuts and system controls, and any Watch, phone or agent it paired, stop working too." : "";
   return { title: `Revoke ${phone.displayName}?`, message: `It is signed out now and must be paired again.${paired}`, confirmLabel: PAIR_COPY.revoke };
@@ -185,7 +190,7 @@ function pairedDate(iso: string) {
 /** Where a device came from when it paired through no listed route: the phone that set it up, the home network, or a removed route. */
 function origin(device: Pick<PairedPhone, "clientType">, parentName: string | null): string {
   if (device.clientType === "app-watch") return `Paired automatically from ${parentName ?? "an iPhone"}`;
-  if (device.clientType === "me-watch") return `Paired automatically from ${parentName ?? "FamilyFi Me"}`;
+  if (device.clientType === "me-watch") return `Paired automatically from ${parentName ?? "a FamilyFi Me phone"}`;
   if (isAppControls(device)) return `Set up automatically by ${parentName ?? "the FamilyFi app"}`;
   if (device.clientType === "agent") return "On the home network";
   return "via a route that was removed";
@@ -410,7 +415,7 @@ export const ME_PAGE_COPY = {
   getApp: "Get FamilyFi Me",
   getAppSub: "Install it on their phone before you pair it.",
   phones: "Paired devices",
-  phonesSub: "FamilyFi Me on each person's phone; revoke any one of them",
+  phonesSub: "FamilyFi Me on each person's phone and Watch; revoke any one of them",
   empty: "No FamilyFi Me phones paired yet. Choose Pair FamilyFi Me to pair a person's phone.",
   shared: "Shared Things",
   sharedSub: "Things everyone with FamilyFi Me sees and can ask you for more time on",
