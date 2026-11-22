@@ -780,6 +780,41 @@ describe("a child's day on the household's clock", () => {
       ["10 PM", "Bedtime", "Until 11 PM"],
       ["11 PM", "Not blocked", "For the rest of today"],
     ]);
+    // Another always-on rule a parent lifted until after the break comes back too, and is told: blocked from then on.
+    const video = { label: "Video", allowed: { by: "Nick", until: 21 * 60 + 30 } };
+    expect(tell({ windows: [], always: [pauseBreak, video] })).toEqual([
+      ["Now", "Allowed until 9 PM", "Nick said yes"],
+      ["9 PM", "Paused again", "Until 10 PM"],
+      ["10 PM", "Video", "For the rest of today"],
+    ]);
+    // One that comes back after the pause has ended: not blocked until then.
+    const later = { ...video, allowed: { by: "Nick", until: 22 * 60 + 30 } };
+    expect(tell({ windows: [], always: [pauseBreak, later] })).toEqual([
+      ["Now", "Allowed until 9 PM", "Nick said yes"],
+      ["9 PM", "Paused again", "Until 10 PM"],
+      ["10 PM", "Not blocked", "Until 10:30 PM"],
+      ["10:30 PM", "Video again", "For the rest of today"],
+    ]);
+    // One that comes back during a window on after the pause, or past midnight, blocks from that window's end; no free morning.
+    const quarter = { ...video, allowed: { by: "Nick", until: 22 * 60 + 15 } };
+    expect(tell({ windows: [{ label: "Reading", from: 22 * 60, to: 22 * 60 + 30 }], always: [pauseBreak, quarter] }).at(-1)).toEqual(["10:30 PM", "Video", "For the rest of today"]);
+    const eleven = { ...video, allowed: { by: "Nick", until: 23 * 60 } };
+    expect(tell({ windows: [{ label: "Bedtime", from: 22 * 60, to: 60 }], always: [pauseBreak, eleven] }).at(-1)).toEqual(["10 PM", "Bedtime", "Until 1 AM"]);
+    // Past midnight, one still lifted then leaves no free morning either.
+    const late = { ...video, allowed: { by: "Nick", until: 24 * 60 + 90 } };
+    expect(tell({ windows: [{ label: "Bedtime", from: 22 * 60, to: 60 }], always: [pauseBreak, late] }).at(-1)).toEqual(["10 PM", "Bedtime", "Until 1 AM"]);
+    // The timeline shows it as the list tells it.
+    expect(tellDay({ windows: [], always: [pauseBreak, video] } as never, 19 * 60, PHONE_VOICE).bands).toContainEqual(expect.objectContaining({ kind: "window", from: 22 * 60, to: 1440, label: "Video" }));
+    // A Thing's lifted Block button rule comes back in the paused ink, in the list and on the timeline alike.
+    const games = { label: "Games block", source: "Blocked", pause: true, allowed: { by: "Nick", until: 21 * 60 + 30 } };
+    const thing = tellDay({ windows: [], always: [pauseBreak, games] } as never, 19 * 60, THING_VOICE);
+    expect(thing.items.at(-1)).toMatchObject({ time: "10 PM", title: "Blocked", tone: "paused" });
+    expect(thing.bands).toContainEqual(expect.objectContaining({ kind: "pause", from: 22 * 60, to: 1440, label: "Blocked" }));
+    // The rule whose lift ends first is the one told back, whichever comes back after it.
+    const homework = { label: "Homework", from: 18 * 60, to: 21 * 60 + 30 };
+    const videoFirst = { label: "Video", allowed: { by: "Nick", until: 20 * 60 } };
+    expect(tell({ windows: [homework], always: [videoFirst, pauseBreak] }).at(-1)).toEqual(["9:30 PM", "Video again", "For the rest of today"]);
+    expect(tell({ windows: [homework], always: [videoFirst, { label: "Games", allowed: { by: "Nick", until: 20 * 60 + 30 } }] }).at(-1)).toEqual(["9:30 PM", "Video again", "For the rest of today"]);
     // The pause comes back in the paused ink on the timeline, as the list's row does.
     expect(tellDay({ windows: [], always: [pauseBreak] } as never, 19 * 60, PHONE_VOICE).bands).toContainEqual(expect.objectContaining({ kind: "pause", from: 21 * 60, to: 22 * 60 }));
     // A Thing's pause with no end, answered by no one named.
