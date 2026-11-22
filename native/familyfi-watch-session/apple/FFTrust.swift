@@ -117,7 +117,7 @@ enum FFTrust {
 
     /// The household refused a call outside the device's scope: 403 `watch_scope` for a Watch
     /// (`app-watch`, `app:rulesOnly`), 403 `app_scope` for the app's Siri, Shortcuts and controls
-    /// (`app:rulesOnly`). Only that: the session stays, so this never renews or signs the device out.
+    /// (`app:rulesOnly`), 403 `me_scope` for FamilyFi Me's Watch (`me-watch`). Only that: the session stays, so this never renews or signs the device out.
     static func isScopeRefusal(status: Int, body: Data) -> Bool {
         guard status == 403 else { return false }
         struct Wire: Decodable { struct E: Decodable { var code: String }; var error: E }

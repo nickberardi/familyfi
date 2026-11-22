@@ -295,6 +295,10 @@ async function inviteAndClaimMeWatch(input: { parentDeviceId: string; createdByA
     // As a phone's claim does: hold the group so a deletion waits and then revokes this Watch too.
     const held = await db.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Group" WHERE "id" = ${input.group.id} FOR SHARE`;
     if (!held.length) throw new VoidInvite();
+    // And the phone: revoking it waits for this Watch, then finds it and revokes it too; a phone revoked
+    // since its request was signed in sets up nothing.
+    const parent = await db.$queryRaw<{ id: string }[]>`SELECT "id" FROM "PairedDevice" WHERE "id" = ${input.parentDeviceId} AND "revokedAt" IS NULL FOR SHARE`;
+    if (!parent.length) throw new VoidInvite();
     const invite = await db.pairing.create({
       data: {
         clientType: "me-watch",

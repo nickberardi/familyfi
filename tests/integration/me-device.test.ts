@@ -24,6 +24,8 @@ import { removeAccountDevices, revokeDevice } from "@/server/connection";
 import { deleteGroup } from "@/server/groups";
 import { exportHousehold, importHousehold } from "@/server/household-export";
 import { deviceTokenAppVersion } from "@/server/device-token";
+import { readSessionFromRequest } from "@/server/auth";
+import { claimMeWatch, meWatchHost } from "@/server/pairing";
 import { resetDatabase } from "../helpers/db";
 import { request, type SessionAuth } from "../helpers/http";
 import { bearer, claimInvite, claimWatchRequest, homeRoute, issuedInvite, pairingAdmin, pairingAdminAuth, pairPhone, type Claim } from "../helpers/pairing";
@@ -414,6 +416,16 @@ describe("FamilyFi Me's Watch", () => {
     const renewed = await refresh(request("/api/v1/auth/refresh", { method: "POST", headers: json, body: JSON.stringify({ refreshToken: watch.refreshToken }) }));
     expect(renewed.status).toBe(200);
     expect(deviceTokenAppVersion(((await renewed.json()) as { token: string }).token)).toBe("1.1.0");
+  });
+
+  it("sets up nothing for a phone revoked after its request was signed in", async () => {
+    const emma = await childGroup();
+    const phone = await pairMe(admin, emma.id);
+    const session = await readSessionFromRequest(request("/api/v1/paired/invites?claim=true", { auth: bearer(phone.token) }));
+    const host = await meWatchHost(session!);
+    await revokeDevice(phone.device.id);
+    await expect(claimMeWatch(host, { clientId: WATCH_ID }, null)).rejects.toMatchObject({ status: 403, code: "me_phone_required" });
+    expect(await prisma().pairedDevice.count({ where: { clientType: "me-watch" } })).toBe(0);
   });
 
   it("sets up no Watch of its own and reports no Screen Time permission", async () => {
