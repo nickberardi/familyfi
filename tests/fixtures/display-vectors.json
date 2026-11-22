@@ -34679,7 +34679,7 @@
           "unknown": false,
           "title": "Bedtime",
           "who": "Abby and Cassie",
-          "line": "Ends at 7:00 AM",
+          "line": "Ends tomorrow at 7:00 AM",
           "short": "Bedtime ends for Abby and Cassie in",
           "privateShort": "Bedtime ends in"
         },
@@ -35156,7 +35156,7 @@
           "unknown": false,
           "title": "Bedtime",
           "who": "Abby",
-          "line": "Ends at 7:00 AM",
+          "line": "Ends tomorrow at 7:00 AM",
           "short": "Bedtime ends for Abby in",
           "privateShort": "Bedtime ends in"
         },
@@ -35186,7 +35186,7 @@
           "unknown": false,
           "title": "Bedtime",
           "who": "Abby",
-          "line": "Ends at 7:00 AM",
+          "line": "Ends tomorrow at 7:00 AM",
           "short": "Bedtime ends for Abby in",
           "privateShort": "Bedtime ends in"
         },
@@ -35391,7 +35391,7 @@
           "unknown": false,
           "title": "Bedtime",
           "who": "Abby and Cassie",
-          "line": "Ends at 7:00 AM",
+          "line": "Ends tomorrow at 7:00 AM",
           "short": "Bedtime ends for Abby and Cassie in",
           "privateShort": "Bedtime ends in"
         },
@@ -35504,6 +35504,669 @@
           "line": "",
           "short": "Nothing planned",
           "privateShort": "Nothing planned"
+        }
+      ]
+    },
+    {
+      "fn": "familyTimeline",
+      "name": "a pause on a break blocks again when the break ends",
+      "input": {
+        "groups": [
+          {
+            "id": "g-abby",
+            "kind": "family",
+            "name": "Abby",
+            "monogram": "A",
+            "familyRole": null,
+            "deviceCount": 2,
+            "suspension": {
+              "active": false,
+              "until": "2026-11-22T18:00:00.000Z",
+              "by": {
+                "accountId": "acc-nick",
+                "name": "Nick"
+              },
+              "resumesAt": "2026-11-22T16:00:00.000Z"
+            },
+            "allowance": {
+              "active": true,
+              "until": "2026-11-22T16:00:00.000Z",
+              "by": {
+                "accountId": "acc-nick",
+                "name": "Nick"
+              }
+            },
+            "internetRuleIds": [],
+            "access": "available",
+            "dohOverrideUrl": null
+          }
+        ],
+        "rules": [],
+        "timeZone": "America/New_York",
+        "now": "2026-11-22T15:00:00.000Z",
+        "hours": 6
+      },
+      "expected": [
+        {
+          "from": "2026-11-22T15:00:00.000Z",
+          "now": [],
+          "next": {
+            "name": "Block",
+            "pause": true,
+            "who": "Abby",
+            "groupIds": [
+              "g-abby"
+            ],
+            "at": "2026-11-22T16:00:00.000Z",
+            "kind": "start"
+          },
+          "unknown": false,
+          "title": "Block",
+          "who": "Abby",
+          "line": "Starts at 11:00 AM",
+          "short": "Block for Abby in",
+          "privateShort": "Block in"
+        },
+        {
+          "from": "2026-11-22T16:00:00.000Z",
+          "now": [
+            {
+              "name": "Block",
+              "pause": true,
+              "who": "Abby",
+              "groupIds": [
+                "g-abby"
+              ],
+              "at": "2026-11-22T18:00:00.000Z"
+            }
+          ],
+          "next": {
+            "name": "Block",
+            "pause": true,
+            "who": "Abby",
+            "groupIds": [
+              "g-abby"
+            ],
+            "at": "2026-11-22T18:00:00.000Z",
+            "kind": "end"
+          },
+          "unknown": false,
+          "title": "Block",
+          "who": "Abby",
+          "line": "Ends at 1:00 PM",
+          "short": "Block ends for Abby in",
+          "privateShort": "Block ends in"
+        },
+        {
+          "from": "2026-11-22T18:00:00.000Z",
+          "now": [],
+          "next": null,
+          "unknown": false,
+          "title": "Nothing planned",
+          "who": "",
+          "line": "",
+          "short": "Nothing planned",
+          "privateShort": "Nothing planned"
+        }
+      ]
+    },
+    {
+      "fn": "familyTimeline",
+      "name": "an always-on internet rule blocks with no end",
+      "input": {
+        "groups": [
+          {
+            "id": "g-abby",
+            "kind": "family",
+            "name": "Abby",
+            "monogram": "A",
+            "familyRole": null,
+            "deviceCount": 2,
+            "suspension": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "allowance": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "internetRuleIds": [],
+            "access": "available",
+            "dohOverrideUrl": null
+          }
+        ],
+        "rules": [
+          {
+            "id": "r-off",
+            "name": "No internet",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g-abby"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-11-22T15:00:00.000Z",
+        "hours": 6
+      },
+      "expected": [
+        {
+          "from": "2026-11-22T15:00:00.000Z",
+          "now": [
+            {
+              "name": "No internet",
+              "pause": false,
+              "who": "Abby",
+              "groupIds": [
+                "g-abby"
+              ],
+              "at": null
+            }
+          ],
+          "next": null,
+          "unknown": false,
+          "title": "Nothing planned",
+          "who": "",
+          "line": "",
+          "short": "Nothing planned",
+          "privateShort": "Nothing planned"
+        }
+      ]
+    },
+    {
+      "fn": "familyTimeline",
+      "name": "an always-on internet rule allowed until a time",
+      "input": {
+        "groups": [
+          {
+            "id": "g-abby",
+            "kind": "family",
+            "name": "Abby",
+            "monogram": "A",
+            "familyRole": null,
+            "deviceCount": 2,
+            "suspension": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "allowance": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "internetRuleIds": [],
+            "access": "available",
+            "dohOverrideUrl": null
+          }
+        ],
+        "rules": [
+          {
+            "id": "r-off",
+            "name": "No internet",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g-abby"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [
+              {
+                "groupId": "g-abby",
+                "pause": {
+                  "active": true,
+                  "until": "2026-11-22T16:00:00.000Z",
+                  "kind": "allow",
+                  "by": {
+                    "accountId": "acc-nick",
+                    "name": "Nick"
+                  }
+                }
+              }
+            ],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-11-22T15:00:00.000Z",
+        "hours": 6
+      },
+      "expected": [
+        {
+          "from": "2026-11-22T15:00:00.000Z",
+          "now": [],
+          "next": {
+            "name": "No internet",
+            "pause": false,
+            "who": "Abby",
+            "groupIds": [
+              "g-abby"
+            ],
+            "at": "2026-11-22T16:00:00.000Z",
+            "kind": "start"
+          },
+          "unknown": false,
+          "title": "No internet",
+          "who": "Abby",
+          "line": "Starts at 11:00 AM",
+          "short": "No internet for Abby in",
+          "privateShort": "No internet in"
+        },
+        {
+          "from": "2026-11-22T16:00:00.000Z",
+          "now": [
+            {
+              "name": "No internet",
+              "pause": false,
+              "who": "Abby",
+              "groupIds": [
+                "g-abby"
+              ],
+              "at": null
+            }
+          ],
+          "next": null,
+          "unknown": false,
+          "title": "Nothing planned",
+          "who": "",
+          "line": "",
+          "short": "Nothing planned",
+          "privateShort": "Nothing planned"
+        }
+      ]
+    },
+    {
+      "fn": "familyTimeline",
+      "name": "Bedtime paused for everyone until a time",
+      "input": {
+        "groups": [
+          {
+            "id": "g-abby",
+            "kind": "family",
+            "name": "Abby",
+            "monogram": "A",
+            "familyRole": null,
+            "deviceCount": 2,
+            "suspension": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "allowance": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "internetRuleIds": [],
+            "access": "available",
+            "dohOverrideUrl": null
+          },
+          {
+            "id": "g-cassie",
+            "kind": "family",
+            "name": "Cassie",
+            "monogram": "C",
+            "familyRole": null,
+            "deviceCount": 2,
+            "suspension": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "allowance": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "internetRuleIds": [],
+            "access": "available",
+            "dohOverrideUrl": null
+          }
+        ],
+        "rules": [
+          {
+            "id": "r-nights",
+            "name": "School nights",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g-abby",
+              "g-cassie"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": true,
+              "until": "2026-11-23T03:00:00.000Z",
+              "kind": "pause",
+              "by": {
+                "accountId": "acc-nick",
+                "name": "Nick"
+              }
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w-bed",
+                "name": "Bedtime",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "21:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-11-23T02:30:00.000Z",
+        "hours": 6
+      },
+      "expected": [
+        {
+          "from": "2026-11-23T02:30:00.000Z",
+          "now": [],
+          "next": {
+            "name": "Bedtime",
+            "pause": false,
+            "who": "Abby and Cassie",
+            "groupIds": [
+              "g-abby",
+              "g-cassie"
+            ],
+            "at": "2026-11-23T03:00:00.000Z",
+            "kind": "start"
+          },
+          "unknown": false,
+          "title": "Bedtime",
+          "who": "Abby and Cassie",
+          "line": "Starts at 10:00 PM",
+          "short": "Bedtime for Abby and Cassie in",
+          "privateShort": "Bedtime in"
+        },
+        {
+          "from": "2026-11-23T03:00:00.000Z",
+          "now": [
+            {
+              "name": "Bedtime",
+              "pause": false,
+              "who": "Abby and Cassie",
+              "groupIds": [
+                "g-abby",
+                "g-cassie"
+              ],
+              "at": "2026-11-23T12:00:00.000Z"
+            }
+          ],
+          "next": {
+            "name": "Bedtime",
+            "pause": false,
+            "who": "Abby and Cassie",
+            "groupIds": [
+              "g-abby",
+              "g-cassie"
+            ],
+            "at": "2026-11-23T12:00:00.000Z",
+            "kind": "end"
+          },
+          "unknown": false,
+          "title": "Bedtime",
+          "who": "Abby and Cassie",
+          "line": "Ends tomorrow at 7:00 AM",
+          "short": "Bedtime ends for Abby and Cassie in",
+          "privateShort": "Bedtime ends in"
+        },
+        {
+          "from": "2026-11-23T08:30:00.000Z",
+          "now": [
+            {
+              "name": "Bedtime",
+              "pause": false,
+              "who": "Abby and Cassie",
+              "groupIds": [
+                "g-abby",
+                "g-cassie"
+              ],
+              "at": "2026-11-23T12:00:00.000Z"
+            }
+          ],
+          "next": null,
+          "title": "Not up to date",
+          "who": "",
+          "line": "Open FamilyFi to update",
+          "short": "Not up to date",
+          "privateShort": "Not up to date",
+          "unknown": true
+        }
+      ]
+    },
+    {
+      "fn": "familyTimeline",
+      "name": "a Thing blocked by its Block button rule",
+      "input": {
+        "groups": [
+          {
+            "id": "g-tv",
+            "kind": "things",
+            "name": "TV",
+            "monogram": "T",
+            "familyRole": null,
+            "deviceCount": 2,
+            "suspension": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "allowance": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "internetRuleIds": [],
+            "access": "available",
+            "dohOverrideUrl": null,
+            "blockButtonRuleId": "r-tv"
+          }
+        ],
+        "rules": [
+          {
+            "id": "r-tv",
+            "name": "TV off",
+            "kind": "category",
+            "scope": "group",
+            "groupIds": [
+              "g-tv"
+            ],
+            "networkIds": [],
+            "targetIds": [
+              1
+            ],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "always",
+            "windows": [],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-11-22T15:00:00.000Z",
+        "hours": 6
+      },
+      "expected": [
+        {
+          "from": "2026-11-22T15:00:00.000Z",
+          "now": [
+            {
+              "name": "Block",
+              "pause": true,
+              "who": "TV",
+              "groupIds": [
+                "g-tv"
+              ],
+              "at": null
+            }
+          ],
+          "next": null,
+          "unknown": false,
+          "title": "Nothing planned",
+          "who": "",
+          "line": "",
+          "short": "Nothing planned",
+          "privateShort": "Nothing planned"
+        }
+      ]
+    },
+    {
+      "fn": "familyTimeline",
+      "name": "a weekly window days away is still what comes next",
+      "input": {
+        "groups": [
+          {
+            "id": "g-abby",
+            "kind": "family",
+            "name": "Abby",
+            "monogram": "A",
+            "familyRole": null,
+            "deviceCount": 2,
+            "suspension": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "allowance": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "internetRuleIds": [],
+            "access": "available",
+            "dohOverrideUrl": null
+          }
+        ],
+        "rules": [
+          {
+            "id": "r-chores",
+            "name": "Chores",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g-abby"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w-ch",
+                "name": "Chores",
+                "days": [
+                  6
+                ],
+                "start": "10:00",
+                "end": "12:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-11-23T15:00:00.000Z"
+      },
+      "expected": [
+        {
+          "from": "2026-11-23T15:00:00.000Z",
+          "now": [],
+          "next": {
+            "name": "Chores",
+            "pause": false,
+            "who": "Abby",
+            "groupIds": [
+              "g-abby"
+            ],
+            "at": "2026-11-28T15:00:00.000Z",
+            "kind": "start"
+          },
+          "unknown": false,
+          "title": "Chores",
+          "who": "Abby",
+          "line": "Starts Sat at 10:00 AM",
+          "short": "Chores for Abby in",
+          "privateShort": "Chores in"
+        },
+        {
+          "from": "2026-11-24T15:00:00.000Z",
+          "now": [],
+          "next": null,
+          "title": "Not up to date",
+          "who": "",
+          "line": "Open FamilyFi to update",
+          "short": "Not up to date",
+          "privateShort": "Not up to date",
+          "unknown": true
         }
       ]
     }

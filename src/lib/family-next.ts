@@ -1,12 +1,12 @@
 import { groupDayOf } from "./child-day";
-import { formatClock } from "./display";
-import { headsUpBlocks, type HeadsUpBlock } from "./heads-up";
+import { formatClock, relativeDayLabel } from "./display";
+import { HEADS_UP_DAYS, headsUpBlocks, type HeadsUpBlock } from "./heads-up";
 import type { Rule } from "./rules";
 import type { Group } from "./types";
 
 /**
  * What changes next across the family, for a parent's watch face, Smart Stack card and Wear Tile
- * (docs/design.md, "Parent watch: what changes next"). Each group's blocks come from the same plan
+ * (docs/design.md, "A parent's watch: what changes next"). Each group's blocks come from the same plan
  * FamilyFi Me's heads-up uses (`groupDayOf`, `headsUpBlocks`), so a parent's watch and a person's
  * phone agree on when Bedtime starts; this only gathers them across groups and words them for a
  * parent, naming whose it is. The watches port it (Swift and Kotlin) and replay its vectors.
@@ -46,7 +46,7 @@ export type FamilyEntry = {
   title: string;
   /** "Abby and Cassie", or "" with nothing next. */
   who: string;
-  /** "Starts at 9:00 PM", "Ends at 7:00 AM", or "" with nothing next. */
+  /** "Starts at 9:00 PM", "Ends tomorrow at 7:00 AM", "Starts Sat at 10:00 AM", or "" with nothing next. */
   line: string;
   /**
    * The inline complication's words before its relative time: "Bedtime for Abby in", "Bedtime ends
@@ -79,8 +79,9 @@ type GroupBlock = { group: Pick<Group, "id" | "name">; block: HeadsUpBlock };
 export function familyTimeline(groups: Group[], rules: Rule[], timeZone: string, now: Date, hours: number = FAMILY_NEXT_HOURS): FamilyEntry[] {
   const horizon = now.getTime() + hours * 3_600_000;
   const blocks: GroupBlock[] = groups.flatMap((group) =>
-    // Planned two days past what it shows, so the last entry still knows what comes after it.
-    headsUpBlocks(groupDayOf(group, rules, timeZone, now), now, (hours + 48) / 24).map((block) => ({ group, block })),
+    // Planned at least two days past what it shows, and as far as FamilyFi Me's heads-up, so the last
+    // entry still knows what comes after it and a weekly window is never read as nothing planned.
+    headsUpBlocks(groupDayOf(group, rules, timeZone, now), now, Math.max(HEADS_UP_DAYS, (hours + 48) / 24)).map((block) => ({ group, block })),
   );
   const recurs = groups.some((group) => groupDayOf(group, rules, timeZone, now).windows.length > 0);
   const after = (times: (number | undefined)[]) => [...new Set(times)].filter((time): time is number => time !== undefined && time > now.getTime()).sort((a, b) => a - b);
@@ -107,13 +108,16 @@ function entryAt(blocks: GroupBlock[], at: number, nextAt: number | null, timeZo
   const next = first ? { ...gather(changes.filter((change) => change.kind === first.kind && change.name === first.name && change.pause === first.pause))[0]!, kind: first.kind } : null;
   const base = { from: new Date(at).toISOString(), now, next, unknown: false };
   if (!next) return { ...base, title: FAMILY_NEXT_WORDS.nothingPlanned, who: "", line: "", short: FAMILY_NEXT_WORDS.nothingPlanned, privateShort: FAMILY_NEXT_WORDS.nothingPlanned };
-  const clock = formatClock(new Date(next.at!), timeZone);
+  // "Starts at 9:00 PM" today, "Ends tomorrow at 7:00 AM", "Starts Sat at 10:00 AM".
+  const when = new Date(next.at!);
+  const day = relativeDayLabel(when, timeZone, new Date(at));
+  const clock = `${day === "today" ? "" : `${day} `}at ${formatClock(when, timeZone)}`;
   const start = next.kind === "start";
   return {
     ...base,
     title: next.name,
     who: next.who,
-    line: start ? `Starts at ${clock}` : `Ends at ${clock}`,
+    line: start ? `Starts ${clock}` : `Ends ${clock}`,
     short: start ? `${next.name} for ${next.who} in` : `${next.name} ends for ${next.who} in`,
     privateShort: start ? `${next.name} in` : `${next.name} ends in`,
   };
