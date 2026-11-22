@@ -348,7 +348,15 @@ describe("FamilyFi Me on a child's phone", () => {
   });
 
   it("says what revoking takes from the child", () => {
-    expect(revokeConfirm(child()).message).toBe("FamilyFi Me on it signs out now and can't show Emma's rules or ask for more time until it is paired again.");
+    expect(revokeConfirm(child()).message).toBe("FamilyFi Me on it signs out now and can't show Emma's rules or ask for more time until it is paired again. Its Watch, if it has one, signs out too.");
+    expect(revokeConfirm({ ...child(), clientType: "me-watch", displayName: "Watch" }).message).toBe("FamilyFi Me on it signs out now, until FamilyFi Me on the phone sets it up again.");
+  });
+
+  it("lists FamilyFi Me's Watch with its phone on Pair FamilyFi Me, not on Pair Device", () => {
+    const watch = { ...child(), id: "w1", clientType: "me-watch", displayName: "Watch", parentDeviceId: child().id };
+    expect(mePhones([child(), watch]).map((phone) => phone.id)).toEqual([child().id, "w1"]);
+    expect(pairDeviceList([child(), watch])).toEqual([]);
+    expect(phoneLines(watch, new Date(), "Emma's phone").origin).toBe("Paired automatically from Emma's phone");
   });
 
   it("invites for its person (their family group) and no account", async () => {

@@ -30,7 +30,7 @@ describe("API compatibility", () => {
     expect(MIN_SERVER_API_VERSION).toBe(info["x-min-server"]);
     expect(MIN_WATCH_API_VERSION).toBe(info["x-min-app-watch"]);
     expect(MIN_ME_API_VERSION).toBe(info["x-min-me"]);
-    expect(MIN_API_VERSION_BY_CLIENT).toEqual({ app: info["x-min-app"], agent: info["x-min-app"], "app-watch": info["x-min-app-watch"], "app-controls": info["x-min-app-watch"], me: info["x-min-me"] });
+    expect(MIN_API_VERSION_BY_CLIENT).toEqual({ app: info["x-min-app"], agent: info["x-min-app"], "app-watch": info["x-min-app-watch"], "app-controls": info["x-min-app-watch"], me: info["x-min-me"], "me-watch": info["x-min-me"] });
   });
 
   it("asks for an app update when the app is older than the server's oldest client", () => {

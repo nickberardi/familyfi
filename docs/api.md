@@ -61,7 +61,7 @@ Platform-specific navigation, typography and layout are owned by each implementa
 | PUT/DELETE | `/api/v1/connection/endpoints/{id}` | Update or remove a route the household runs. A write-only `serviceToken` puts an `own` `cloudflare` route behind Cloudflare Access (a different token replaces it); `edgeAuth: none` turns Access off; any other route is 409 `access_unsupported`. A duplicate address is 409 `endpoint_exists`; deleting a route while an unclaimed pairing uses it is 409 `endpoint_in_use`; a `quick` or `domain` route is 409 `managed_route`. Deleting the published route turns remote access off. Any update clears the route's reachability evidence |
 | POST | `/api/v1/connection/endpoints/{id}/check` | Checks from home whether a route the household runs answers as this FamilyFi: it requests the route's `/api/v1/connection/identity` with the route's own trust and Access token and compares `instanceId`. Stores and returns `reachability`; a `quick` or `domain` route is 409 `managed_route` |
 | GET/PUT | `/api/v1/connection/tunnel` | Remote access: publish one route — `off`, `quick`, or `named` with a `hostname` (FamilyFi's Cloudflare tunnel on your domain) or an `endpointId` (a route you run). Every other route is turned off. A published route you run always reports `status: running`; `reachability` says whether it works: `reachedAt`, the last request the remote-access port answered through it (written at most once a minute), and FamilyFi's own last check (`checkedAt`, `result`, `message`), run once on publish and on request. Publishing again clears it. Clients never show such a route as on without that evidence |
-| POST | `/api/v1/paired/invites` | Invite a device to join. An administrator invites a phone, tablet or Mac (`clientType: app`; its route, the administrator it signs in as; five minutes) a child's phone (`clientType: me`; its route and `personId`; five minutes), or an agent (`clientType: agent`, `scope`; fifteen minutes, home network only) and gets a single-use `code`. With `?claim=true`, a signed-in paired app invites and claims its Watch, or its own sign-in for Siri and shortcuts (`clientType: app-controls`), in one call |
+| POST | `/api/v1/paired/invites` | Invite a device to join. An administrator invites a phone, tablet or Mac (`clientType: app`; its route, the administrator it signs in as; five minutes) a child's phone (`clientType: me`; its route and `personId`; five minutes), or an agent (`clientType: agent`, `scope`; fifteen minutes, home network only) and gets a single-use `code`. With `?claim=true`, a signed-in paired app invites and claims its Watch, or its own sign-in for Siri and shortcuts (`clientType: app-controls`), in one call, and FamilyFi Me on a child's phone its own Watch (`clientType: me-watch`) |
 | GET/PUT | `/api/v1/connection/home` | Administrator reads or sets the home network address: where FamilyFi is inside the home (an http or https origin, 400 `invalid_home_url` otherwise; `null` clears it), apart from the route remote access publishes. Both answer `current`, the address this request reached and whether it is `private`, which stands in while none is saved. Agents pair there |
 | POST | `/api/v1/connection/pins` | Administrator computes a route's SPKI pin from its live address (TLS handshake only) or a pasted PEM; stores nothing |
 | GET/DELETE | `/api/v1/paired/invites/{id}` | Administrator reads an invite's status (`pending`, `claimed`, `expired`) or cancels it early |
@@ -315,6 +315,19 @@ does. Deleting its group revokes it and cancels invites still
 waiting for the group, keeping the record; an import keeps it where its group comes back with the
 same id and revokes it otherwise.
 
+#### FamilyFi Me's Watch
+
+FamilyFi Me sets up its own Watch the way the FamilyFi app does its own: in one call,
+`POST /paired/invites?claim=true` with `{ clientType: "me-watch", clientId, displayName? }`, from the
+signed-in phone, and the response is the Watch's claim, which the phone hands it. The Watch pairs as
+`me-watch` with `me:askOnly` and signs in for the phone's person, never as an account; the phone is
+its parent, so revoking the phone, or deleting the person's group, revokes the Watch. It reads and
+asks exactly as the phone does, but sets up no Watch of its own and never reports a Screen Time
+permission. Only a signed-in `me` device whose group is still there may set one up (403
+`me_phone_required` otherwise); FamilyFi Me sets up nothing else this way (400). Setting it up again
+with the same `clientId` replaces the earlier record. Administrators see it beside its phone under
+Pair FamilyFi Me.
+
 #### Shared Things
 
 A Things group's `kidsCanAsk`, which an administrator sets with `PUT /groups/{id}` (400
@@ -410,9 +423,10 @@ Me only its own, and a code with none (from before 2.0.0) is the app's (`verifyH
 | `app-watch` | That app's Watch | `app:rulesOnly` |
 | `app-controls` | That app's Siri, Shortcuts and system controls, which run outside the app | `app:rulesOnly` |
 | `me` | FamilyFi Me on a child's phone | `me:askOnly` |
+| `me-watch` | FamilyFi Me's Watch, set up by that phone | `me:askOnly` |
 | `agent` | An AI agent | `agent:full` or `agent:readOnly` |
 
-`me-watch` is reserved. The scope is stored as one value, `group:scope`, and each is one explicit
+The scope is stored as one value, `group:scope`, and each is one explicit
 allowlist in [`src/server/device-scope.ts`](../src/server/device-scope.ts), not a ladder:
 
 | Scope | May call |
@@ -470,7 +484,7 @@ Any of them may rise on purpose and none ever falls or passes `info.version`. `s
 
 **Deprecated in 2.0, gone by 2.3.0.** Everything 2.0 keeps only for apps before it ends by 2.3.0, on the operator's decision: Health's `minAppApiVersion` and `minWatchApiVersion`, the paired-devices list's `?client=` filter, an optional `appVersion` at pairing and refresh (required from 2.3.0), and the 1.4.0 app floor (`x-min-app` at least 2.0.0 from 2.3.0, `info.x-min-app-by`). Every `deprecated: true` in the contract names its `x-removed-in`, every field that will become required its `x-required-in`, and `tests/unit/api-deprecations.test.ts` fails once `info.version` reaches either while the promise is unkept. Anything deprecated later in 2.x is marked for removal the same way.
 
-`GET /api/v1/health` reports `apiVersion` (this document's `info.version`), `minAppApiVersion` (`x-min-app`) and `minWatchApiVersion` (`x-min-app-watch`) to anyone, in every answer. Those two are deprecated and will be removed in a future version; new clients name their type and read `minApiVersion` instead, and they stay only so apps built before 2.0.0 are still told to update. A client that names its client type, `GET /api/v1/health?clientType=me`, also gets `minApiVersion`, its own floor from the server's table (`MIN_API_VERSION_BY_CLIENT` in `src/lib/api-compat.ts`): `x-min-app` for `app` and `agent`, `x-min-app-watch` for `app-watch` and `app-controls`, `x-min-me` for `me`. A client type the server does not know, or a server before 2.0.0, sends none, and the client falls back to the two fields above. A client that can meet a server of another version, the companion app, compares them before it reads the household (`src/lib/api-compat.ts`, and the household store's `checkCompatibility`):
+`GET /api/v1/health` reports `apiVersion` (this document's `info.version`), `minAppApiVersion` (`x-min-app`) and `minWatchApiVersion` (`x-min-app-watch`) to anyone, in every answer. Those two are deprecated and will be removed in a future version; new clients name their type and read `minApiVersion` instead, and they stay only so apps built before 2.0.0 are still told to update. A client that names its client type, `GET /api/v1/health?clientType=me`, also gets `minApiVersion`, its own floor from the server's table (`MIN_API_VERSION_BY_CLIENT` in `src/lib/api-compat.ts`): `x-min-app` for `app` and `agent`, `x-min-app-watch` for `app-watch` and `app-controls`, `x-min-me` for `me` and `me-watch`. A client type the server does not know, or a server before 2.0.0, sends none, and the client falls back to the two fields above. A client that can meet a server of another version, the companion app, compares them before it reads the household (`src/lib/api-compat.ts`, and the household store's `checkCompatibility`):
 
 | Condition | The client shows |
 | --- | --- |

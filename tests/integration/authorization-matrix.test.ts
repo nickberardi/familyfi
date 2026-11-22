@@ -42,6 +42,7 @@ const PASSWORD = process.env.FAMILYFI_DEFAULT_PASSWORD ?? "ci-recovery-password"
  *   signed in as the administrator: an agent with that scope, the app's Watch, or its Siri, Shortcuts
  *   and system controls, both `app:rulesOnly`. Its scope bounds it, not the account.
  * - `me`: FamilyFi Me on a child's phone (`me:askOnly`), signed in for a family group and as no account.
+ * - `me-watch`: FamilyFi Me's Watch, the same scope for the same group (`me:askOnly`).
  */
 const DEVICE_KINDS = {
   "agent:full": { clientType: "agent", scope: "agent:full" },
@@ -49,6 +50,7 @@ const DEVICE_KINDS = {
   "app-watch": { clientType: "app-watch", scope: "app:rulesOnly" },
   "app-controls": { clientType: "app-controls", scope: "app:rulesOnly" },
   me: { clientType: "me", scope: "me:askOnly" },
+  "me-watch": { clientType: "me-watch", scope: "me:askOnly" },
 } as const;
 const DEVICES = Object.keys(DEVICE_KINDS) as (keyof typeof DEVICE_KINDS)[];
 type Device = (typeof DEVICES)[number];
@@ -118,7 +120,7 @@ type Entry = { access: Access; devices?: readonly Device[]; question?: string };
 const READERS: readonly Device[] = ["agent:full", "agent:readOnly"];
 const READERS_AND_WATCH: readonly Device[] = ["agent:full", "agent:readOnly", "app-watch", "app-controls"];
 /** Every paired device, a child's phone included: its own session. */
-const EVERY_DEVICE: readonly Device[] = [...READERS_AND_WATCH, "me"];
+const EVERY_DEVICE: readonly Device[] = [...READERS_AND_WATCH, "me", "me-watch"];
 const CONTROLLERS: readonly Device[] = ["agent:full"];
 const CONTROLLERS_AND_WATCH: readonly Device[] = ["agent:full", "app-watch", "app-controls"];
 
@@ -148,7 +150,7 @@ const ACCESS: Record<string, Entry> = {
   "POST /api/v1/auth/refresh": { access: "refresh-token" },
   "GET /api/v1/auth/session": { access: "session", devices: EVERY_DEVICE },
   "GET /api/v1/changes/{id}": { access: "session", devices: READERS_AND_WATCH },
-  "GET /api/v1/connection": { access: "session", devices: ["app-watch", "app-controls", "me"] },
+  "GET /api/v1/connection": { access: "session", devices: ["app-watch", "app-controls", "me", "me-watch"] },
   "GET /api/v1/connection/endpoints": { access: "administrator" },
   "POST /api/v1/connection/endpoints": { access: "administrator" },
   "PUT /api/v1/connection/endpoints/{id}": { access: "administrator" },
@@ -188,16 +190,16 @@ const ACCESS: Record<string, Entry> = {
   "POST /api/v1/checkup/leftover-policies/remove": { access: "administrator" },
   "GET /api/v1/dpi/applications": { access: "session", devices: READERS },
   "GET /api/v1/dpi/categories": { access: "session", devices: READERS },
-  "GET /api/v1/groups": { access: "session", devices: [...READERS_AND_WATCH, "me"] },
+  "GET /api/v1/groups": { access: "session", devices: [...READERS_AND_WATCH, "me", "me-watch"] },
   "GET /api/v1/groups/{id}/resolver": { access: "session" },
   "POST /api/v1/groups": { access: "session", devices: CONTROLLERS },
-  "GET /api/v1/groups/{id}": { access: "session", devices: [...READERS, "me"] },
+  "GET /api/v1/groups/{id}": { access: "session", devices: [...READERS, "me", "me-watch"] },
   "PUT /api/v1/groups/{id}": { access: "session", devices: CONTROLLERS },
   "DELETE /api/v1/groups/{id}": { access: "session", devices: CONTROLLERS },
   "PUT /api/v1/groups/{id}/resolver": { access: "session" },
   "DELETE /api/v1/groups/{id}/resolver": { access: "session" },
   "GET /api/v1/health": { access: "public" },
-  "GET /api/v1/rules": { access: "session", devices: [...READERS_AND_WATCH, "me"] },
+  "GET /api/v1/rules": { access: "session", devices: [...READERS_AND_WATCH, "me", "me-watch"] },
   "POST /api/v1/rules": { access: "session", devices: CONTROLLERS },
   "GET /api/v1/rules/{id}": { access: "session", devices: READERS },
   "PATCH /api/v1/rules/{id}": { access: "session", devices: CONTROLLERS },
@@ -218,7 +220,7 @@ const ACCESS: Record<string, Entry> = {
   "POST /api/v1/groups/{id}/unblock/end": { access: "session", devices: CONTROLLERS_AND_WATCH },
   "POST /api/v1/groups/{id}/unblock/extend": { access: "session", devices: CONTROLLERS_AND_WATCH },
   // A child asks for more time on its own group or a shared Thing; a parent's Not now is the app's or the web's alone.
-  "POST /api/v1/groups/{id}/asks": { access: "child", devices: ["me"] },
+  "POST /api/v1/groups/{id}/asks": { access: "child", devices: ["me", "me-watch"] },
   "POST /api/v1/groups/{id}/asks/{askId}/decline": { access: "administrator" },
   "GET /api/v1/settings/export": { access: "administrator" },
   "GET /api/v1/settings/household": { access: "session", devices: READERS },
@@ -306,8 +308,8 @@ async function requestAs(caller: Caller, route: Route): Promise<Request> {
   if (isDevice(caller)) {
     // A child's phone signs in for its group, as no account.
     const issued =
-      caller === "me"
-        ? await createSession({ accountId: null, username: `device:${devices.me}`, kind: SessionKind.bearer, deviceId: devices.me })
+      caller === "me" || caller === "me-watch"
+        ? await createSession({ accountId: null, username: `device:${devices[caller]}`, kind: SessionKind.bearer, deviceId: devices[caller] })
         : await createSession({ accountId: accounts.administrator!, username: "matrix-admin", kind: SessionKind.bearer, deviceId: devices[caller] });
     return request(url, { ...init, auth: { cookie: "", csrf: "", token: issued.raw } });
   }
@@ -340,7 +342,7 @@ describe("authorization matrix", () => {
     for (const device of DEVICES) {
       const { clientType, scope } = DEVICE_KINDS[device];
       const created = await prisma().pairedDevice.create({
-        data: { displayName: device, clientType, scope, accountId: clientType === "agent" ? administrator.id : null, groupId: clientType === "me" ? child.id : null },
+        data: { displayName: device, clientType, scope, accountId: clientType === "agent" ? administrator.id : null, groupId: clientType === "me" || clientType === "me-watch" ? child.id : null },
       });
       devices[device] = created.id;
     }

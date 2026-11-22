@@ -39,7 +39,7 @@ const NEVER_FOR_AGENTS: [string, string][] = [
 describe("device scopes", () => {
   it("lets each client type hold only its own scopes", () => {
     const valid = CLIENT_TYPES.flatMap((clientType) => CLIENT_SCOPE_VALUES.filter((scope) => isValidScope(clientType, scope)).map((scope) => `${clientType} ${scope}`));
-    expect(valid.sort()).toEqual(["agent agent:full", "agent agent:readOnly", "app app:full", "app-controls app:rulesOnly", "app-watch app:rulesOnly", "me me:askOnly"]);
+    expect(valid.sort()).toEqual(["agent agent:full", "agent agent:readOnly", "app app:full", "app-controls app:rulesOnly", "app-watch app:rulesOnly", "me me:askOnly", "me-watch me:askOnly"]);
   });
 
   it("refuses everything for a scope its client type may not hold, or one it does not know", () => {
@@ -55,8 +55,19 @@ describe("device scopes", () => {
     }
     const household: [string, string][] = [["GET", "/api/v1/rules/r1"], ["GET", "/api/v1/changes/c1"], ["GET", "/api/v1/paired/devices"], ["DELETE", "/api/v1/paired/devices/someone-else"], ["PATCH", "/api/v1/paired/devices/someone-else"], ["PUT", "/api/v1/groups/g1"], ["DELETE", "/api/v1/groups/g1"], ["GET", "/api/v1/groups/g1/devices"], ["POST", "/api/v1/groups/g1/asks/a1/decline"], ["GET", "/api/v1/groups/g1/asks"]];
     // `GET /connection` is the one call it shares with the agents' never-list: it needs the manifest away from home.
-    const never = NEVER_FOR_AGENTS.filter(([method, path]) => !(method === "GET" && path === "/api/v1/connection"));
+    // It also sets up its Watch (`POST /paired/invites`, which takes only `?claim=true` and `me-watch` from it).
+    expect(allowed("me", "me:askOnly", "POST", "/api/v1/paired/invites")).toBe(true);
+    const never = NEVER_FOR_AGENTS.filter(([method, path]) => !(method === "GET" && path === "/api/v1/connection") && !(method === "POST" && path === "/api/v1/paired/invites"));
     for (const [method, path] of [...household, ...RULE_VERBS, ...HOUSEHOLD_WRITES, ...never]) expect(allowed("me", "me:askOnly", method, path), `${method} ${path}`).toBe(false);
+  });
+
+  it("me:askOnly on FamilyFi Me's Watch is the phone's list without setting up a Watch or reporting Screen Time", () => {
+    for (const [method, path] of [["GET", "/api/v1/auth/session"], ["GET", "/api/v1/connection"], ["GET", "/api/v1/groups"], ["GET", "/api/v1/groups/g1"], ["GET", "/api/v1/rules"], ["POST", "/api/v1/groups/g1/asks"], ["DELETE", "/api/v1/paired/devices/device-1"]]) {
+      expect(allowed("me-watch", "me:askOnly", method, path), `${method} ${path}`).toBe(true);
+    }
+    for (const [method, path] of [["POST", "/api/v1/paired/invites"], ["PATCH", "/api/v1/paired/devices/device-1"], ["DELETE", "/api/v1/paired/devices/someone-else"], ["GET", "/api/v1/paired/devices"], ...RULE_VERBS, ...HOUSEHOLD_WRITES]) {
+      expect(allowed("me-watch", "me:askOnly", method, path), `${method} ${path}`).toBe(false);
+    }
   });
 
   it("app:full allows whatever the account may", () => {

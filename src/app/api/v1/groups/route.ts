@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isPersonDevice } from "@/lib/client-type";
 import { childGroupIds, groupForChild } from "@/server/child-day";
 import { createGroup, listGroups } from "@/server/groups";
 import { readBody, withMutation, withSession } from "@/server/guard";
@@ -13,7 +14,7 @@ const Create = z.object({
 
 export async function GET(request: Request) {
   return withSession(request, async (session) => {
-    if (session.device?.clientType !== "me") return Response.json({ groups: await listGroups() });
+    if (!isPersonDevice(session.device)) return Response.json({ groups: await listGroups() });
     // A child's phone (FamilyFi Me) reads its own group first, then the Things shared with children.
     const own = session.device.groupId;
     const reads = own ? await childGroupIds(own) : [];
