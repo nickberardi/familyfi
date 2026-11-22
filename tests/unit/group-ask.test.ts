@@ -116,6 +116,36 @@ describe("a child's ask, as a parent answers it", () => {
     expect(askSheetChoices(pauseAsk, [], TZ, NOW, 30, emma(pauseAsk)).map((choice) => choice.label)).toEqual(["Not now"]);
   });
 
+  it("offers the length a child asked to be unblocked for, as a break in a block a parent set", async () => {
+    const timed: GroupAsk = { ...pauseAsk, minutes: 30 };
+    // Blocked until 12:39 AM by a parent: a yes for 30 minutes blocks again at 11 PM.
+    const paused = { ...emma(timed), suspension: { active: true, until: "2026-11-17T05:39:00Z", by: null } } as Group;
+    expect(groupAskLine(paused, [], NOW)).toBe("Asked to be unpaused for 30 minutes");
+    const [allow, unblock] = askSheetChoices(timed, [], TZ, NOW, 30, paused);
+    expect(allow).toMatchObject({ label: "Allow 30 minutes", note: "blocks again at 11:00 PM", request: { kind: "unblockFor", run: "unblockNow", minutes: 30 } });
+    expect(unblock).toMatchObject({ label: "Unblock", note: "ends the block now" });
+    const { sent, mutate, shown } = recorder({ groups: [paused], devices: [] });
+    await answerAsk(mutate, paused, timed, allow as never, undefined, NOW, undefined, TZ);
+    expect(sent[0]).toMatchObject({ path: "/api/v1/groups/g1/rules/internet/resume", init: { method: "POST", body: { askId: "a2", until: "2026-11-17T04:00:00.000Z" } } });
+    expect(sent[0]!.options.feedback).toMatchObject({ notice: "Emma unblocked until 11:00 PM, then blocked again." });
+    expect(shown().groups[0]!.ask?.state).toBe("yes");
+    // A block that ends first: Unblock alone, as it ends the block anyway.
+    const ending = { ...paused, suspension: { active: true, until: "2026-11-17T03:45:00Z", by: null } } as Group;
+    expect(askSheetChoices(timed, [], TZ, NOW, 30, ending).map((choice) => choice.label)).toEqual(["Unblock", "Not now"]);
+  });
+
+  it("offers the length a child asked to unblock a Thing for, as its Unblock sheet would give it", async () => {
+    const video = { ...bedtime, id: "r-video", name: "Video", kind: "category", mode: "always", windows: [], groupIds: ["tv"] } as unknown as Rule;
+    const timed: GroupAsk = { ...pauseAsk, minutes: 120, from: { groupId: "g1", name: "Cassie" } };
+    const tv = { ...emma(timed), id: "tv", kind: "things", name: "TV", familyRole: null, blockButtonRuleId: "r-video" } as unknown as Group;
+    expect(groupAskLine(tv, [video], NOW)).toBe("Cassie asked to unblock it for 2 hours");
+    const [allow] = askSheetChoices(timed, [video], TZ, NOW, 30, tv);
+    expect(allow).toMatchObject({ label: "Allow 2 hours", note: "lifts Video until 12:30 AM", request: { kind: "unblockFor", run: "pauseRule", ruleId: "r-video", minutes: 120 } });
+    const { sent, mutate } = recorder({ groups: [tv], devices: [] });
+    await answerAsk(mutate, tv, timed, allow as never, undefined, NOW, undefined, TZ);
+    expect(sent[0]).toMatchObject({ path: "/api/v1/groups/tv/rules/r-video/pause", init: { method: "POST", body: { until: "2026-11-17T05:30:00.000Z" } } });
+  });
+
   it("says Not now with the ask's decline", async () => {
     const { sent, mutate, shown } = recorder({ groups: [emma(pauseAsk)], devices: [] });
     const notNow = askSheetChoices(pauseAsk, [], TZ, NOW, 30).at(-1)!;

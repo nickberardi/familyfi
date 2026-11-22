@@ -63,13 +63,13 @@ describe("a child's day", () => {
     expect(waiting.items[0]!.status?.text).toBe("You asked for 30 more minutes at 8:56 PM. Waiting for an answer.");
   });
 
-  it("asks to unpause during a pause, with no length", () => {
+  it("asks to unpause during a pause, for a length", () => {
     const story = tellDay(paused, NOW, PHONE_VOICE);
     expect(story.day.kind).toBe("paused");
     expect(story.items[0]).toMatchObject({
       now: true,
       title: "Paused by Dad",
-      ask: { withLength: false, label: "Ask to unpause" },
+      ask: { withLength: true, label: "Ask to unpause" },
     });
     expect(topAnswer(story)).toMatchObject({
       title: "Paused until 5 PM",
@@ -217,7 +217,7 @@ describe("a child's day", () => {
     expect(declined.items[0]?.ask).toBeUndefined();
     const lapsed = tellDay({ ...paused, ask: { state: "timedOut", at: NOW - 60 } }, NOW, PHONE_VOICE);
     expect(lapsed.items[0]?.status?.text).toBe("No one answered in time. You can ask again.");
-    expect(lapsed.items[0]?.ask).toMatchObject({ withLength: false, label: "Ask to unpause" });
+    expect(lapsed.items[0]?.ask).toMatchObject({ withLength: true, label: "Ask to unpause" });
     const ended = tellDay({ ...paused, ask: { state: "ended", at: NOW - 60 } }, NOW, PHONE_VOICE);
     expect(ended.ask).toBeUndefined();
     expect(ended.items[0]?.status).toBeUndefined();
@@ -291,7 +291,7 @@ describe("a child's day", () => {
     const later = tellDay(subject, NOW + 30, PHONE_VOICE);
     expect(later.ask).toBeUndefined();
     expect(later.items[0]).toMatchObject({
-      ask: { withLength: false, label: "Ask to unpause" },
+      ask: { withLength: true, label: "Ask to unpause" },
     });
   });
 
@@ -358,7 +358,7 @@ describe("a child's day", () => {
     };
     const paused = tellDay(pauseInWindow, 21 * 60 + 30, PHONE_VOICE);
     expect(paused.day.kind).toBe("paused");
-    expect(paused.items[0]?.ask).toMatchObject({ withLength: false });
+    expect(paused.items[0]?.ask).toMatchObject({ withLength: true, label: "Ask to unpause" });
 
     const waitingToUnpause = tellDay(
       {
@@ -728,6 +728,57 @@ describe("a child's day on the household's clock", () => {
     expect(groupDayOf({ ...tv, kind: "family" as const }, [video], ZONE, MONDAY_NIGHT).pause).toBeNull();
   });
 
+  it("asks to unblock a Thing for a length, and tells a yes for it until it ends", () => {
+    const video = {
+      id: "r3",
+      name: "Video",
+      kind: "category",
+      scope: "group",
+      groupIds: ["t1"],
+      enabled: true,
+      builtIn: null,
+      mode: "always",
+      windows: [],
+      targetIds: [],
+      pause: { active: false, until: null, kind: "pause", by: null },
+      groupPauses: [],
+    } as unknown as Rule;
+    const tv = { id: "t1", name: "TV", kind: "things" as const, blockButtonRuleId: "r3", suspension: { active: false, until: null, by: null }, allowance: { active: false, until: null, by: null } };
+    // Asked for 2 hours at 10:25 PM: the ask shows its length while it waits.
+    const asked = { ...tv, ask: { id: "a1", about: "pause" as const, minutes: 120, state: "waiting" as const, at: "2026-11-17T03:25:00Z", expiresAt: "2026-11-17T04:25:00Z" } };
+    const waiting = meDaySubject(groupDayOf(asked, [video], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
+    const told = tellDay(waiting.subject, waiting.now, THING_VOICE, waiting.clock);
+    expect(told.items[0]?.status?.text).toBe("You asked for 2 hours at 10:25 PM. Waiting for an answer.");
+    // A yes: Video paused for TV until 11:30 PM. Allowed until then, then Video again.
+    const yes = { ...asked.ask, state: "yes" as const, answeredAt: "2026-11-17T03:30:00Z", by: { name: "Nick" } };
+    const lifted = { ...video, groupPauses: [{ groupId: "t1", pause: { active: true, until: "2026-11-17T04:30:00Z", kind: "pause", by: { name: "Nick" } } }] } as unknown as Rule;
+    const day = meDaySubject(groupDayOf({ ...tv, ask: yes } as never, [lifted], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
+    const story = tellDay(day.subject, day.now, THING_VOICE, day.clock);
+    expect(story.items[0]).toMatchObject({ title: "Allowed until 11:30 PM", detail: "Nick said yes" });
+    expect(story.items[1]).toMatchObject({ time: "11:30 PM", title: "Video again" });
+    expect(thingTile(story)).toEqual({ word: "Allowed", line: "Until 11:30 PM", tone: "on" });
+  });
+
+  it("tells a pause's break as allowed until it ends, then blocked again", () => {
+    const computers = {
+      id: "t2",
+      name: "Computers",
+      kind: "things" as const,
+      // Blocked until 12:39 AM, with a break until 11 PM from a yes to a 30 minute ask.
+      suspension: { active: false, until: "2026-11-17T05:39:00Z", by: { name: "Nick" }, resumesAt: "2026-11-17T04:00:00Z" },
+      allowance: { active: true, until: "2026-11-17T04:00:00Z", by: { name: "Nick" } },
+    };
+    const day = groupDayOf(computers as never, [], ZONE, MONDAY_NIGHT);
+    expect(day.pause).toBeNull();
+    expect(day.pauseBreak).toEqual({ by: "Nick", until: "2026-11-17T04:00:00Z" });
+    const { subject, now, clock: on } = meDaySubject(day, MONDAY_NIGHT);
+    const story = tellDay(subject, now, THING_VOICE, on);
+    expect(story.items[0]).toMatchObject({ title: "Allowed until 11 PM", detail: "Nick said yes" });
+    expect(story.items[1]).toMatchObject({ time: "11 PM", title: "Blocked again" });
+    // Once the break is over, the pause is told again (FamilyFi reports it active).
+    expect(groupDayOf({ ...computers, suspension: { ...computers.suspension, resumesAt: "2026-11-17T03:00:00Z" } } as never, [], ZONE, MONDAY_NIGHT).pauseBreak).toBeUndefined();
+  });
+
   it("tells a yes as the group's pause and lifts stand now, not as it was asked", () => {
     const at = "2026-11-17T03:00:00Z"; // 10 PM
     const answeredAt = "2026-11-17T03:05:00Z";
@@ -832,7 +883,9 @@ describe("a length of the child's own", () => {
     type Spec = { paths: Record<string, { post: { requestBody: { content: { "application/json": { schema: { oneOf: { properties: { minutes?: { minimum: number; maximum: number } } }[] } } } } } }> };
     const spec = YAML.parse(readFileSync(path.resolve(__dirname, "../../openapi/familyfi.v1.yaml"), "utf8")) as Spec;
     const bodies = spec.paths["/api/v1/groups/{id}/asks"].post.requestBody.content["application/json"].schema.oneOf;
-    const minutes = bodies.map((body) => body.properties.minutes).find(Boolean);
-    expect(minutes).toEqual({ type: "integer", minimum: ASK_MINUTES.min, maximum: ASK_MINUTES.max });
+    // Both asks take a length: a window's always, an ask to unblock when the child chose one.
+    const minutes = bodies.map((body) => body.properties.minutes);
+    expect(minutes).toHaveLength(2);
+    for (const length of minutes) expect(length).toMatchObject({ type: "integer", minimum: ASK_MINUTES.min, maximum: ASK_MINUTES.max });
   });
 });

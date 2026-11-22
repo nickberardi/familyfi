@@ -4,7 +4,7 @@ import { answerAsks, blockedBeyondPause, claimAsk, endEarlierUnblockYes, followP
 import { isFullApp } from "./device-scope";
 import { enqueueChange } from "./changes";
 import { prisma } from "./db";
-import { blockRuleOf, groupInclude, internetLinks, lifted, publicGroup, sessionActor } from "./groups";
+import { BREAK_CLEARED, blockRuleOf, groupInclude, internetLinks, lifted, pauseOf, publicGroup, sessionActor } from "./groups";
 import { ApiError } from "./http";
 import { CLEARED, liftRule, type LiftAction, type LiftBody } from "./rule-lifts";
 import { activeWindowsEnd, askableWindows, ruleInternetWindows } from "./rules";
@@ -14,7 +14,7 @@ import { currentHouseholdId } from "./household-context";
 /** The reserved `ruleId` for a group's built-in rule: "this group has internet". */
 export const INTERNET_RULE_ID = "internet";
 
-const BLOCK_CLEARED = { enabled: false, expiresAt: null, blockedByAccountId: null, blockedByName: null };
+const BLOCK_CLEARED = { enabled: false, expiresAt: null, blockedByAccountId: null, blockedByName: null, ...BREAK_CLEARED };
 
 /**
  * The five verbs on a group's built-in `internet` rule. They do to it what they do to any
@@ -22,7 +22,9 @@ const BLOCK_CLEARED = { enabled: false, expiresAt: null, blockedByAccountId: nul
  * the rule's polarity differs. Pausing "has internet" blocks all internet, through the
  * group's hidden always-on block rule, enabled until `until` or until resumed. Allowing
  * overrides the group's own internet rules, one lift each. Pause and allow replace each
- * other. `body` is what `readLiftBody` read.
+ * other. `body` is what `readLiftBody` read. Resume with `until`, only as a parent's yes to a
+ * child's ask (`answering`), gives the pause a break: it stops blocking until then and blocks again
+ * after, until its own end; at or past that end it simply ends.
  */
 export async function liftGroupInternet(
   session: Parameters<typeof sessionActor>[0],
@@ -37,7 +39,7 @@ export async function liftGroupInternet(
   const now = new Date();
   const actor = sessionActor(session);
   const block = blockRuleOf(existing);
-  const blocking = Boolean(block?.enabled && (block.expiresAt === null || now < block.expiresAt));
+  const { set } = pauseOf(block, now);
   const lifts = { groupId, rule: { kind: RuleKind.internet, systemGroupId: null } };
   const clearAllowances = () =>
     prisma().ruleGroup.updateMany({ where: { ...lifts, pauseActive: true, pauseKind: RuleLiftKind.allow }, data: CLEARED });
@@ -50,7 +52,8 @@ export async function liftGroupInternet(
 
   if (action === "pause") {
     const end = until(body.until);
-    const fields = { enabled: true, expiresAt: end, blockedByAccountId: actor.accountId, blockedByName: actor.name };
+    // A new pause has no break.
+    const fields = { enabled: true, expiresAt: end, blockedByAccountId: actor.accountId, blockedByName: actor.name, ...BREAK_CLEARED };
     await prisma().$transaction(async (tx) => {
       const data = { ...fields, name: pauseRuleName(existing) };
       // Upserted on the unique group id, so two first pauses at once do not collide.
@@ -70,6 +73,22 @@ export async function liftGroupInternet(
     });
     await endEarlierUnblockYes(groupId);
     await followPause(groupId);
+  } else if (action === "resume" && body.until) {
+    // A break, never a parent's own resume: only a yes to a child's ask carries a time.
+    if (!answering) throw new ApiError(400, "invalid_request", "until on resume answers a child's ask, with its askId.");
+    const end = until(body.until)!;
+    if (!block || !set) throw new ApiError(409, "not_paused", "There is no pause to lift.");
+    if (block.expiresAt && end.getTime() >= block.expiresAt.getTime()) {
+      // The pause would end first: the yes ends it, as a resume does.
+      await prisma().rule.update({ where: { id: block.id }, data: BLOCK_CLEARED });
+    } else {
+      await prisma().rule.update({
+        where: { id: block.id },
+        data: { pauseActive: true, pauseUntil: end, pausedByAccountId: actor.accountId, pausedByName: actor.name },
+      });
+    }
+    await endEarlierUnblockYes(groupId, answering);
+    await answerAsks(session, groupId, { pause: true });
   } else if (action === "resume") {
     const resumed = await prisma().rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
     if (resumed.count) {
@@ -77,7 +96,7 @@ export async function liftGroupInternet(
       await answerAsks(session, groupId, { pause: true });
     }
   } else if (action === "extend") {
-    if (!block || !blocking) throw new ApiError(409, "not_paused", "Extend requires an active pause.");
+    if (!block || !set) throw new ApiError(409, "not_paused", "Extend requires an active pause.");
     if (!block.expiresAt) throw new ApiError(409, "indefinite", "An indefinite pause has no expiry to extend.");
     const extended = extendSuspensionUntil(block.expiresAt, now, body.minutes! * 60_000);
     await prisma().rule.update({ where: { id: block.id }, data: { expiresAt: extended } });
@@ -111,7 +130,7 @@ export async function liftGroupInternet(
       // Read and cleared here, so a pause that lands meanwhile is replaced, not left beside the allow.
       await tx.rule.updateMany({ where: { systemGroupId: groupId, enabled: true }, data: BLOCK_CLEARED });
     });
-    if (blocking) await endEarlierUnblockYes(groupId);
+    if (set) await endEarlierUnblockYes(groupId);
     await answerAsks(session, groupId, { pause: true, ruleIds: targets.map(({ rule }) => rule.id) });
   } else {
     await clearAllowances();
