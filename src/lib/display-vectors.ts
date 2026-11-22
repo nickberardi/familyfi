@@ -128,6 +128,8 @@ export const EXCLUDED: Record<string, string> = {
   // The Watch lists a group's rules but draws no schedule bar.
   groupScheduleToday: "the schedule bar and today's list are phone and web only; tests/unit/group-schedule.test.ts",
   groupScheduleRules: "returns the rules themselves; the groupScheduleRuleRows vectors cover their titles and order",
+  // familyfi-mobile's parent watches replay these vectors, and never show FamilyFi Me's words.
+  meWatchAppCopy: "FamilyFi Me's watch words; familyfi-mobile-me's tests check its Swift and Kotlin spell them; tests/unit/me-watch-app-copy.test.ts",
 };
 
 export type Outcome =

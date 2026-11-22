@@ -19,6 +19,14 @@ describe("meWatchAppCopy", () => {
     expect(copy.notOpen).toBe("Open FamilyFi Me on your phone to send this.");
   });
 
+  it("names the app, the Things and the complication", () => {
+    const copy = meWatchAppCopy("apple");
+    expect(copy.title).toBe("FamilyFi Me");
+    expect(copy.things).toBe("Things");
+    expect(copy.nextChange).toBe("Next change");
+    expect(copy.nextChangeAbout).toBe("When your next block starts or ends.");
+  });
+
   it("says the same words on both watches where the platforms don't differ", () => {
     const { openTitle, setUpLine, updatesLine, notOpen, ...rest } = meWatchAppCopy("apple");
     const wear = meWatchAppCopy("wear");
