@@ -88,9 +88,9 @@ export type DaySubject = {
   windows: DayWindow[];
   ask?: DayAsk;
   /** Rules that block all internet all the time (an always-on internet rule); `allowed` while a parent lifted one until a time. */
-  /** `to`: when it stops blocking again today, for a pause's break; absent: the rest of today. */
+  /** `to`: when it stops blocking again today, for a pause's break; absent: the rest of today. `ends`: a break's pause that ends after midnight, told by its time. */
   /** `pause` marks a pause's break or a Thing's lifted Block button rule, `open` when that pause has no end (a yes to the child's ask for a length): told in the voice's own words, blocked again until `to`. */
-  always?: { label: string; allowed?: { by?: string; until: Clock }; source?: string; to?: Clock; pause?: true; open?: true }[];
+  always?: { label: string; allowed?: { by?: string; until: Clock }; source?: string; to?: Clock; ends?: Clock; pause?: true; open?: true }[];
   /** How many minutes before a window starts the child can ask (the household's `askAheadMinutes`); 0 is never. */
   askAhead?: number;
 };
@@ -486,7 +486,7 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
       label: "Paused",
       pause: true,
       allowed: { ...(me.pauseBreak.by ? { by: me.pauseBreak.by } : {}), until },
-      ...(end < 1440 ? { to: end } : {}),
+      ...(end < 1440 ? { to: end } : me.pauseBreak.pauseUntil ? { ends: end } : {}),
       ...(me.pauseBreak.pauseUntil ? {} : { open: true as const }),
     });
   }
@@ -625,7 +625,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
       tone: liftedAlways!.pause ? "paused" : "window",
       sign: liftedAlways!.pause ? "pause" : "window",
       title: `${liftedAlways!.label} again`,
-      detail: againTo !== undefined ? `Until ${clock(againTo)}` : liftedAlways!.open ? NO_END_TIME : "For the rest of today",
+      detail: againTo !== undefined ? `Until ${clock(againTo)}` : liftedAlways!.ends !== undefined ? `Until ${clock(liftedAlways!.ends)}` : liftedAlways!.open ? NO_END_TIME : "For the rest of today",
     });
   // A lifted rule blocks again from `at`; a pause's break only until the pause's end, and what comes after is told on.
   const blocksAgain = (at: Clock): DayItem[] => [alwaysAgain(at), ...(againTo !== undefined ? onwards(againTo) : [])];
