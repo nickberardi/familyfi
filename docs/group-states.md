@@ -203,7 +203,7 @@ Answer opens the answer sheet
 | A rule's window no longer on | **Not now** |
 
 During a pause's break the group reads not paused, with `suspension.resumesAt`, and its allowance
-is active until then: the badge says Unblocked and the line "Unblocked until 11:00 PM by Sam, then
+is active until then: the badge says Unblocked and the line "Unblocked until 11:00 PM by Nick, then
 blocked again", and the button is **Resume**, which ends the unblock (`/unblock/end`) and so the
 break: the pause blocks again at once. A parent's own Unblock never gives a break; it ends the pause.
 

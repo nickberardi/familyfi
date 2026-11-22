@@ -94,9 +94,9 @@ describe("the heads-up before a block starts or ends", () => {
     expect(blocks[0]).toMatchObject({ name: "Paused", pause: true, afterExtraTime: true, to: new Date("2026-11-17T02:00:00Z") });
     expect(blocks[0]!.from.toISOString()).toBe("2026-11-17T01:30:00.000Z");
     const notices = headsUpNotices(blocks, MONDAY_EVENING, ZONE, "apps");
-    expect(notices.map(({ kind, title }) => [kind, title])).toEqual([
-      ["start", "Your extra time ends in 5 minutes"],
-      ["end", "Your pause ends in 5 minutes"],
+    expect(notices.map(({ kind, title, body }) => [kind, title, body])).toEqual([
+      ["start", "Your extra time ends in 5 minutes", "Your pause is back on. Your apps pause at 8:30 PM."],
+      ["end", "Your pause ends in 5 minutes", "Your apps are back at 9 PM."],
     ]);
   });
 

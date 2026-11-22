@@ -171,7 +171,11 @@ function startWords(block: HeadsUpBlock, timeZone: string, voice: HeadsUpVoice, 
   const lead = minutesText(minutes);
   const at = timeAt(block.from, timeZone);
   const stops = voice === "apps" ? `Your apps pause at ${at}.` : `Your internet pauses at ${at}.`;
-  if (block.afterExtraTime) return { title: `Your extra time ends in ${lead}`, lateTitle: `Your extra time ends at ${at}`, body: `${block.name} is back on. ${stops}` };
+  if (block.afterExtraTime) {
+    // A pause's break ends as the pause: "Your pause is back on."
+    const back = block.pause ? "Your pause" : block.name;
+    return { title: `Your extra time ends in ${lead}`, lateTitle: `Your extra time ends at ${at}`, body: `${back} is back on. ${stops}` };
+  }
   return { title: `${block.name} starts in ${lead}`, lateTitle: `${block.name} starts at ${at}`, body: `Save your game and finish your messages. ${stops}` };
 }
 
