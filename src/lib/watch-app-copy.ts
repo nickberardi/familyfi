@@ -1,7 +1,9 @@
 /**
  * The words a watch app shows, for familyfi-mobile's native watch apps: the Apple Watch (Swift) and
  * the Wear OS watch (Kotlin). Neither can run this TypeScript, so each keeps a copy and replays
- * `tests/fixtures/display-vectors.json`, which pins these words for both platforms.
+ * `tests/fixtures/display-vectors.json`, which pins these words for both platforms. FamilyFi Me's
+ * watch apps' words (`meWatchAppCopy`) have no vectors: familyfi-mobile-me's tests check its Swift
+ * and Kotlin spell them as here.
  */
 
 /** Which watch: an Apple Watch set up from an iPhone, or a Wear OS watch set up from an Android phone. */
@@ -72,8 +74,9 @@ export function meWatchAppCopy(platform: WatchPlatform) {
     notOpen: `Open FamilyFi Me on your ${phone} to send this.`,
     /** Over the Things a parent shares, under the person's own day. */
     things: "Things",
-    /** The complication's (and on Apple Watch the Smart Stack card's) name and line in the face's gallery. */
+    /** The complication's (and on Apple Watch the Smart Stack card's) name in the face's gallery. */
     nextChange: "Next change",
+    /** Its line under that name, on Apple Watch; Wear OS's gallery shows a name only. */
     nextChangeAbout: "When your next block starts or ends.",
   };
 }
