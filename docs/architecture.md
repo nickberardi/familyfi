@@ -123,7 +123,9 @@ administrator access has no sign-in, session or device, and demoting one ends al
 `me:askOnly`): its invite names a family group, it signs in for that group as no account, and it
 reads only that group's day and the Things a parent shares with children
 ([`src/server/child-day.ts`](../src/server/child-day.ts)) and asks for more time on them ([`src/server/asks.ts`](../src/server/asks.ts)), which only a parent's own write
-answers; deleting the group revokes it ([API](api.md#familyfi-me-on-a-childs-phone)).
+answers; deleting the group revokes it ([API](api.md#familyfi-me-on-a-childs-phone)). Its Watch
+(`me-watch`, the same scope) is set up by that phone, signs in for the same group, and is revoked
+with it ([API](api.md#familyfi-mes-watch)).
 
 Remote routes reach the [phone-only gateway](../src/server/tunnel/phone-gateway.ts), which forwards
 only API traffic, strips cookies and stamps tunnel provenance. The ordinary web UI is not exposed

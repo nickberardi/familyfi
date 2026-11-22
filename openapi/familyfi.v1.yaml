@@ -3838,8 +3838,9 @@ components:
         Shortcuts and system controls, reads its session, connection manifest, groups, rules and changes, and pauses, resumes,
         extends, allows, disallows and turns rules on and off (403 `watch_scope` for a Watch beyond
         that, 403 `app_scope` for the app's controls). `me:askOnly`, held by FamilyFi Me on a child's
-        phone, reads its session, connection manifest, its own group and the rules that cover it, asks
-        for more time on its group, and un-pairs itself; beyond that 403 `me_scope`. New scopes may be added.
+        phone and its Watch, reads its session, connection manifest, its own group and the rules that cover it, asks
+        for more time on its group, and un-pairs itself; the phone (`me`) also tells its own Screen Time
+        permission and sets up its own Watch (`me-watch`); beyond that 403 `me_scope`. New scopes may be added.
         `agent:readOnly` reads household state: groups, rules, devices, sync, changes, DNS categories
         and household settings (its timezone). `agent:full` also changes groups, rules and their
         verbs, devices and their assignment, sync and DNS categories. No agent reaches accounts,
