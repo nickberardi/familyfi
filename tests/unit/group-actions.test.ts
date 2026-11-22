@@ -170,7 +170,7 @@ describe("the Block button rule's runs", () => {
 
   it("offers Resume during a pause's break, which ends the unblock", () => {
     const resumesAt = new Date(NOW.getTime() + 30 * 60_000).toISOString();
-    const onBreak = group({ suspension: { active: false, until: null, by: null, resumesAt }, allowance: { active: true, until: resumesAt, by: { accountId: null, name: "Sam" } } });
+    const onBreak = group({ suspension: { active: false, until: null, by: null, resumesAt }, allowance: { active: true, until: resumesAt, by: { accountId: null, name: "Nick" } } });
     expect(groupHeaderActions(onBreak, [], TZ, NOW).action).toEqual({ label: "Resume", run: "resume" });
     expect(groupStatusParts(onBreak, [], TZ, NOW)).toEqual({ badge: "unblocked", detail: "Unblocked until 5:00 PM by Nick, then blocked again", change: "unblocked" });
     // A blocking internet window during the break is told, and unblocked, first.
