@@ -15,6 +15,12 @@ import type { Group } from "./types";
 /** How far ahead a parent's watch plans; it plans again each time it reads FamilyFi. */
 export const FAMILY_NEXT_HOURS = 24;
 
+/**
+ * How long before a group's block starts its screen on a parent's watch counts down to it, and the
+ * circular complication's ring fills: an hour, long enough to act on before it starts.
+ */
+export const FAMILY_COUNTDOWN_MINUTES = 60;
+
 /** A block under way, or the change coming next, with the groups it is for (in the order given). */
 export type FamilyItem = {
   /** "Bedtime", the window's name; "Block" for a group's own block (its pause); an always-on rule's name. */
