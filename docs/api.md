@@ -435,7 +435,7 @@ allowlist in [`src/server/device-scope.ts`](../src/server/device-scope.ts), not 
 | `app:rulesOnly` | Its session, connection manifest, groups, rules and changes; the rule and group-rule verbs; revoking itself (403 `watch_scope` for a Watch, `app_scope` for the app's controls, beyond that) |
 | `agent:full` | Household reads and controls; never accounts, UniFi settings, resolvers, household-settings changes or connection management |
 | `agent:readOnly` | Household reads |
-| `me:askOnly` | Its session, connection manifest, its own group and the shared Things and the rules that cover them (`GET /groups`, `GET /groups/{id}`, `GET /rules`); asking for more time on those (`POST /groups/{id}/asks`); revoking itself, and telling its own Screen Time permission (`PATCH /paired/devices/{its id}`) (403 `me_scope` beyond that) |
+| `me:askOnly` | Its session, connection manifest, its own group and the shared Things and the rules that cover them (`GET /groups`, `GET /groups/{id}`, `GET /rules`); asking for more time on those (`POST /groups/{id}/asks`); revoking itself. FamilyFi Me on the phone (`me`) also tells its own Screen Time permission (`PATCH /paired/devices/{its id}`) and sets up its own Watch (`POST /paired/invites?claim=true` with `me-watch`); its Watch (`me-watch`) does neither (403 `me_scope` beyond that) |
 
 A client type holds only the scopes in its row, and a device holding any other allows nothing. A
 phone, tablet or Mac always pairs as `app`, and a Watch and an app's Siri and shortcuts enroll with

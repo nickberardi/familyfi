@@ -341,8 +341,9 @@ export async function refreshSession(
   if (options.tunnelled && session.device.clientType === "agent") return { ok: false, code: "agent_remote", message: "Agents connect from the home network only." };
 
   // An app that names no version is one before 2.0, and gets bare tokens. A Watch or the app's Siri
-  // sign-in never names one when it refreshes: it keeps the version of the app that set it up.
-  const companion = session.device.clientType === "app-watch" || session.device.clientType === "app-controls";
+  // sign-in (or FamilyFi Me's Watch) never names one when it refreshes: it keeps the version of the
+  // app that set it up.
+  const companion = session.device.clientType === "app-watch" || session.device.clientType === "app-controls" || session.device.clientType === "me-watch";
   const appVersion = options.appVersion ?? (companion ? deviceTokenAppVersion(refreshToken) : null);
   const next = bearerSessionData(now, appVersion);
   const rotated = await prisma().session.updateMany({

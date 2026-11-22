@@ -91,7 +91,7 @@ function requireVisible(session: Viewer) {
 export async function listPairedDevices(session: Viewer, query: { clientType: string[]; status?: string }) {
   const visible = requireVisible(session);
   const filter = Filter.safeParse(query);
-  if (!filter.success) throw new ApiError(400, "invalid_request", "clientType must be app, app-watch, app-controls, me or agent, and status active or revoked.");
+  if (!filter.success) throw new ApiError(400, "invalid_request", "clientType must be app, app-watch, app-controls, me, me-watch or agent, and status active or revoked.");
   const { status } = filter.data;
   const clientTypes = filter.data.clientType;
   const devices = await prisma().pairedDevice.findMany({
