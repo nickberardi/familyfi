@@ -811,6 +811,14 @@ describe("a child's day on the household's clock", () => {
     expect(told.items[1]).toMatchObject({ time: "11 PM", title: "Blocked again", detail: "Until 11:30 PM" });
     expect(told.items[2]).toMatchObject({ time: "11:30 PM" });
     expect(told.items[2]?.title).not.toContain("again");
+    // A break past midnight is still a break, never the pause ended: allowed until then, nothing more today.
+    const late = { ...computers, ask: { id: "a1", about: "pause" as const, minutes: 120, state: "yes" as const, at: "2026-11-17T03:25:00Z", answeredAt: "2026-11-17T03:30:00Z", expiresAt: "2026-11-17T04:25:00Z", by: { name: "Nick" } }, suspension: { ...computers.suspension, until: "2026-11-17T12:00:00Z", resumesAt: "2026-11-17T06:00:00Z" }, allowance: { ...computers.allowance, until: "2026-11-17T06:00:00Z" } };
+    for (const voice of [PHONE_VOICE, THING_VOICE]) {
+      const night = meDaySubject(groupDayOf(late as never, [], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
+      const after = tellDay(night.subject, night.now, voice, night.clock);
+      expect(after.items).toEqual([expect.objectContaining({ title: "Allowed until 1 AM", detail: "Nick said yes" })]);
+      expect(topAnswer(after).sentence).toBe(`Nick said yes. ${voice.pauseWord} again at 1 AM.`);
+    }
     // Once the break is over, the pause is told again (FamilyFi reports it active).
     expect(groupDayOf({ ...computers, suspension: { ...computers.suspension, resumesAt: "2026-11-17T03:00:00Z" } } as never, [], ZONE, MONDAY_NIGHT).pauseBreak).toBeUndefined();
   });

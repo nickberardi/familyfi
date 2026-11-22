@@ -476,19 +476,19 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
     }))
     // Lifted for the rest of today: nothing to tell today.
     .filter((rule) => !rule.allowed || rule.allowed.until < 1440);
-  // A pause's break is told as a block lifted until then: allowed now, blocked again after.
+  // A pause's break is told as a block lifted until then: allowed now, blocked again after, after
+  // midnight too (never as the pause ended).
   if (me.pauseBreak) {
     const until = minutesOf(me.pauseBreak.until);
     // Blocked again until the pause's own end, when that is today.
     const end = me.pauseBreak.pauseUntil ? minutesOf(me.pauseBreak.pauseUntil) : 1440;
-    if (until < 1440)
-      always.push({
-        label: "Paused",
-        pause: true,
-        allowed: { ...(me.pauseBreak.by ? { by: me.pauseBreak.by } : {}), until },
-        ...(end < 1440 ? { to: end } : {}),
-        ...(me.pauseBreak.pauseUntil ? {} : { open: true as const }),
-      });
+    always.push({
+      label: "Paused",
+      pause: true,
+      allowed: { ...(me.pauseBreak.by ? { by: me.pauseBreak.by } : {}), until },
+      ...(end < 1440 ? { to: end } : {}),
+      ...(me.pauseBreak.pauseUntil ? {} : { open: true as const }),
+    });
   }
   // A request no one answered is told only while what it asked about still blocks.
   const stillOn = (ask: NonNullable<GroupDay["ask"]>) =>
@@ -604,7 +604,7 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     later({
       time: clock(at),
       tone: liftedAlways!.pause ? "paused" : "window",
-      sign: "window",
+      sign: liftedAlways!.pause ? "pause" : "window",
       title: `${liftedAlways!.label} again`,
       detail: againTo !== undefined ? `Until ${clock(againTo)}` : liftedAlways!.open ? NO_END_TIME : "For the rest of today",
     });
@@ -809,10 +809,11 @@ export function tellDay(subject: DaySubject, now: Clock, voice: DayVoice, on: Da
     const pauseBreak = liftedAlways.pause;
     // A pause comes back in the paused ink, a Thing's category or app rule as a rule, all internet as a window.
     const kind = pauseBreak ? "pause" : liftedAlways.source ? "category" : "window";
-    bands.push({ kind, from: back!, to: to ?? 1440, label, source: liftedAlways.source ?? "No internet", times: to === undefined ? `from ${clock(back!)}` : `until ${clock(to)}` });
+    // Back only after midnight: nothing more of it today.
+    if (back! < 1440) bands.push({ kind, from: back!, to: to ?? 1440, label, source: liftedAlways.source ?? "No internet", times: to === undefined ? `from ${clock(back!)}` : `until ${clock(to)}` });
     items = [
       { time: "Now", now: true, tone: "on", sign: "allowed", title: `Allowed until ${clock(until)}`, detail: by ? `${by} said yes` : pauseBreak ? voice.unpausedByNoOne.replace(/\.$/, "") : `${label} is off for now` },
-      ...(then ? onwards(then.from) : blocksAgain(back!)),
+      ...(then ? onwards(then.from) : back! < 1440 ? blocksAgain(back!) : []),
     ];
     day = { kind: "extended", window: { label, from: 0, to: 1440 }, until, end: 1440, ...(by ? { by } : {}), ...(then ? { then } : {}), ...(pauseBreak ? { pause: true as const } : {}) };
   } else if (window && ((ask?.state === "yes" && ask.minutes && allowedUntil !== undefined && now < allowedUntil) || lift)) {
