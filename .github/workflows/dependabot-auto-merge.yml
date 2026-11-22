@@ -1,12 +1,10 @@
 name: Dependabot auto-merge
 
-# Turns on auto-merge for Dependabot's minor and patch PRs, so GitHub squashes one once the
-# branch protection's required checks pass. Majors and Docker image updates stay for a person:
-# a major can change behaviour no test pins, and pull requests do not build the image
-# (container.yml runs only for a release). Needs "Allow auto-merge" and "Allow squash merging"
-# in the repository settings, and CI's verify and browser jobs as required checks on main;
-# without those, GitHub refuses or merges at once.
-# The merge is made with GITHUB_TOKEN, so it starts no workflow on main; none runs on push.
+# Turns on auto-merge for every Dependabot PR, majors included, so GitHub squashes it once main's
+# required checks pass, like any other PR. dependabot.yml puts each weekly scan into one PR.
+# Pull requests do not build the image (container.yml runs only for a release), so a Docker base
+# image update is first built and smoke-tested by the next release.
+# The merge is made with GITHUB_TOKEN, so it starts no workflow on main.
 on:
   pull_request:
     branches:
@@ -25,11 +23,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - id: metadata
-        uses: dependabot/fetch-metadata@v3
-      # A grouped PR reports its largest update type.
-      - if: steps.metadata.outputs.update-type != 'version-update:semver-major' && steps.metadata.outputs.package-ecosystem != 'docker'
-        uses: actions/github-script@v9
+      - uses: actions/github-script@v9
         with:
           script: |
             try {
