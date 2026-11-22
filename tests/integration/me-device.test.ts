@@ -446,6 +446,11 @@ describe("FamilyFi Me's Watch", () => {
     await revokeDevice(phone.device.id);
     expect((await currentSession(request("/api/v1/auth/session", { auth: bearer(second.token) }))).status).toBe(401);
 
+    // Another person's phone cannot take this Watch over.
+    const sam = await childGroup("Sam");
+    const taken = await setUpWatch(bearer((await pairMe(admin, sam.id)).token));
+    expect(taken.status).toBe(409);
+
     const otherPhone = await pairMe(admin, emma.id);
     const third = await pairWatch(otherPhone);
     await deleteGroup(emma.id);

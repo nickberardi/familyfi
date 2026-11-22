@@ -146,6 +146,8 @@ async function join(db: Db, input: {
     const previous = await db.pairedDevice.findUnique({ where: { clientId: input.clientId } });
     // Only the same client type is replaced: an app's Siri and shortcuts never retire a Watch, nor a Watch them.
     if (previous && (previous.clientType !== invite.clientType || previous.scope !== invite.scope)) throw new ClientIdInUseError();
+    // FamilyFi Me's Watch is replaced only for the same person: one person's phone never takes over another's.
+    if (previous && invite.clientType === "me-watch" && previous.groupId !== (signer.group?.id ?? null)) throw new ClientIdInUseError();
     if (previous) {
       await db.session.updateMany({ where: { deviceId: previous.id, revokedAt: null }, data: { revokedAt: now } });
       await db.pairedDevice.update({ where: { id: previous.id }, data: { revokedAt: now, clientId: null } });

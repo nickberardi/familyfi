@@ -323,9 +323,10 @@ signed-in phone, and the response is the Watch's claim, which the phone hands it
 `me-watch` with `me:askOnly` and signs in for the phone's person, never as an account; the phone is
 its parent, so revoking the phone, or deleting the person's group, revokes the Watch. It reads and
 asks exactly as the phone does, but sets up no Watch of its own and never reports a Screen Time
-permission. Only a signed-in `me` device whose group is still there may set one up (403
-`me_phone_required` otherwise); FamilyFi Me sets up nothing else this way (400). Setting it up again
-with the same `clientId` replaces the earlier record. Administrators see it beside its phone under
+permission. Only a signed-in `me` device whose group is still there may set one up: a browser is refused (403
+`paired_phone_required`), as is the Watch itself (403 `me_scope`), and a parent's app or any other
+client type gets 400. Setting it up again with the same `clientId` replaces the earlier record, for
+the same person only (409 `client_id_in_use` for another person's Watch). Administrators see it beside its phone under
 Pair FamilyFi Me.
 
 #### Shared Things
