@@ -1,4 +1,5 @@
 import { hash, verify } from "@node-rs/argon2";
+import { isPersonDevice, signsInForPerson } from "@/lib/client-type";
 import { cookies } from "next/headers";
 import { type Account, AccountKind, SessionKind } from "@prisma/client";
 import { cookieValue } from "@/lib/cookie";
@@ -187,7 +188,7 @@ export function deviceMaySignIn(session: {
   account: Pick<Account, "kind" | "isAdmin"> | null;
   device: { clientType: string; accountId: string | null; groupId: string | null } | null;
 }): boolean {
-  if (session.device?.clientType === "me") return !session.account && !session.device.accountId && Boolean(session.device.groupId);
+  if (isPersonDevice(session.device)) return !session.account && !session.device.accountId && Boolean(session.device.groupId);
   return mayPairAs(session.account);
 }
 
@@ -429,7 +430,7 @@ export type SessionView = {
 
 export function toPublicSession(session: SessionView): PublicSession {
   // A child's phone has no account: it is named for the person (family group) it signs in for.
-  if (session.device?.clientType === "me" && !session.account) {
+  if (isPersonDevice(session.device) && !session.account) {
     const personId = session.device.groupId ?? session.device.group?.id;
     return {
       username: session.username,
@@ -475,7 +476,7 @@ export function deviceScopeRefusal(
   if (device.clientType === "agent") {
     return jsonError(403, "agent_scope", "This agent's scope does not cover that request. Ask the person you are helping to do it in the FamilyFi web app.");
   }
-  if (device.clientType === "me") {
+  if (signsInForPerson(device.clientType)) {
     return jsonError(403, "me_scope", "FamilyFi Me cannot use that endpoint.");
   }
   if (device.clientType === "app-controls") {

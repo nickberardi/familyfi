@@ -259,13 +259,14 @@ describe("the versions GET /api/v1/health reports", () => {
       "app-watch": info["x-min-app-watch"],
       "app-controls": info["x-min-app-watch"],
       me: info["x-min-me"],
+      "me-watch": info["x-min-me"],
     };
     for (const [client, floor] of Object.entries(floors)) {
       const body = (await (await getHealth(request(`/api/v1/health?clientType=${client}`))).json()) as Record<string, unknown>;
       expect(body.minApiVersion, client).toBe(floor);
       expect(body.minAppApiVersion).toBe(info["x-min-app"]);
     }
-    for (const url of ["/api/v1/health", "/api/v1/health?clientType=me-watch", "/api/v1/health?client=me"]) {
+    for (const url of ["/api/v1/health", "/api/v1/health?clientType=kids-watch", "/api/v1/health?client=me"]) {
       expect(await (await getHealth(request(url))).json(), url).not.toHaveProperty("minApiVersion");
     }
   });

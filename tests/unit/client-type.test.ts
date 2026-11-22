@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { apiCompatibility } from "@/lib/api-compat";
-import { CLIENT_SCOPES, mayHoldScope } from "@/lib/client-type";
+import { CLIENT_SCOPES, mayHoldScope, signsInForPerson } from "@/lib/client-type";
 import { parsePairingCode } from "@/lib/pairing-code";
 
 describe("client types and scopes", () => {
@@ -10,12 +10,19 @@ describe("client types and scopes", () => {
       "app-watch": ["app:rulesOnly"],
       "app-controls": ["app:rulesOnly"],
       me: ["me:askOnly"],
+      "me-watch": ["me:askOnly"],
       agent: ["agent:full", "agent:readOnly"],
     });
     expect(mayHoldScope("app-watch", "app:rulesOnly")).toBe(true);
     expect(mayHoldScope("app-watch", "rulesOnly")).toBe(false);
     expect(mayHoldScope("watch", "app:rulesOnly")).toBe(false);
     expect(mayHoldScope("agent", null)).toBe(false);
+    expect(mayHoldScope("me-watch", "me:askOnly")).toBe(true);
+    expect(mayHoldScope("me-watch", "app:rulesOnly")).toBe(false);
+  });
+
+  it("signs FamilyFi Me and its Watch in for a person, and nothing else", () => {
+    expect(["app", "app-watch", "app-controls", "me", "me-watch", "agent"].filter(signsInForPerson)).toEqual(["me", "me-watch"]);
   });
 
   it("reads a pairing code's client type, and a code without one from an older server", () => {

@@ -20,8 +20,10 @@ import { mayHoldScope, type ClientScope } from "@/lib/client-type";
  *   never as an account: its session, `GET /connection` for the manifest it needs away from home, its
  *   own group and the Things groups shared with children (`GET /groups`, `GET /groups/{id}`) and the
  *   rules that cover them (`GET /rules`), asking for more time on those (`POST /groups/{id}/asks`),
- *   un-pairing itself, and telling its own Screen Time permission (`PATCH /paired/devices/{its id}`).
- *   It reads nothing else in the household.
+ *   un-pairing itself, telling its own Screen Time permission (`PATCH /paired/devices/{its id}`), and
+ *   setting up its Watch (`POST /paired/invites?claim=true`, which takes only `me-watch` from it).
+ *   Its Watch (`me-watch`) holds the same scope for the same person, without the Screen Time report
+ *   and without setting up a Watch of its own. It reads nothing else in the household.
  *
  * The built-in quarantine rule's switch is the household's quarantine setting, so an `app:rulesOnly` device or an
  * agent may pause, extend and resume it, never switch, edit or delete it.
@@ -41,7 +43,7 @@ const GROUP_UNBLOCK = /^\/api\/v1\/groups\/[^/]+\/unblock(\/(end|extend))?$/;
 /** The built-in quarantine rule's switch: PATCH, DELETE, on and off. Its other verbs are rule verbs. */
 const QUARANTINE_SWITCH = /^\/api\/v1\/rules\/quarantine(\/(on|off))?$/;
 
-type ScopedCall = { method: string; path: string; deviceId: string };
+type ScopedCall = { method: string; path: string; deviceId: string; clientType?: string };
 
 function changesQuarantineSetting({ method, path }: ScopedCall): boolean {
   return method !== "GET" && method !== "HEAD" && QUARANTINE_SWITCH.test(path);
@@ -107,14 +109,17 @@ function agentFull(request: ScopedCall): boolean {
 }
 
 /** `me:askOnly`: the child's own day and shared Things, and the calls every paired device needs to stay signed in. */
-function meAskOnly({ method, path, deviceId }: ScopedCall): boolean {
+function meAskOnly({ method, path, deviceId, clientType }: ScopedCall): boolean {
+  const phone = clientType === "me";
   if (method === "GET") {
     return path === "/api/v1/auth/session" || path === "/api/v1/connection" || path === "/api/v1/groups" || ONE_GROUP.test(path) || path === "/api/v1/rules";
   }
-  // Asking for more time; the route answers only for the device's own group and shared Things.
-  if (method === "POST") return GROUP_ASKS.test(path);
-  // Un-pairing itself, and telling its Screen Time permission (the route takes only that from it).
-  return (method === "DELETE" || method === "PATCH") && path === `/api/v1/paired/devices/${encodeURIComponent(deviceId)}`;
+  // Asking for more time; the route answers only for the device's own group and shared Things. The
+  // phone also sets up its Watch: the invite route takes only `?claim=true` and `me-watch` from it.
+  if (method === "POST") return GROUP_ASKS.test(path) || (phone && path === "/api/v1/paired/invites");
+  const own = path === `/api/v1/paired/devices/${encodeURIComponent(deviceId)}`;
+  // Un-pairing itself; the phone also tells its Screen Time permission (the route takes only that from it).
+  return own && (method === "DELETE" || (phone && method === "PATCH"));
 }
 
 const ALLOWLISTS: Record<ClientScope, (request: ScopedCall) => boolean> = {

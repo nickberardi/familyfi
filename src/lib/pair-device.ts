@@ -1,3 +1,4 @@
+import { signsInForPerson } from "./client-type";
 import { ME_QUIET_AFTER_MS } from "./me-protection";
 import { ALERTS_CARD_COPY } from "./alert-copy";
 import { scopeLabel } from "./agent-prompt";
@@ -155,9 +156,13 @@ export function revokeConfirm(phone: Pick<PairedPhone, "displayName"> & Partial<
   if (phone.clientType === "me") {
     return {
       title: `Revoke ${phone.displayName}?`,
-      message: `FamilyFi Me on it signs out now and can't show ${phone.person ? `${phone.person.name}'s` : "their"} rules or ask for more time until it is paired again.`,
+      message: `FamilyFi Me on it signs out now and can't show ${phone.person ? `${phone.person.name}'s` : "their"} rules or ask for more time until it is paired again. Its Watch, if it has one, signs out too.`,
       confirmLabel: PAIR_COPY.revoke,
     };
+  }
+  // FamilyFi Me sets its Watch up again itself, from the phone.
+  if (phone.clientType === "me-watch") {
+    return { title: `Revoke ${phone.displayName}?`, message: "FamilyFi Me on it signs out now, until FamilyFi Me on the phone sets it up again.", confirmLabel: PAIR_COPY.revoke };
   }
   const paired = kind && isApp(kind) ? " Its shortcuts and system controls, and any Watch, phone or agent it paired, stop working too." : "";
   return { title: `Revoke ${phone.displayName}?`, message: `It is signed out now and must be paired again.${paired}`, confirmLabel: PAIR_COPY.revoke };
@@ -180,6 +185,7 @@ function pairedDate(iso: string) {
 /** Where a device came from when it paired through no listed route: the phone that set it up, the home network, or a removed route. */
 function origin(device: Pick<PairedPhone, "clientType">, parentName: string | null): string {
   if (device.clientType === "app-watch") return `Paired automatically from ${parentName ?? "an iPhone"}`;
+  if (device.clientType === "me-watch") return `Paired automatically from ${parentName ?? "FamilyFi Me"}`;
   if (isAppControls(device)) return `Set up automatically by ${parentName ?? "the FamilyFi app"}`;
   if (device.clientType === "agent") return "On the home network";
   return "via a route that was removed";
@@ -237,7 +243,7 @@ export function phoneLines(phone: PairedPhone, now = new Date(), parentName: str
     via: phone.pairedVia ? { url: phone.pairedVia.url, transport: transportLabel(phone.pairedVia.transport) } : null,
     origin: origin(phone, parentName),
     // A phone or agent another phone paired goes when that phone is revoked; a Watch or an app's Siri and shortcuts says so in its origin.
-    dates: `Paired ${pairedDate(phone.enrolledAt)}${parentName && phone.clientType !== "app-watch" && !isAppControls(phone) ? ` from ${parentName}` : ""}${ends ? ` · expires ${pairedDate(ends)}` : ""}`,
+    dates: `Paired ${pairedDate(phone.enrolledAt)}${parentName && phone.clientType !== "app-watch" && phone.clientType !== "me-watch" && !isAppControls(phone) ? ` from ${parentName}` : ""}${ends ? ` · expires ${pairedDate(ends)}` : ""}`,
     expired: !phone.revokedAt && phone.sessions.length === 0,
   };
 }
@@ -392,9 +398,9 @@ export const CHILD_PHONES_COPY = {
   revoke: PAIR_COPY.revoke,
 } as const;
 
-/** Pair Device's list: every paired device except FamilyFi Me phones still paired, which Pair FamilyFi Me lists. */
+/** Pair Device's list: every paired device except FamilyFi Me phones and Watches still paired, which Pair FamilyFi Me lists. */
 export function pairDeviceList(phones: readonly PairedPhone[]): PairedPhone[] {
-  return phones.filter((phone) => phone.clientType !== "me" || phone.revokedAt);
+  return phones.filter((phone) => !signsInForPerson(phone.clientType) || phone.revokedAt);
 }
 
 /** System › Pair FamilyFi Me: getting FamilyFi Me, the phones paired with it, asking for more time, and the Things it shows. */
@@ -411,9 +417,9 @@ export const ME_PAGE_COPY = {
   noThings: "No Things groups yet.",
 } as const;
 
-/** Pair FamilyFi Me's list: the FamilyFi Me phones still paired, the ones Pair Device leaves out (`pairDeviceList`). */
+/** Pair FamilyFi Me's list: the FamilyFi Me phones and Watches still paired, the ones Pair Device leaves out (`pairDeviceList`). */
 export function mePhones(phones: readonly PairedPhone[]): PairedPhone[] {
-  return phones.filter((phone) => phone.clientType === "me" && !phone.revokedAt);
+  return phones.filter((phone) => signsInForPerson(phone.clientType) && !phone.revokedAt);
 }
 
 /**

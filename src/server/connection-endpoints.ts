@@ -1,4 +1,5 @@
 import { type ConnectionTransport, type ConnectionTrustMode, EdgeAuth, RouteKind } from "@prisma/client";
+import { isPersonDevice } from "@/lib/client-type";
 import { homeOrigin } from "@/lib/connection-routes";
 import type { SignedInSession } from "./auth";
 import { assertEndpoint, hasPendingPairing, isManagedRoute, isUniqueViolation, publicEndpoint, signedEndpointManifest } from "./connection";
@@ -58,7 +59,7 @@ export async function connectionOverview(session: SignedInSession) {
     endpoints: manifest.endpoints,
     endpointManifest: manifest,
     // A child's phone needs the manifest, not the gateway's error text.
-    unifi: { status: household.connectionStatus, error: session.device?.clientType === "me" ? null : household.connectionError, lastSyncAt: lastRun?.finishedAt?.toISOString() ?? lastRun?.startedAt?.toISOString() ?? null },
+    unifi: { status: household.connectionStatus, error: isPersonDevice(session.device) ? null : household.connectionError, lastSyncAt: lastRun?.finishedAt?.toISOString() ?? lastRun?.startedAt?.toISOString() ?? null },
     lastChange: lastChange ? { id: lastChange.id, scope: lastChange.scope, status: lastChange.status, error: lastChange.error, updatedAt: lastChange.updatedAt.toISOString() } : null,
   };
 }

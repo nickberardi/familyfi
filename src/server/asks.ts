@@ -1,4 +1,5 @@
 import { AskState, GroupKind, RuleMode, type Ask } from "@prisma/client";
+import { isPersonDevice } from "@/lib/client-type";
 import { z } from "zod";
 import { ASK_MINUTES } from "@/lib/child-day";
 import { recordAsk } from "./alerts/producers";
@@ -68,7 +69,7 @@ export function blockedBeyondPause(group: GroupWithRules, now: Date, timezone: s
 
 /** Refuses anyone but FamilyFi Me on a child's phone, which alone asks for more time. */
 export function requireChild(session: SignedInSession) {
-  if (session.device?.clientType !== "me") throw new ApiError(403, "child_only", "Only FamilyFi Me on a child's phone asks for more time.");
+  if (!isPersonDevice(session.device)) throw new ApiError(403, "child_only", "Only FamilyFi Me on a child's phone asks for more time.");
   return session.device;
 }
 
