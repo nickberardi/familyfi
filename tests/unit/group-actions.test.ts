@@ -173,6 +173,11 @@ describe("the Block button rule's runs", () => {
     const onBreak = group({ suspension: { active: false, until: null, by: null, resumesAt }, allowance: { active: true, until: resumesAt, by: { accountId: null, name: "Sam" } } });
     expect(groupHeaderActions(onBreak, [], TZ, NOW).action).toEqual({ label: "Resume", run: "resume" });
     expect(groupStatusParts(onBreak, [], TZ, NOW)).toEqual({ badge: "unblocked", detail: "Unblocked until 5:00 PM by Sam, then blocked again", change: "unblocked" });
+    // A blocking internet window during the break is told, and unblocked, first.
+    const bedtime = { id: "r-bed", name: "Bedtime", kind: "internet", scope: "group", groupIds: [onBreak.id], enabled: true, builtIn: null, mode: "always", windows: [], targetIds: [], pause: { active: false, until: null, kind: "pause", by: null }, groupPauses: [] } as unknown as Rule;
+    const windowed = group({ ...onBreak, allowance: { active: false, until: null, by: null } });
+    expect(groupHeaderActions(windowed, [bedtime], TZ, NOW).action.label).toBe("Unblock");
+    expect(groupStatusParts(windowed, [bedtime], TZ, NOW).badge).toBe("blocked");
     // A break already over reads as the pause it was.
     const over = group({ suspension: { active: false, until: null, by: null, resumesAt: new Date(NOW.getTime() - 60_000).toISOString() } });
     expect(groupHeaderActions(over, [], TZ, NOW).action.label).toBe("Block");

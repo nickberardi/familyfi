@@ -770,11 +770,18 @@ describe("a child's day on the household's clock", () => {
     };
     const day = groupDayOf(computers as never, [], ZONE, MONDAY_NIGHT);
     expect(day.pause).toBeNull();
-    expect(day.pauseBreak).toEqual({ by: "Nick", until: "2026-11-17T04:00:00Z" });
+    expect(day.pauseBreak).toEqual({ by: "Nick", until: "2026-11-17T04:00:00Z", pauseUntil: "2026-11-17T05:39:00Z" });
     const { subject, now, clock: on } = meDaySubject(day, MONDAY_NIGHT);
     const story = tellDay(subject, now, THING_VOICE, on);
     expect(story.items[0]).toMatchObject({ title: "Allowed until 11 PM", detail: "Nick said yes" });
     expect(story.items[1]).toMatchObject({ time: "11 PM", title: "Blocked again" });
+    // A pause ending today: blocked again until its end, then not blocked.
+    const ending = { ...computers, suspension: { ...computers.suspension, until: "2026-11-17T04:30:00Z" } };
+    const short = meDaySubject(groupDayOf(ending as never, [], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
+    const told = tellDay(short.subject, short.now, THING_VOICE, short.clock);
+    expect(told.items[1]).toMatchObject({ time: "11 PM", title: "Blocked again", detail: "Until 11:30 PM" });
+    expect(told.items[2]).toMatchObject({ time: "11:30 PM" });
+    expect(told.items[2]?.title).not.toContain("again");
     // Once the break is over, the pause is told again (FamilyFi reports it active).
     expect(groupDayOf({ ...computers, suspension: { ...computers.suspension, resumesAt: "2026-11-17T03:00:00Z" } } as never, [], ZONE, MONDAY_NIGHT).pauseBreak).toBeUndefined();
   });

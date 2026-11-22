@@ -426,6 +426,18 @@ describe("asking for more time", () => {
     expect(after.expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(5 * MINUTE);
   });
 
+  it("tells a window on during a pause's break as blocking, never as allowed", async () => {
+    await windowRule(emma.id);
+    await verb(pauseRoute, "pause", admin, emma.id, "internet");
+    const waiting = await askOf(await ask(child, emma.id, { about: "pause", minutes: 30 }));
+    const breakEnd = new Date(Date.now() + 30 * MINUTE).toISOString();
+    expect((await verb(resumeRoute, "resume", admin, emma.id, "internet", { askId: waiting.id, until: breakEnd })).status).toBe(200);
+    const group = await readGroup(admin, emma.id);
+    expect(group.suspension).toMatchObject({ active: false, resumesAt: breakEnd });
+    expect(group.allowance.active).toBe(false);
+    expect(group.access).not.toBe("allowed");
+  });
+
   it("answers an ask to be unpaused with the group's unblock, the card's Unblock while a window blocks it too", async () => {
     const homework = await windowRule(emma.id);
     await verb(pauseRoute, "pause", admin, emma.id, "internet");
