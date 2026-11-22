@@ -34684,6 +34684,38 @@
           "privateShort": "Bedtime ends in"
         },
         {
+          "from": "2026-11-23T05:00:00.000Z",
+          "now": [
+            {
+              "name": "Bedtime",
+              "pause": false,
+              "who": "Abby and Cassie",
+              "groupIds": [
+                "g-abby",
+                "g-cassie"
+              ],
+              "at": "2026-11-23T12:00:00.000Z"
+            }
+          ],
+          "next": {
+            "name": "Bedtime",
+            "pause": false,
+            "who": "Abby and Cassie",
+            "groupIds": [
+              "g-abby",
+              "g-cassie"
+            ],
+            "at": "2026-11-23T12:00:00.000Z",
+            "kind": "end"
+          },
+          "unknown": false,
+          "title": "Bedtime",
+          "who": "Abby and Cassie",
+          "line": "Ends at 7:00 AM",
+          "short": "Bedtime ends for Abby and Cassie in",
+          "privateShort": "Bedtime ends in"
+        },
+        {
           "from": "2026-11-23T12:00:00.000Z",
           "now": [],
           "next": {
@@ -35191,6 +35223,36 @@
           "privateShort": "Bedtime ends in"
         },
         {
+          "from": "2026-11-23T05:00:00.000Z",
+          "now": [
+            {
+              "name": "Bedtime",
+              "pause": false,
+              "who": "Abby",
+              "groupIds": [
+                "g-abby"
+              ],
+              "at": "2026-11-23T12:00:00.000Z"
+            }
+          ],
+          "next": {
+            "name": "Bedtime",
+            "pause": false,
+            "who": "Abby",
+            "groupIds": [
+              "g-abby"
+            ],
+            "at": "2026-11-23T12:00:00.000Z",
+            "kind": "end"
+          },
+          "unknown": false,
+          "title": "Bedtime",
+          "who": "Abby",
+          "line": "Ends at 7:00 AM",
+          "short": "Bedtime ends for Abby in",
+          "privateShort": "Bedtime ends in"
+        },
+        {
           "from": "2026-11-23T12:00:00.000Z",
           "now": [],
           "next": {
@@ -35392,6 +35454,38 @@
           "title": "Bedtime",
           "who": "Abby and Cassie",
           "line": "Ends tomorrow at 7:00 AM",
+          "short": "Bedtime ends for Abby and Cassie in",
+          "privateShort": "Bedtime ends in"
+        },
+        {
+          "from": "2026-11-23T05:00:00.000Z",
+          "now": [
+            {
+              "name": "Bedtime",
+              "pause": false,
+              "who": "Abby and Cassie",
+              "groupIds": [
+                "g-abby",
+                "g-cassie"
+              ],
+              "at": "2026-11-23T12:00:00.000Z"
+            }
+          ],
+          "next": {
+            "name": "Bedtime",
+            "pause": false,
+            "who": "Abby and Cassie",
+            "groupIds": [
+              "g-abby",
+              "g-cassie"
+            ],
+            "at": "2026-11-23T12:00:00.000Z",
+            "kind": "end"
+          },
+          "unknown": false,
+          "title": "Bedtime",
+          "who": "Abby and Cassie",
+          "line": "Ends at 7:00 AM",
           "short": "Bedtime ends for Abby and Cassie in",
           "privateShort": "Bedtime ends in"
         },
@@ -35961,6 +36055,38 @@
           "privateShort": "Bedtime ends in"
         },
         {
+          "from": "2026-11-23T05:00:00.000Z",
+          "now": [
+            {
+              "name": "Bedtime",
+              "pause": false,
+              "who": "Abby and Cassie",
+              "groupIds": [
+                "g-abby",
+                "g-cassie"
+              ],
+              "at": "2026-11-23T12:00:00.000Z"
+            }
+          ],
+          "next": {
+            "name": "Bedtime",
+            "pause": false,
+            "who": "Abby and Cassie",
+            "groupIds": [
+              "g-abby",
+              "g-cassie"
+            ],
+            "at": "2026-11-23T12:00:00.000Z",
+            "kind": "end"
+          },
+          "unknown": false,
+          "title": "Bedtime",
+          "who": "Abby and Cassie",
+          "line": "Ends at 7:00 AM",
+          "short": "Bedtime ends for Abby and Cassie in",
+          "privateShort": "Bedtime ends in"
+        },
+        {
           "from": "2026-11-23T08:30:00.000Z",
           "now": [
             {
@@ -35986,7 +36112,7 @@
     },
     {
       "fn": "familyTimeline",
-      "name": "a Thing blocked by its Block button rule",
+      "name": "a Thing blocked by its Block button rule until a time",
       "input": {
         "groups": [
           {
@@ -36071,6 +36197,165 @@
     },
     {
       "fn": "familyTimeline",
+      "name": "read before midnight, the day of the change is told again after it",
+      "input": {
+        "groups": [
+          {
+            "id": "g-abby",
+            "kind": "family",
+            "name": "Abby",
+            "monogram": "A",
+            "familyRole": null,
+            "deviceCount": 2,
+            "suspension": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "allowance": {
+              "active": false,
+              "until": null,
+              "by": null
+            },
+            "internetRuleIds": [],
+            "access": "available",
+            "dohOverrideUrl": null
+          }
+        ],
+        "rules": [
+          {
+            "id": "r-nights",
+            "name": "School nights",
+            "kind": "internet",
+            "scope": "group",
+            "groupIds": [
+              "g-abby",
+              "g-cassie"
+            ],
+            "networkIds": [],
+            "targetIds": [],
+            "domains": [],
+            "enabled": true,
+            "pause": {
+              "active": false,
+              "until": null,
+              "kind": "pause",
+              "by": null
+            },
+            "groupPauses": [],
+            "mode": "scheduled",
+            "windows": [
+              {
+                "id": "w-bed",
+                "name": "Bedtime",
+                "days": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "start": "21:00",
+                "end": "07:00"
+              }
+            ],
+            "useGeneratedName": false,
+            "policyNames": [],
+            "builtIn": null
+          }
+        ],
+        "timeZone": "America/New_York",
+        "now": "2026-11-23T04:30:00.000Z",
+        "hours": 4
+      },
+      "expected": [
+        {
+          "from": "2026-11-23T04:30:00.000Z",
+          "now": [
+            {
+              "name": "Bedtime",
+              "pause": false,
+              "who": "Abby",
+              "groupIds": [
+                "g-abby"
+              ],
+              "at": "2026-11-23T12:00:00.000Z"
+            }
+          ],
+          "next": {
+            "name": "Bedtime",
+            "pause": false,
+            "who": "Abby",
+            "groupIds": [
+              "g-abby"
+            ],
+            "at": "2026-11-23T12:00:00.000Z",
+            "kind": "end"
+          },
+          "unknown": false,
+          "title": "Bedtime",
+          "who": "Abby",
+          "line": "Ends tomorrow at 7:00 AM",
+          "short": "Bedtime ends for Abby in",
+          "privateShort": "Bedtime ends in"
+        },
+        {
+          "from": "2026-11-23T05:00:00.000Z",
+          "now": [
+            {
+              "name": "Bedtime",
+              "pause": false,
+              "who": "Abby",
+              "groupIds": [
+                "g-abby"
+              ],
+              "at": "2026-11-23T12:00:00.000Z"
+            }
+          ],
+          "next": {
+            "name": "Bedtime",
+            "pause": false,
+            "who": "Abby",
+            "groupIds": [
+              "g-abby"
+            ],
+            "at": "2026-11-23T12:00:00.000Z",
+            "kind": "end"
+          },
+          "unknown": false,
+          "title": "Bedtime",
+          "who": "Abby",
+          "line": "Ends at 7:00 AM",
+          "short": "Bedtime ends for Abby in",
+          "privateShort": "Bedtime ends in"
+        },
+        {
+          "from": "2026-11-23T08:30:00.000Z",
+          "now": [
+            {
+              "name": "Bedtime",
+              "pause": false,
+              "who": "Abby",
+              "groupIds": [
+                "g-abby"
+              ],
+              "at": "2026-11-23T12:00:00.000Z"
+            }
+          ],
+          "next": null,
+          "title": "Not up to date",
+          "who": "",
+          "line": "Open FamilyFi to update",
+          "short": "Not up to date",
+          "privateShort": "Not up to date",
+          "unknown": true
+        }
+      ]
+    },
+    {
+      "fn": "familyTimeline",
       "name": "a weekly window days away is still what comes next",
       "input": {
         "groups": [
@@ -36139,6 +36424,26 @@
       "expected": [
         {
           "from": "2026-11-23T15:00:00.000Z",
+          "now": [],
+          "next": {
+            "name": "Chores",
+            "pause": false,
+            "who": "Abby",
+            "groupIds": [
+              "g-abby"
+            ],
+            "at": "2026-11-28T15:00:00.000Z",
+            "kind": "start"
+          },
+          "unknown": false,
+          "title": "Chores",
+          "who": "Abby",
+          "line": "Starts Sat at 10:00 AM",
+          "short": "Chores for Abby in",
+          "privateShort": "Chores in"
+        },
+        {
+          "from": "2026-11-24T05:00:00.000Z",
           "now": [],
           "next": {
             "name": "Chores",

@@ -1,4 +1,5 @@
 import { groupDayOf, NO_END_TIME } from "./child-day";
+import { addCalendarDays, zonedParts, zonedWallTimeToUtc } from "./clock";
 import { formatClock, relativeDayLabel } from "./display";
 import { HEADS_UP_DAYS, headsUpBlocks, type HeadsUpBlock } from "./heads-up";
 import type { Rule } from "./rules";
@@ -92,10 +93,21 @@ export function familyTimeline(groups: Group[], rules: Rule[], timeZone: string,
   const after = (times: (number | undefined)[]) => [...new Set(times)].filter((time): time is number => time !== undefined && time > now.getTime()).sort((a, b) => a - b);
   // A change is a block starting or ending; a block that ran into another also changes its name, which starts an entry but is no change.
   const changes = after(blocks.flatMap(({ block }) => [block.from.getTime(), block.to?.getTime()]));
-  const shown = after([...changes, ...blocks.map(({ block }) => block.switchAt?.getTime())]).filter((time) => time < horizon);
+  // Each household midnight with a change still to come starts an entry too, so "tomorrow" becomes "today".
+  const midnights = householdMidnights(now, timeZone, hours).filter((midnight) => changes.some((change) => change > midnight));
+  const shown = after([...changes, ...blocks.map(({ block }) => block.switchAt?.getTime()), ...midnights]).filter((time) => time < horizon);
   const entries = [now.getTime(), ...shown].map((at) => entryAt(blocks, at, changes.find((change) => change > at) ?? null, timeZone));
   if (recurs) entries.push(unknownEntry(horizon, blocks));
   return entries;
+}
+
+/** The household's midnights after `now`, for `hours` and a day more. */
+function householdMidnights(now: Date, timeZone: string, hours: number): number[] {
+  const today = zonedParts(now, timeZone);
+  return Array.from({ length: Math.ceil(hours / 24) + 1 }, (_, index) => {
+    const day = addCalendarDays(today.year, today.month, today.day, index + 1);
+    return zonedWallTimeToUtc(timeZone, day.year, day.month, day.day, 0, 0).getTime();
+  });
 }
 
 function entryAt(blocks: GroupBlock[], at: number, nextAt: number | null, timeZone: string): FamilyEntry {
