@@ -77,7 +77,8 @@ describe("a child's day", () => {
     });
   });
 
-  // familyfi's unblock ends a pause (docs/group-states.md): a yes is never "30 minutes, then paused again".
+  // familyfi's unblock ends a pause (docs/group-states.md): a yes to an ask with no length is never
+  // "30 minutes, then paused again"; a yes for a length gives a break (below).
   it("ends the pause on a yes", () => {
     const story = tellDay(
       {
@@ -749,13 +750,14 @@ describe("a child's day on the household's clock", () => {
     const waiting = meDaySubject(groupDayOf(asked, [video], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
     const told = tellDay(waiting.subject, waiting.now, THING_VOICE, waiting.clock);
     expect(told.items[0]?.status?.text).toBe("You asked for 2 hours at 10:25 PM. Waiting for an answer.");
-    // A yes: Video paused for TV until 11:30 PM. Allowed until then, then Video again.
+    // A yes: Video paused for TV until 11:30 PM. Allowed until then, then blocked again, as the Thing says it.
     const yes = { ...asked.ask, state: "yes" as const, answeredAt: "2026-11-17T03:30:00Z", by: { name: "Nick" } };
     const lifted = { ...video, groupPauses: [{ groupId: "t1", pause: { active: true, until: "2026-11-17T04:30:00Z", kind: "pause", by: { name: "Nick" } } }] } as unknown as Rule;
     const day = meDaySubject(groupDayOf({ ...tv, ask: yes } as never, [lifted], ZONE, MONDAY_NIGHT), MONDAY_NIGHT);
     const story = tellDay(day.subject, day.now, THING_VOICE, day.clock);
     expect(story.items[0]).toMatchObject({ title: "Allowed until 11:30 PM", detail: "Nick said yes" });
-    expect(story.items[1]).toMatchObject({ time: "11:30 PM", title: "Video again" });
+    expect(story.items[1]).toMatchObject({ time: "11:30 PM", title: "Blocked again", detail: "For the rest of today" });
+    expect(topAnswer(story).sentence).toBe("Nick said yes. Blocked again at 11:30 PM.");
     expect(thingTile(story)).toEqual({ word: "Allowed", line: "Until 11:30 PM", tone: "on" });
   });
 

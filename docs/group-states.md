@@ -205,7 +205,8 @@ Answer opens the answer sheet
 During a pause's break the group reads not paused, with `suspension.resumesAt`, and its allowance
 is active until then: the badge says Unblocked and the line "Unblocked until 11:00 PM by Nick, then
 blocked again", and the button is **Resume**, which ends the unblock (`/unblock/end`) and so the
-break: the pause blocks again at once. A parent's own Unblock never gives a break; it ends the pause.
+break: the pause blocks again at once. A break offers no **More time** (2026-11-22): its length is the
+one the person asked for, and the person asks again for more. A parent's own Unblock never gives a break; it ends the pause.
 
 A time past the window's end stops at the end, as the server caps it. **Not now** is the ask's
 `decline`, with when the child can ask again (the household's `askWaitMinutes`). An answer takes

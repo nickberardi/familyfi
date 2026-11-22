@@ -89,7 +89,7 @@ export type DaySubject = {
   ask?: DayAsk;
   /** Rules that block all internet all the time (an always-on internet rule); `allowed` while a parent lifted one until a time. */
   /** `to`: when it stops blocking again today, for a pause's break; absent: the rest of today. */
-  /** `pause` marks a pause's break, `open` when that pause has no end (a yes to the child's ask for a length): told in the voice's own words, blocked again until `to`. */
+  /** `pause` marks a pause's break or a Thing's lifted Block button rule, `open` when that pause has no end (a yes to the child's ask for a length): told in the voice's own words, blocked again until `to`. */
   always?: { label: string; allowed?: { by?: string; until: Clock }; source?: string; to?: Clock; pause?: true; open?: true }[];
   /** How many minutes before a window starts the child can ask (the household's `askAheadMinutes`); 0 is never. */
   askAhead?: number;
@@ -465,13 +465,13 @@ export function meDaySubject(me: GroupDay, now: Date): { subject: DaySubject; no
         ...(me.pause.until ? { to: minutesOf(me.pause.until) } : { to: 1440, open: true }),
       }
     : undefined;
-  // A Thing's Block button rule lifted until a time is told as an always-on rule is: allowed until
-  // then, and blocked again after. While it blocks, it is the Thing's block (`pause`).
+  // A Thing's Block button rule lifted until a time is told as the Thing's block is: allowed until
+  // then, and "Blocked again" after, in the voice's word, never by the rule's name.
   const always: NonNullable<DaySubject["always"]> = me.alwaysOn
     .filter((rule) => rule.kind === "internet" || (rule.button && rule.allowed))
     .map((rule) => ({
       label: rule.name,
-      ...(rule.kind === "internet" ? {} : { source: "Blocked" }),
+      ...(rule.kind === "internet" ? {} : { source: "Blocked", pause: true as const }),
       ...(rule.allowed ? { allowed: { ...(rule.allowed.by ? { by: rule.allowed.by } : {}), until: minutesOf(rule.allowed.until) } } : {}),
     }))
     // Lifted for the rest of today: nothing to tell today.
