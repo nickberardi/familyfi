@@ -36356,6 +36356,89 @@
     },
     {
       "fn": "familyTimeline",
+      "name": "a reading from a pause's break, planned after the break, blocks again",
+      "input": {
+        "groups": [
+          {
+            "id": "g-abby",
+            "kind": "family",
+            "name": "Abby",
+            "monogram": "A",
+            "familyRole": null,
+            "deviceCount": 2,
+            "suspension": {
+              "active": false,
+              "until": "2026-11-22T17:00:00.000Z",
+              "by": {
+                "accountId": "acc-nick",
+                "name": "Nick"
+              },
+              "resumesAt": "2026-11-22T15:15:00.000Z"
+            },
+            "allowance": {
+              "active": true,
+              "until": "2026-11-22T15:15:00.000Z",
+              "by": {
+                "accountId": "acc-nick",
+                "name": "Nick"
+              }
+            },
+            "internetRuleIds": [],
+            "access": "available",
+            "dohOverrideUrl": null
+          }
+        ],
+        "rules": [],
+        "timeZone": "America/New_York",
+        "now": "2026-11-22T15:30:00.000Z",
+        "hours": 6
+      },
+      "expected": [
+        {
+          "from": "2026-11-22T15:30:00.000Z",
+          "now": [
+            {
+              "name": "Block",
+              "pause": true,
+              "who": "Abby",
+              "groupIds": [
+                "g-abby"
+              ],
+              "at": "2026-11-22T17:00:00.000Z"
+            }
+          ],
+          "next": {
+            "name": "Block",
+            "pause": true,
+            "who": "Abby",
+            "groupIds": [
+              "g-abby"
+            ],
+            "at": "2026-11-22T17:00:00.000Z",
+            "kind": "end"
+          },
+          "unknown": false,
+          "title": "Block",
+          "who": "Abby",
+          "line": "Ends at 12:00 PM",
+          "short": "Block ends for Abby in",
+          "privateShort": "Block ends in"
+        },
+        {
+          "from": "2026-11-22T17:00:00.000Z",
+          "now": [],
+          "next": null,
+          "unknown": false,
+          "title": "Nothing planned",
+          "who": "",
+          "line": "",
+          "short": "Nothing planned",
+          "privateShort": "Nothing planned"
+        }
+      ]
+    },
+    {
+      "fn": "familyTimeline",
       "name": "a weekly window days away is still what comes next",
       "input": {
         "groups": [

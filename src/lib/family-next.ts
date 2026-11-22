@@ -82,7 +82,8 @@ type GroupBlock = { group: Pick<Group, "id" | "name">; block: HeadsUpBlock };
  * end. When any group has scheduled windows, the last entry says the watch is not up to date rather
  * than "Nothing planned", since they go on past the plan.
  */
-export function familyTimeline(groups: Group[], rules: Rule[], timeZone: string, now: Date, hours: number = FAMILY_NEXT_HOURS): FamilyEntry[] {
+export function familyTimeline(read: Group[], rules: Rule[], timeZone: string, now: Date, hours: number = FAMILY_NEXT_HOURS): FamilyEntry[] {
+  const groups = read.map((group) => afterBreak(group, now));
   const horizon = now.getTime() + hours * 3_600_000;
   const blocks: GroupBlock[] = groups.flatMap((group) =>
     // Planned at least two days past what it shows, and as far as FamilyFi Me's heads-up, so the last
@@ -99,6 +100,17 @@ export function familyTimeline(groups: Group[], rules: Rule[], timeZone: string,
   const entries = [now.getTime(), ...shown].map((at) => entryAt(blocks, at, changes.find((change) => change > at) ?? null, timeZone));
   if (recurs) entries.push(unknownEntry(horizon, blocks));
   return entries;
+}
+
+/**
+ * A reading taken during a pause's break and planned after the break ran out (the watch kept it
+ * while it could not read FamilyFi): the pause blocks again until its own end, as FamilyFi does.
+ */
+function afterBreak(group: Group, now: Date): Group {
+  const { active, until, resumesAt } = group.suspension;
+  if (active || !resumesAt || Date.parse(resumesAt) > now.getTime()) return group;
+  if (until !== null && Date.parse(until) <= now.getTime()) return group;
+  return { ...group, suspension: { active: true, until, by: group.suspension.by } };
 }
 
 /** The household's midnights after `now`, for `hours` and a day more. */
