@@ -118,7 +118,7 @@ With `FAMILYFI_MODE=dev` (never in production), Settings Test/Save talk to the i
 
 ## Remote access with a sidecar container
 
-The easiest remote access is built in: **System → Pair Device → Remote access** (a quick tunnel, or
+The easiest remote access is built in: **Pairing → Pair Device → Remote access** (a quick tunnel, or
 FamilyFi's Cloudflare tunnel on your own domain). Use a sidecar instead when you already run
 Tailscale, or want a VPN or reverse proxy in front of FamilyFi. Set it up with the wiki guide, then
 choose **Tailscale** or **My domain** and enter its HTTPS address:
