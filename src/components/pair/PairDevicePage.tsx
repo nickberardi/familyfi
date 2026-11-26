@@ -20,7 +20,7 @@ const CARD = "overflow-hidden rounded-[12px] border border-[var(--ff-hairline-ca
 const TITLE = PAIR_COPY.title;
 const SUB = PAIR_COPY.sub;
 
-/** System → Pair Device. `stores` comes from the server, which knows the release track it runs. */
+/** Pairing → Pair Device. `stores` comes from the server, which knows the release track it runs. */
 export function PairDevicePage({ stores }: { stores: readonly AppStore[] }) {
   const { tunnel, setTunnel, routes, phones, remote, forbidden, error, load, run, published, canPair, pairedThrough } = usePairDevice(request);
   const [pairing, setPairing] = useState(false);
