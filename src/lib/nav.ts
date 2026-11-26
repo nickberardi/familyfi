@@ -27,7 +27,8 @@ export const NAV_FOOTER_COPY = {
 
 /**
  * Every destination, in the groups the web's navigation lists them. The native app shows the ones
- * that are not its tabs under More, in the same groups.
+ * that are not its tabs under More, in the same groups, with a group of its own for the device's
+ * own pages (Alerts, Watch, Connection…) between Pairing and System.
  */
 export const NAV: readonly NavGroup[] = [
   {

@@ -176,7 +176,7 @@ a device revoking itself when it unpairs (`DELETE /paired/devices/{its id}`), wh
 route that last answered: a second arrival is refused (401, or 404) and changes nothing, and a
 phone unpaired away from home would otherwise stop at its home route and stay paired.
 
-Administrators do all of this from **System → Pair Device** in the web app. Administrator reads need only the session; writes also need the CSRF header.
+Administrators do all of this from **Pairing → Pair Device** in the web app. Administrator reads need only the session; writes also need the CSRF header.
 
 ### Phone alerts
 
@@ -275,7 +275,7 @@ becomes required once they are not.
 The iPhone invites and claims its reachable Watch in one call (`POST /paired/invites?claim=true`),
 without an administrator: the Watch makes no network call to join, the phone hands it its bearer,
 refresh token and manifest, and the phone is recorded as its parent. The Watch acts as the phone's
-account, appears as a separate device in System → Pair Device, and can be revoked there, by itself
+account, appears as a separate device in Pairing → Pair Device, and can be revoked there, by itself
 or by its phone. Its scope is `app:rulesOnly`: its sessions may only read session,
 connection, group, rule and change state, pause, resume, extend and allow any group, and pause,
 resume, extend, allow, disallow, turn on and turn off any rule, or lift one for a single group; role never limits a control. They cannot
@@ -375,7 +375,7 @@ They never use the app's own tokens: two holders of one rotating refresh token e
 (403 `refresh_reused`). The app instead sets up a second sign-in for them with the same call
 (`clientType: app-controls` and a `clientId` the app makes once and keeps), and stores the
 answer where its native code reads it. That is its own paired device, `app:rulesOnly`, with the
-Watch's list and the app as its parent, listed in System → Pair Device in its platform's words ("Siri and Shortcuts on" an
+Watch's list and the app as its parent, listed in Pairing → Pair Device in its platform's words ("Siri and Shortcuts on" an
 iPhone, "Quick Settings and shortcuts on" an Android phone). Setting it up again with the same `clientId` replaces the earlier record, so an app has
 one. It works over remote access as a Watch does, and revoking or removing the app revokes it. Only
 an `app:full` device administers, sets up a Watch or this sign-in, or is re-paired: the server asks
@@ -383,7 +383,7 @@ for the pair, never the client alone (`isFullApp` in `src/server/device-scope.ts
 
 ### Agents
 
-An administrator connects an AI agent with **Connect an agent** on **System → Pair Device** (`/pair`): name it, choose a
+An administrator connects an AI agent with **Connect an agent** on **Pairing → Pair Device** (`/pair`): name it, choose a
 scope (**Full access** or **Read only**), and copy the prompt shown. The prompt points the agent at `/agents.md`, a guide served
 without a session from [`openapi/agent-guide.md`](../openapi/agent-guide.md) with this server's
 address filled in, and carries an agent pairing code. That code is single-use, expires in fifteen
