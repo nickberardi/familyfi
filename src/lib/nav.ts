@@ -12,6 +12,19 @@ export type NavItem = {
 };
 export type NavGroup = { title: string; items: readonly NavItem[] };
 
+/** FamilyFi's source, where the navigation's footer stars the project and reports an issue. */
+export const SOURCE_URL = "https://github.com/nickberardi/familyfi";
+
+/**
+ * The line at the foot of the navigation, on the web's rail and the app's More and sidebar: the
+ * version, then links to star the project and to report an issue on GitHub.
+ */
+export const NAV_FOOTER_COPY = {
+  star: "Star us",
+  report: "Report issue",
+  reportUrl: `${SOURCE_URL}/issues/new`,
+} as const;
+
 /**
  * Every destination, in the groups the web's navigation lists them. The native app shows the ones
  * that are not its tabs under More, in the same groups.
@@ -34,11 +47,16 @@ export const NAV: readonly NavGroup[] = [
     ],
   },
   {
+    title: "Pairing",
+    items: [
+      { href: "/pair", label: "Pair Device", icon: "qr-code" },
+      { href: "/pair-me", label: "Pair FamilyFi Me", icon: "user-plus" },
+    ],
+  },
+  {
     title: "System",
     items: [
       { href: "/sync", label: "Sync", icon: "arrows-clockwise" },
-      { href: "/pair", label: "Pair Device", icon: "qr-code" },
-      { href: "/pair-me", label: "Pair FamilyFi Me", icon: "user-plus" },
       { href: "/settings", label: "Settings", icon: "gear" },
       { href: "/diagnostics", label: "Diagnostics", icon: "gauge" },
       { href: "/reference", label: "API", icon: "code", webOnly: true },

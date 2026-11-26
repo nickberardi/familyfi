@@ -4,12 +4,12 @@ import { Toast } from "@/ui/Toast";
 import { Suspense, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { AboutSheet, SOURCE_URL } from "@/components/AboutSheet";
+import { AboutSheet } from "@/components/AboutSheet";
 import { DeviceDetailModal } from "@/components/DeviceDetailModal";
 import { Icon } from "@/components/ui/Icon";
 import { Shield, Tagline, Wordmark } from "@/components/ui/Logo";
 import { api, request } from "@/lib/api";
-import { NAV, navBadge, navBadgeTone, navCounts, navGroupBadge } from "@/lib/nav";
+import { NAV, NAV_FOOTER_COPY, SOURCE_URL, navBadge, navBadgeTone, navCounts, navGroupBadge } from "@/lib/nav";
 import { reconcileNow } from "@/lib/sync-writes";
 import { AccountCard } from "@/ui/StatusCards";
 import { SidebarStatus } from "@/components/SidebarStatus";
@@ -237,11 +237,11 @@ function SidebarFooter({ onAbout }: { onAbout: () => void }) {
       <span aria-hidden="true">·</span>
       <a href={SOURCE_URL} target="_blank" rel="noreferrer" className={`flex items-center gap-1 ${link}`}>
         <Icon name="github-logo" size={12} />
-        Star us
+        {NAV_FOOTER_COPY.star}
       </a>
       <span aria-hidden="true">·</span>
-      <a href={`${SOURCE_URL}/issues/new`} target="_blank" rel="noreferrer" className={link}>
-        Report issue
+      <a href={NAV_FOOTER_COPY.reportUrl} target="_blank" rel="noreferrer" className={link}>
+        {NAV_FOOTER_COPY.report}
       </a>
     </div>
   );

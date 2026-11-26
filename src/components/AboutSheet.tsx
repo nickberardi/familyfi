@@ -5,9 +5,8 @@ import { Modal } from "@/components/ui/Modal";
 import { Icon } from "@/components/ui/Icon";
 import { Segmented } from "@/components/ui/Segmented";
 import { PRIMARY_BUTTON } from "@/components/pair/SheetFrame";
+import { SOURCE_URL } from "@/lib/nav";
 import { appVersionLabel } from "@/lib/version";
-
-export const SOURCE_URL = "https://github.com/nickberardi/familyfi";
 
 type AboutTab = "about" | "start";
 

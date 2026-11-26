@@ -25,6 +25,7 @@ test("reaches every destination the desktop sidebar has, not just the old bottom
   const drawer = page.getByRole("dialog", { name: "Navigation" });
   await expect(drawer.getByText("Household", { exact: true })).toBeVisible();
   await expect(drawer.getByText("Network", { exact: true })).toBeVisible();
+  await expect(drawer.getByText("Pairing", { exact: true })).toBeVisible();
   await expect(drawer.getByText("System", { exact: true })).toBeVisible();
   // Rules, Categories, Sync and API had no way onto a phone screen before this drawer.
   for (const label of ["Rules", "Categories", "Sync", "API"]) {
